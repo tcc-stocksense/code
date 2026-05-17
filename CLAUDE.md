@@ -366,6 +366,7 @@ O sistema aceita dados em planilhas `.xlsx`. Há 6 planilhas possíveis:
 - Sempre use inglês para nomes de variáveis, funções, classes e tabelas
 - Use português apenas em comentários de negócio e mensagens de log
 - Todos os commits devem ter mensagem em português descrevendo o que foi feito
+- Nunca adicionar linha `Co-Authored-By` nas mensagens de commit
 - Nunca commite credenciais, API keys ou senhas — use variáveis de ambiente
 
 ### Python (AI/ML Service)

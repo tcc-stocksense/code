@@ -36,7 +36,7 @@ class Produto(
     var nivelServicoAlvo: BigDecimal = BigDecimal("0.95"),
 
     // campos calculados pelo motor preditivo — nunca recebidos via planilha
-    @Column(name = "classe_abc", length = 1)
+    @Column(name = "classe_abc", columnDefinition = "CHAR(1)")
     var classeAbc: String? = null,
 
     @Column(name = "desvio_padrao_demanda", precision = 10, scale = 4)

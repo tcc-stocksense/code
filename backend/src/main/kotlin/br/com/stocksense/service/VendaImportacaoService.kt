@@ -376,6 +376,21 @@ class VendaImportacaoService(
         }
     }
 
+    private fun validateFile(file: MultipartFile) {
+        val filename = file.originalFilename?.trim() ?: ""
+        if (!filename.lowercase().endsWith(".xlsx")) {
+            throw ImportacaoException(
+                "Apenas arquivos .xlsx são aceitos. Arquivo recebido: '${filename.ifBlank { "(sem nome)" }}'.",
+            )
+        }
+        val contentType = file.contentType?.lowercase()?.trim() ?: ""
+        if (contentType.isNotBlank() && contentType !in XLSX_CONTENT_TYPES) {
+            throw ImportacaoException(
+                "Tipo de arquivo inválido: '$contentType'. Envie um arquivo .xlsx.",
+            )
+        }
+    }
+
     private fun buildColumnMap(headerRow: Row): Map<String, Int> {
         val map = mutableMapOf<String, Int>()
         for (cellIndex in 0 until headerRow.lastCellNum) {

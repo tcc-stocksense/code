@@ -198,7 +198,12 @@ def _gerar_previsao(serie: pd.Series, usar_sazonalidade: bool) -> pd.Series:
     """
     modelo_ajustado = _ajustar_modelo(serie, usar_sazonalidade)
     previsao = modelo_ajustado.forecast(_FORECAST_HORIZON)
+    datas_futuras = pd.date_range(
+        start=serie.index[-1] + pd.Timedelta(days=1),
+        periods=_FORECAST_HORIZON,
+        freq="D",
+    )
     return pd.Series(
         np.maximum(np.array(previsao), 0.0),
-        index=previsao.index,
+        index=datas_futuras,
     )

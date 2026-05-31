@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: mysql:8.0
@@ -10,7 +8,7 @@ services:
       MYSQL_USER: ${DB_USERNAME:-appuser}
       MYSQL_PASSWORD: ${DB_PASSWORD:-apppassword}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:

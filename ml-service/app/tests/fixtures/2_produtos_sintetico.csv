@@ -1,0 +1,11 @@
+produto_id,nome,categoria,unidade_medida,preco_custo,preco_venda,estoque_atual,nivel_servico_alvo
+1,Arroz 5kg,Grãos,un,18.79,28.9,45,0.95
+2,Feijão Carioca 1kg,Grãos,un,5.53,8.5,30,0.95
+3,Leite Integral 1L,Laticínios,un,3.24,4.99,60,0.95
+4,Pão Francês,Padaria,un,0.49,0.75,80,0.95
+5,Banana Prata kg,Frutas,kg,3.84,5.9,40,0.95
+6,Sal Refinado 1kg,Condimentos,un,1.62,2.5,20,0.95
+7,Açúcar Cristal 1kg,Condimentos,un,2.73,4.2,25,0.95
+8,Óleo de Soja 900ml,Óleos,un,5.07,7.8,22,0.95
+9,Frango Inteiro kg,Carnes,kg,8.38,12.9,35,0.95
+10,Refrigerante 2L,Bebidas,un,6.17,9.5,42,0.95

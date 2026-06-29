@@ -5,16 +5,39 @@
 
 ## 1. Responsabilidade do Serviço
 
-O ml-service é o **cérebro preditivo** do StockSense. Ele não gerencia usuários, não faz autenticação, não conhece o frontend. Sua única responsabilidade é:
+O ml-service é o **cérebro preditivo** do StockSense. Ele não gerencia usuários, não faz autenticação, não conhece o frontend e **não acessa banco de dados** (é stateless). Sua única responsabilidade é:
 
 1. Receber um histórico de vendas por produto
 2. Treinar e comparar dois modelos de séries temporais (Holt-Winters e Prophet)
 3. Selecionar o modelo de melhor desempenho por produto
-4. Calcular KPIs de estoque: estoque de segurança, ponto de reposição, dias até ruptura, classificação ABC
+4. Calcular KPIs de estoque: estoque de segurança, ponto de reposição, dias até ruptura
 5. Retornar tudo via JSON para o backend (Spring Boot)
+
+> **Mudança de escopo:** a **Classificação ABC saiu deste serviço** e passou para o backend (`AbcService`). Motivo: ABC é um ranking *relativo entre todos os produtos* (corte por faturamento acumulado), e o `/predict` opera **por produto** — não enxerga o catálogo nem recebe `valor_venda`, então não tem como calcular a posição relativa. O backend tem todos os produtos e o `valor_venda` no MySQL. Ver CLAUDE.md do backend.
 
 **Este serviço é síncrono.** O backend chama, o Python processa e responde na mesma requisição.
 Timeout máximo esperado pelo backend (Feign Client): **30 segundos**.
+
+---
+
+## Prioridade MVP — mapa de entregáveis
+
+Guia de "por onde começar". Status: **MVP** (núcleo da entrega) · **MVP-opcional** (funciona sem, agrega precisão/qualidade) · **Pós-MVP** · **Movido** (saiu deste serviço).
+
+| Entregável | Arquivo / Onde | Prioridade |
+|---|---|---|
+| Endpoint `POST /predict` | `routers/predict_router.py` | **MVP** |
+| Endpoint `GET /health` | `routers/health_router.py` | **MVP** |
+| Holt-Winters | `services/holt_winters_service.py` | **MVP** |
+| Prophet | `services/prophet_service.py` | **MVP** |
+| Métricas MAPE/RMSE/MAE (walk-forward) | `services/prediction_service.py` | **MVP** |
+| Seleção do melhor modelo (menor MAPE) | `services/prediction_service.py` | **MVP** |
+| Estoque de segurança / ponto de reposição / dias até ruptura | `services/stock_service.py` | **MVP** |
+| Tratamento de erros (§9) | routers/services | **MVP** |
+| Regressor `is_promocional` no Prophet | `services/prophet_service.py` | **MVP-opcional** |
+| Campo `aviso` (MAPE > 50%) na resposta | `models/predict_response.py` | **MVP-opcional** |
+| Classificação ABC | — | **Movido p/ backend** |
+| Versionamento de modelo / monitoramento de drift | — | **Pós-MVP** |
 
 ---
 
@@ -31,6 +54,7 @@ Timeout máximo esperado pelo backend (Feign Client): **30 segundos**.
 | statsmodels | 0.14+ | Implementação do Holt-Winters (ExponentialSmoothing) |
 | prophet | 1.1+ | Implementação do Prophet (Meta) |
 | scikit-learn | 1.4+ | Métricas de avaliação (MAE, RMSE) e utilitários |
+| scipy | 1.11+ | Z-score do nível de serviço (`scipy.stats.norm.ppf`) |
 | pytest | 8.0+ | Testes unitários e de integração |
 | pytest-asyncio | 0.23+ | Suporte a testes assíncronos FastAPI |
 | httpx | 0.27+ | Cliente HTTP para testes de endpoints |
@@ -46,11 +70,14 @@ numpy>=1.26.0
 statsmodels>=0.14.0
 prophet>=1.1.0
 scikit-learn>=1.4.0
+scipy>=1.11.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 httpx>=0.27.0
 python-dotenv>=1.0.0
 ```
+
+> `scipy` foi explicitado: o `stock_service.py` usa `scipy.stats.norm.ppf` para converter nível de serviço em Z-score (§7).
 
 ---
 
@@ -76,7 +103,6 @@ ml-service/
     │   ├── prediction_service.py    ← orquestra os modelos e seleciona o melhor
     │   ├── holt_winters_service.py  ← implementação isolada do Holt-Winters
     │   ├── prophet_service.py       ← implementação isolada do Prophet
-    │   ├── abc_service.py           ← cálculo da Classificação ABC
     │   └── stock_service.py         ← cálculo de estoque de segurança, ponto de reposição, dias até ruptura
     │
     ├── models/
@@ -89,9 +115,10 @@ ml-service/
         ├── test_predict_router.py
         ├── test_holt_winters_service.py
         ├── test_prophet_service.py
-        ├── test_stock_service.py
-        └── test_abc_service.py
+        └── test_stock_service.py
 ```
+
+> **Removidos** em relação à versão anterior: `abc_service.py` e `test_abc_service.py` (ABC migrou para o backend).
 
 **Regra:** cada arquivo tem uma única responsabilidade. Nunca misture lógica de modelo com lógica de rota.
 
@@ -136,14 +163,17 @@ class PrevisaoDiaria(BaseModel):
 
 class PredictResponse(BaseModel):
     produto_id: int
-    modelo_selecionado: str           # "holt_winters" ou "prophet"
-    previsoes: list[PrevisaoDiaria]   # próximos 30 dias
-    metricas: dict[str, MetricasModelo]  # comparativo dos dois modelos
+    modelo_selecionado: str               # "holt_winters" ou "prophet"
+    previsoes: list[PrevisaoDiaria]       # próximos 30 dias
+    metricas: dict[str, MetricasModelo]   # comparativo dos dois modelos (alimenta a Tela 10)
     ponto_reposicao: float
     estoque_seguranca: float
-    dias_ate_ruptura: float
-    classe_abc: str                   # "A", "B" ou "C"
+    dias_ate_ruptura: float | None        # null quando demanda média = 0 (ver §7 e §9)
+    aviso: str | None = None              # preenchido quando MAPE > 50% (ver §9) — MVP-opcional
 ```
+
+> **Removido:** o campo `classe_abc` (ABC migrou para o backend).
+> **Correções:** `dias_ate_ruptura` agora é `float | None` — `float("inf")` não é JSON válido e quebraria a serialização. O campo `aviso` foi adicionado para alinhar o schema ao comportamento descrito no §9.
 
 ---
 
@@ -172,11 +202,10 @@ PredictRequest
 6. Calcular: estoque de segurança, ponto de reposição, dias até ruptura
       │
       ▼
-7. Calcular classe ABC (requer faturamento — usar quantidade se valor_venda ausente)
-      │
-      ▼
 PredictResponse
 ```
+
+> **Removido** o antigo passo de cálculo da classe ABC (migrou para o backend). O `/predict` não recebe `valor_venda` nem conhece os demais produtos, então não tem insumo para ABC.
 
 ### Regra de isolamento dos services
 
@@ -286,35 +315,25 @@ def calcular_ponto_reposicao(
 def calcular_dias_ate_ruptura(
     estoque_atual: int,
     demanda_media_diaria: float
-) -> float:
-    """Quantos dias o estoque atual aguenta antes de atingir zero"""
+) -> float | None:
+    """
+    Quantos dias o estoque atual aguenta antes de atingir zero.
+    Retorna None quando a demanda média é zero (JSON não aceita infinito).
+    """
     if demanda_media_diaria <= 0:
-        return float("inf")
+        return None
     return estoque_atual / demanda_media_diaria
 ```
 
+> **Correção:** `calcular_dias_ate_ruptura` retornava `float("inf")` — inválido em JSON. Agora retorna `None`, coerente com `dias_ate_ruptura: float | None` no response e com o §9.
+
 ---
 
-## 8. Classificação ABC (`abc_service.py`)
+## 8. Classificação ABC — MOVIDA PARA O BACKEND
 
-```python
-def classificar_abc(faturamento_total: float, faturamento_acumulado_percentual: float) -> str:
-    """
-    Classificação por representatividade no faturamento:
-    A = top 80% do faturamento acumulado
-    B = de 80% a 95%
-    C = de 95% a 100%
-    
-    Nota: no MVP, se valor_venda não estiver disponível,
-    usar quantidade vendida como proxy do faturamento.
-    Documentar essa limitação na resposta.
-    """
-    if faturamento_acumulado_percentual <= 80:
-        return "A"
-    elif faturamento_acumulado_percentual <= 95:
-        return "B"
-    return "C"
-```
+Esta seção foi **removida deste serviço**. A classificação ABC é um cálculo *relativo entre todos os produtos* (ordenação por faturamento e corte em 80% / 95% acumulado). O `/predict` é por produto e não recebe `valor_venda`, logo não consegue posicionar o produto no ranking.
+
+A lógica passou para `AbcService` no backend, que tem o catálogo completo e o `valor_venda` em `venda`. Ver CLAUDE.md do backend.
 
 ---
 
@@ -329,9 +348,10 @@ Implemente tratamento explícito para todos os casos abaixo. **Nunca deixar exce
 | Prophet falha (dados insuficientes) | Usar apenas Holt-Winters, registrar no response qual modelo foi descartado |
 | Holt-Winters falha | Usar apenas Prophet, idem |
 | Ambos falham | Retornar HTTP 500 com mensagem descritiva |
-| MAPE > 50% no modelo vencedor | Incluir campo `aviso` no response: "Acurácia baixa — previsões com confiança reduzida" |
+| MAPE > 50% no modelo vencedor | Preencher o campo `aviso` no response: "Acurácia baixa — previsões com confiança reduzida" |
 | `demanda_media_diaria = 0` | `dias_ate_ruptura = null`, não dividir por zero |
-| `valor_venda` ausente na série | Usar `quantidade` como proxy para ABC, incluir campo `abc_proxy: true` no response |
+
+> **Removida** a linha sobre `valor_venda` ausente / `abc_proxy`: não se aplica mais, pois ABC saiu deste serviço.
 
 ---
 
@@ -400,13 +420,14 @@ Sempre incluir `produto_id` nos logs para rastreabilidade.
 
 ### Cobertura mínima obrigatória
 
-| Arquivo | O que testar |
-|---|---|
-| `test_holt_winters_service.py` | Série normal, série com zeros, série curta (< 14 dias) |
-| `test_prophet_service.py` | Série normal, série sem coluna promocional |
-| `test_stock_service.py` | Fórmulas de ES, PR e ruptura com valores conhecidos |
-| `test_abc_service.py` | Classificação A, B e C com percentuais limítrofes |
-| `test_predict_router.py` | POST /predict com payload válido, com < 90 dias, com série inválida |
+| Arquivo | O que testar | Prioridade |
+|---|---|---|
+| `test_holt_winters_service.py` | Série normal, série com zeros, série curta (< 14 dias) | **MVP** |
+| `test_prophet_service.py` | Série normal, série sem coluna promocional | **MVP** |
+| `test_stock_service.py` | Fórmulas de ES, PR e ruptura com valores conhecidos (incluindo demanda = 0 → None) | **MVP** |
+| `test_predict_router.py` | POST /predict com payload válido, com < 90 dias, com série inválida | **MVP** |
+
+> **Removido** `test_abc_service.py` (ABC migrou para o backend — testar lá).
 
 ### Como rodar os testes
 
@@ -475,10 +496,12 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - ❌ Nunca deixar uma exceção sem tratamento subir para o router sem ser capturada
 - ❌ Nunca vazar stack trace Python para o cliente — log interno, mensagem amigável para fora
 - ❌ Nunca aceitar histórico com menos de 90 dias — rejeitar com HTTP 422 e mensagem clara
-- ❌ Nunca dividir por zero no cálculo de dias até ruptura — tratar `demanda_media = 0` explicitamente
+- ❌ Nunca dividir por zero no cálculo de dias até ruptura — tratar `demanda_media = 0` retornando `None`
+- ❌ Nunca retornar `float("inf")` em campo serializado para JSON — usar `None`
 - ❌ Nunca hardcodar parâmetros dos modelos (seasonal_periods, interval_width) fora dos services
 - ❌ Nunca colocar lógica de modelo dentro do router — router só roteia, service processa
 - ❌ Nunca renomear as colunas do Prophet dentro do prediction_service — isso é responsabilidade do prophet_service
+- ❌ Nunca acessar banco de dados a partir deste serviço — ele é stateless; quem persiste é o backend
 - ❌ Nunca commitar arquivo `.env` com valores reais — apenas `.env.example`
 
 ---

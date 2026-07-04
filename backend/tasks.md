@@ -174,66 +174,69 @@
 > Entrega: `POST /api/motor/recalcular` chamando o ml-service, persistindo previsões,
 > métricas e classificação ABC.
 
-- [ ] **T-18 — Entidades `Previsao` + `MetricaModelo` + Repositories** `MVP`
+> **Implementado na branch `feat/motor-abc`** (base: `feat/auth-login-jwt`, pois o
+> Épico 3 depende do Spring Security e da `RecursoNaoEncontradoException` do Épico 1).
+> Todos os testes passando; queries JPQL validadas executando contra o MySQL real.
+
+- [x] **T-18 — Entidades `Previsao` + `MetricaModelo` + Repositories** `MVP`
   `Previsao`: `id` auto, `produtoId`, `dataPrevisao: LocalDate`, `quantidadePrevista?`,
   `modeloUtilizado?`, `executadoEm: LocalDateTime`.
   `MetricaModelo`: `id` auto, `produtoId`, `modelo` (String), `mape?`, `rmse?`, `mae?`,
   `selecionado: Boolean`, `executadoEm`.
   Repositories: `PrevisaoRepository`, `MetricaModeloRepository`.
   _Depende de: T-12_
+  Também adicionado `estabelecimentoId` à entidade `Produto` (a coluna já existia no `V1`),
+  necessário para o filtro por estabelecimento no ABC e no controller.
 
-- [ ] **T-19 — DTOs do contrato Feign** `MVP`
+- [x] **T-19 — DTOs do contrato Feign** `MVP`
   `VendaDiaria(data: LocalDate, quantidade: Int)`.
   `PredictRequest(produtoId, historico, leadTimeMedio, variabilidadeLeadTime, nivelServicoAlvo, estoqueAtual, isPromocional)`.
   `MetricasModelo(mape, rmse, mae)`.
   `PrevisaoDiaria(data, quantidadePrevista)`.
-  `PredictResponse(produtoId, modeloSelecionado, previsoes, metricas: Map<String, MetricasModelo>,
-  pontoReposicao, estoqueSeguranca, diasAteRuptura: BigDecimal?, desvioPadraoDemanda, aviso?)`.
-  ⚠️ `desvioPadraoDemanda` só entra após confirmação de T-05.
+  `PredictResponse(produtoId, modeloSelecionado, previsoes, metricas, pontoReposicao,
+  estoqueSeguranca, diasAteRuptura?, aviso?)`.
   _Depende de: T-01_
+  Mapeamento snake_case via `@JsonNaming` (sem mexer no ObjectMapper global).
+  ⚠️ `desvioPadraoDemanda` **fora do contrato** — o ml-service não o devolve (T-05 pendente).
+  ⚠️ `@JsonIgnoreProperties(ignoreUnknown = true)`: o ml-service ainda devolve `classe_abc`
+  e `abc_proxy` (dívida técnica — deveriam ter saído de lá na ADR #3); o backend os ignora.
 
-- [ ] **T-20 — `MlServiceClient`** `MVP`
+- [x] **T-20 — `MlServiceClient`** `MVP`
   `@FeignClient(name = "ml-service", url = "\${ml.service.url}")`.
   Métodos: `predict(PredictRequest): PredictResponse`, `health(): Map<String, String>`.
-  Adicionar `@EnableFeignClients` na classe principal (`StocksenseApplication`).
-  Timeout já configurado no `application.yml`.
+  `@EnableFeignClients` já estava na classe principal (vem do Épico 1).
   _Depende de: T-19_
 
-- [ ] **T-21 — `MotorService`** `MVP`
-  `montarRequest(produtoId: Int): PredictRequest`: busca vendas em `VendaRepository`,
-  pega lead time de `ProdutoFornecedor` (defaults se sem vínculo), lê `nivelServicoAlvo`
-  e `estoqueAtual` de `Produto`.
-  `@Transactional executarMotor(produtoId: Int)`:
-  1. Chama `MlServiceClient.predict()` → trata `FeignException` → `MotorPreditivoException`
-  2. Salva 30 linhas em `previsao` (mesmo `executadoEm`, `modeloUtilizado = modeloSelecionado`)
-  3. Salva 2 linhas em `metrica_modelo` (flag `selecionado` por modelo)
-  4. Atualiza `produto`: `pontoReposicao`, `estoqueSeguranca`, `desvioPadraoDemanda`,
-     `dataUltimoCalculo = now()`
+- [x] **T-21 — `MotorService`** `MVP`
+  `montarRequest`: **agrega vendas por dia** (`agregarVendasDiarias`, SUM por data) — o
+  ml-service espera série diária; lê `nivelServicoAlvo`/`estoqueAtual` de `Produto`.
+  `@Transactional executarMotor(produtoId)`: chama Feign (→ `MotorPreditivoException` em falha),
+  salva as previsões e as 2 métricas (flag `selecionado`), atualiza `produto` com
+  `pontoReposicao`/`estoqueSeguranca`/`dataUltimoCalculo`.
   _Depende de: T-18, T-19, T-20_
+  ⚠️ Lead time usa os **defaults** (3 / 1.0) — `ProdutoFornecedor` ainda não existe.
+  ⚠️ `desvioPadraoDemanda` não é atualizado (o motor não o devolve — T-05).
 
-- [ ] **T-22 — `AbcService`** `MVP`
-  `recalcularAbc(estabelecimentoId: Int)`:
-  1. `SUM(valor_venda)` por produto (JOIN `venda` + `produto` por `estabelecimento_id`)
-  2. Ordena DESC, calcula % acumulada
-  3. Atribui: A (≤ 80%), B (≤ 95%), C (resto)
-  4. Fallback se `valor_venda` todo nulo: usa `SUM(quantidade)` como proxy — logar aviso
-  5. Atualiza `produto.classe_abc` via repository
+- [x] **T-22 — `AbcService`** `MVP`
+  `recalcularAbc(estabelecimentoId): AbcResultado`. Ranking por faturamento (SUM valor_venda),
+  ordena DESC, % acumulada, atribui A (≤80%) / B (≤95%) / C — com o primeiro produto sempre A
+  (corrige o caso de produto único). Fallback para `quantidade` como proxy quando qualquer
+  produto está sem `valor_venda` (`abcProxy = true`). Atualiza `produto.classe_abc`.
   _Depende de: T-12_
 
-- [ ] **T-23 — `MotorController`** `MVP`
-  `POST /api/motor/recalcular`: executa `MotorService.executarMotor()` para todos os produtos
-  do estabelecimento autenticado, depois chama `AbcService.recalcularAbc()`.
-  Resposta: `{ produtos_processados: Int, executado_em: LocalDateTime }`.
+- [x] **T-23 — `MotorController`** `MVP`
+  `POST /api/motor/recalcular`: pega o estabelecimento do JWT, roda `executarMotor` por produto
+  (cada um em sua transação, via proxy — falha isolada não aborta o lote), depois `recalcularAbc`.
+  Resposta: `{ produtosProcessados, produtosComFalha, produtosClassificadosAbc, abcProxy, executadoEm }`.
   _Depende de: T-04, T-21, T-22_
 
-- [ ] **T-24 — Testes unitários: `MotorService`** `MVP`
-  Cenários: execução bem-sucedida (mock Feign), falha do ml-service → `MotorPreditivoException`,
-  verificar que `previsao` e `metrica_modelo` foram salvos com valores corretos.
+- [x] **T-24 — Testes unitários: `MotorService`** `MVP`
+  Sucesso (persiste previsões/métricas, atualiza produto), falha do ml-service →
+  `MotorPreditivoException`, produto inexistente → `RecursoNaoEncontradoException`.
   _Depende de: T-21_
 
-- [ ] **T-25 — Testes unitários: `AbcService`** `MVP`
-  Cenários: classificação A/B/C com valores limítrofes (80%, 95%),
-  fallback quando `valor_venda` é nulo em todo o histórico.
+- [x] **T-25 — Testes unitários: `AbcService`** `MVP`
+  Limites 80%/95%, produto único → A, fallback por quantidade, sem vendas → 0 classificados.
   _Depende de: T-22_
 
 ---

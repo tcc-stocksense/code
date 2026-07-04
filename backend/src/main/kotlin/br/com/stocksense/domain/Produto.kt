@@ -14,6 +14,9 @@ class Produto(
     @Column(name = "produto_id")
     val produtoId: Int,
 
+    @Column(name = "estabelecimento_id", nullable = false)
+    var estabelecimentoId: Int = 1,
+
     @Column(nullable = false, length = 100)
     var nome: String,
 

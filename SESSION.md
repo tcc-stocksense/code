@@ -9,11 +9,79 @@
 | **Repositório** | Monorepo: `backend/`, `ml-service/`, `frontend/` |
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
-| **Branch de desenvolvimento atual** | `feat/auth-login-jwt` (pushed, PR ainda não aberta) |
+| **Branch de desenvolvimento atual** | `feat/motor-abc` (pushed, PR ainda não aberta) |
+
+> **Ordem de merge das branches abertas:** `main` → `feat/auth-login-jwt` (Épico 1) →
+> `feat/motor-abc` (Épico 3). O Motor depende do Spring Security do Épico 1, então a
+> `feat/auth-login-jwt` **precisa ser mergeada antes** da `feat/motor-abc`.
 
 ---
 
-## Última Sessão — 2026-07-03
+## Última Sessão — 2026-07-04
+
+### O que foi desenvolvido
+
+#### backend (Kotlin/Spring Boot) — branch `feat/motor-abc`
+
+Implementação completa do **Épico 3 — Motor Preditivo + Curva ABC (T-18 a T-25)**.
+Entrega `POST /api/motor/recalcular`, que aciona o ml-service por produto, persiste
+previsões e métricas, atualiza os KPIs de estoque e recalcula a classificação ABC.
+
+| Arquivo | O que foi criado/alterado |
+|---|---|
+| `domain/Previsao.kt`, `domain/MetricaModelo.kt` | **CRIADOS** — mapeiam as tabelas do `V1` |
+| `repository/PrevisaoRepository.kt`, `MetricaModeloRepository.kt` | **CRIADOS** |
+| `domain/Produto.kt` | + campo `estabelecimentoId` (coluna já existia no `V1`) |
+| `repository/ProdutoRepository.kt` | + `findByEstabelecimentoId` |
+| `repository/VendaRepository.kt` | + `agregarVendasDiarias` (SUM por dia) e `agregarFaturamentoPorProduto` (ABC) |
+| `client/dto/PredictRequest.kt`, `PredictResponse.kt` | **CRIADOS** — contrato Feign espelhando o Pydantic; snake_case via `@JsonNaming` |
+| `client/MlServiceClient.kt` | **CRIADO** — `@FeignClient` predict/health |
+| `service/MotorService.kt` | **CRIADO** — agrega vendas por dia, chama o motor, persiste tudo numa transação por produto |
+| `service/AbcService.kt` | **CRIADO** — ranking 80/95%, primeiro produto sempre A, fallback por quantidade |
+| `controller/MotorController.kt` | **CRIADO** — lote com transação isolada por produto |
+| `dto/response/MotorRecalculoResponse.kt` | **CRIADO** |
+| `test/.../MotorServiceTest.kt`, `AbcServiceTest.kt` | **CRIADOS** — 7 testes, todos passando |
+
+**Validação em runtime (não só testes):** o backend subiu contra o MySQL real
+(`ddl-auto: validate` OK para as novas entidades) e as três queries JPQL foram
+exercitadas — inclusive a `agregarVendasDiarias` com `CAST(... AS date)`, via um
+produto seedado (o ABC classificou como `A` e persistiu no banco). O único caminho
+não exercitado é uma chamada **bem-sucedida** ao ml-service (precisa do serviço Python
+no ar + 90 dias de dados) — coberto pelos testes unitários.
+
+#### Divergências código × arquitetura encontradas (registradas)
+
+- O ml-service **ainda devolve `classe_abc` e `abc_proxy`** no `PredictResponse`, apesar
+  da ADR #3 (ABC migrou para o backend). O backend os **ignora**
+  (`@JsonIgnoreProperties`) e calcula ABC no `AbcService`. Dívida técnica do ml-service.
+- O ml-service **não devolve `desvio_padrao_demanda`** (calcula e descarta) — confirma a
+  pendência **T-05**. Fora do contrato Feign por ora; bloqueia só a T-30 (Épico 4).
+- O `_preparar_serie` do ml-service **não agrupa por dia** → o `MotorService` agrega as
+  vendas por data (SUM) antes de enviar.
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| `feat/motor-abc` baseada em `feat/auth-login-jwt`, não em `main` | O Épico 3 usa o Spring Security e a `RecursoNaoEncontradoException` do Épico 1, que ainda não estão na `main` |
+| Adicionar `estabelecimentoId` à entidade `Produto` agora | Pré-requisito real do ABC e do controller (filtro por estabelecimento); a coluna já existia no `V1` |
+| Lead time no default (3 / 1.0) | `ProdutoFornecedor` ainda não existe — comportamento documentado no Guia de Importação |
+| Backend ignora `classe_abc` do motor e calcula ABC próprio | Segue a ADR #3, mesmo com o ml-service ainda devolvendo o campo |
+| Transação por produto (proxy) no lote do controller | Falha de um produto não aborta o recálculo dos demais |
+
+### Status do backend ao final desta sessão
+
+- **Épico 1 (Auth):** completo na `feat/auth-login-jwt` (pushed, PR não aberta).
+- **Épico 2 (Importação):** núcleo pronto na `main`; falta T-17 (testes),
+  `Fornecedor`/`ProdutoFornecedor` (MVP-opcional). O `estabelecimentoId` do `Produto`
+  foi adicionado agora (via Épico 3).
+- **Épico 3 (Motor + ABC):** completo na `feat/motor-abc` (pushed, PR não aberta).
+- **Épicos 4–6 e Pós-MVP:** não iniciados. T-30 (detalhe do produto) bloqueado por T-05.
+- **ml-service e frontend:** sem mudanças nesta sessão.
+
+---
+
+## Sessão — 2026-07-03 (Auth / JWT)
 
 ### O que foi desenvolvido
 
@@ -201,40 +269,40 @@ ml-service/
 | ml-service executado localmente | ⚠️ Parcial | Servidor não foi levantado; testes rodaram via TestClient |
 | Branch `feat/ml-service-motor-preditivo` | ✅ Mergeada | Mergeada na `main` via PR #3 |
 | Código Kotlin no backend | ✅ Em andamento | Épico 2 (Importação) e Épico 1 (Auth) já implementados — ver sessão 2026-07-03 acima |
-| PR de `feat/auth-login-jwt` | ⚠️ Pendente | Branch pushed, falta abrir e mergear a PR |
-| T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ⚠️ Pendente | Bloqueia T-30 (detalhe do produto, Épico 4) |
+| PR de `feat/auth-login-jwt` (Épico 1) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **mergear antes** da motor-abc |
+| PR de `feat/motor-abc` (Épico 3) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **depende da auth-login-jwt** |
+| T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ⚠️ Pendente | Confirmado: o ml-service não devolve. Bloqueia T-30 (detalhe do produto, Épico 4) |
+| ml-service ainda devolve `classe_abc`/`abc_proxy` | ⚠️ Dívida técnica | ABC migrou pro backend (ADR #3); backend ignora, mas o campo deveria sair do ml-service |
 | T-17 — testes unitários de `ImportacaoService` | ❌ Não feito | Fecha o núcleo do Épico 2 |
-| `estabelecimentoId` ausente na entidade `Produto` | ⚠️ Pendente | Coluna existe no schema (`V1`), falta o campo Kotlin |
+| `estabelecimentoId` ausente na entidade `Produto` | ✅ Resolvido | Adicionado na `feat/motor-abc` (Épico 3) |
 | CLAUDE.md do backend desatualizado sobre `/api/importacao` | ⚠️ Pendente | Doc descreve 1 endpoint único; código tem 2 (`/produtos`, `/vendas`) — decisão aceita do time, falta documentar |
-| Fornecedor / ProdutoFornecedor (MVP-opcional) | ❌ Não feito | Sem essas entidades, o lead time do Épico 3 (Motor) vai sempre cair no default |
+| Fornecedor / ProdutoFornecedor (MVP-opcional) | ❌ Não feito | Sem essas entidades, o lead time do Motor cai sempre no default (3 / 1.0) |
 
 ---
 
 ## Próxima Sessão — Fazer nesta ordem
 
-> Atualizado em 2026-07-03: os passos abaixo (backend) têm prioridade sobre o
-> backlog antigo do ml-service, que segue mais abaixo sem alteração.
+> Atualizado em 2026-07-04.
 
-### Passo 1: Fechar o Épico 1 (Auth)
+### Passo 1: Mergear as branches abertas na ordem certa
 
-- Abrir e mergear a PR de `feat/auth-login-jwt` na `main`.
+- Abrir e mergear a PR de `feat/auth-login-jwt` (Épico 1) na `main`.
+- Depois abrir e mergear a PR de `feat/motor-abc` (Épico 3) na `main`.
 
 ### Passo 2: Fechar o Épico 2 (Importação)
 
 - T-17 — testes unitários de `ProdutoImportacaoService` e `VendaImportacaoService`.
-- Adicionar `estabelecimentoId` à entidade `Produto`.
 - Atualizar o `CLAUDE.md` do backend para refletir os 2 endpoints de importação
   (`/api/importacao/produtos`, `/api/importacao/vendas`) em vez do único
   `/api/importacao` descrito hoje.
-- Avaliar se vale implementar `Fornecedor`/`ProdutoFornecedor` agora ou só quando
-  o Épico 3 (Motor) precisar do lead time real.
+- Avaliar se vale implementar `Fornecedor`/`ProdutoFornecedor` agora (habilita o
+  lead time real no Motor, hoje no default).
 
-### Passo 3: Épico 3 — Motor + ABC
+### Passo 3: Épico 4 — Produto (T4 + T6 + T10)
 
-- `MlServiceClient` (Feign), `MotorService` (chama o ml-service, persiste
-  `previsao`/`metrica_modelo`, atualiza `produto`), `AbcService`.
-- Resolver T-05 (campo `desvio_padrao_demanda` no `PredictResponse`) antes de
-  tocar em T-30 (detalhe do produto, Épico 4).
+- `ProdutoService` (listagem, edição de estoque, detalhe), `MetricaService`
+  (comparativo Holt-Winters × Prophet), `ProdutoController`.
+- ⚠️ T-30 (detalhe do produto) depende de resolver **T-05** (`desvio_padrao_demanda`).
 
 ### Backlog antigo do ml-service (ainda não resolvido, sem mudanças nesta sessão)
 

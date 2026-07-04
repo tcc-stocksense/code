@@ -3,6 +3,36 @@
 
 ---
 
+## Como rodar o backend localmente
+
+Pré-requisito: Docker Desktop aberto e rodando, e um `.env` na **raiz do monorepo**
+(não em `backend/`) com `DB_ROOT_PASSWORD`, `DB_USERNAME`, `DB_PASSWORD`.
+
+```bash
+# 1. Sobe só o MySQL (não precisa do ml-service/frontend pra rodar o backend)
+docker-compose up -d db
+
+# 2. Roda o backend com as mesmas credenciais do .env
+cd backend
+DB_URL="jdbc:mysql://localhost:3307/stocksense?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
+DB_USERNAME=<valor do DB_USERNAME no .env> \
+DB_PASSWORD=<valor do DB_PASSWORD no .env> \
+./gradlew bootRun
+```
+
+O Flyway aplica as migrations automaticamente na subida (schema + seed). API em `http://localhost:8080`.
+
+**Se o Flyway falhar com `Migration checksum mismatch`:** o volume do MySQL tem uma
+versão antiga de uma migration já aplicada (schema desatualizado ou trocado
+manualmente). Resolver derrubando o volume e recriando o banco do zero:
+
+```bash
+docker-compose down -v
+docker-compose up -d db
+```
+
+---
+
 ## Prioridade MVP — mapa de entregáveis
 
 Status: **MVP** (núcleo da entrega) · **MVP-opcional** (funciona sem, agrega valor) · **Pós-MVP** · **Movido/Novo**.

@@ -8,11 +8,11 @@
 
 ---
 
-## Estado atual
+## Estado atual (auditado em 2026-07-03)
 
 - Migrations prontas: `V1__create_schema.sql` (schema completo) e `V2__seed_dados_padrao.sql` (seed)
 - `application.yml` configurado (DB, Flyway, Feign timeouts, `ML_SERVICE_URL`)
-- **Zero código Kotlin implementado** — todas as tasks abaixo estão pendentes
+- **Épico 2 (Importação) já tem núcleo funcional**
 
 ---
 
@@ -21,27 +21,31 @@
 > Infraestrutura transversal. Pré-requisito inevitável para todos os outros épicos.
 > Nenhuma regra de negócio aqui.
 
-- [ ] **T-01 — Estrutura de pacotes** `MVP`
+- [x] **T-01 — Estrutura de pacotes** `MVP`
   Criar os pacotes com `package` declarations:
   `controller`, `service`, `repository`, `domain`, `dto/request`, `dto/response`,
   `client`, `exception`, `config`
   Pacote raiz: `br.com.stocksense`
 
-- [ ] **T-02 — Dependências novas no `build.gradle.kts`** `MVP`
+- [x] **T-02 — Dependências novas no `build.gradle.kts`** `MVP`
   Adicionar:
   - `io.jsonwebtoken:jjwt-api`, `jjwt-impl`, `jjwt-jackson` (0.12+) — JWT
   - `org.springframework.boot:spring-boot-starter-security` — Spring Security
   - `org.springframework.security:spring-security-test` (testes)
   - `org.apache.poi:poi-ooxml:5.3.0` — leitura de `.xlsx`
   _Depende de: T-01_
+  Nota: `jjwt-*` fixado em `0.12.6`; `poi-ooxml` está em `5.2.5` (não `5.3.0`, sem impacto conhecido).
 
-- [ ] **T-03 — `SecurityConfig` temporário** `MVP`
+- [x] **T-03 — `SecurityConfig` temporário** `MVP` *(pulado deliberadamente)*
   Desabilitar CSRF e liberar todos os endpoints (`permitAll`).
   **Objetivo único:** não bloquear o desenvolvimento enquanto o JWT não está implementado.
   Será substituído integralmente na T-09 (Épico 1).
   _Depende de: T-02_
+  Nota: como o Épico 1 foi feito de uma vez, fomos direto para o `SecurityConfig`
+  definitivo (T-09) — não fazia sentido implementar uma versão temporária só para
+  substituí-la minutos depois.
 
-- [ ] **T-04 — Exceptions de domínio + `GlobalExceptionHandler`** `MVP`
+- [x] **T-04 — Exceptions de domínio + `GlobalExceptionHandler`** `MVP`
   Exceptions: `MotorPreditivoException`, `ImportacaoException(erros: List<String>)`,
   `RecursoNaoEncontradoException`.
   `GlobalExceptionHandler` (`@RestControllerAdvice`) com handlers:
@@ -52,6 +56,9 @@
   - `Exception` (fallback) → 500 sem stack trace no body
   Todas as respostas em `ProblemDetail` (RFC 7807).
   _Depende de: T-01_
+  Nota: `ImportacaoException` no código é `(message: String)`, não `(erros: List<String>)`
+  — a lista de erros por linha vai no DTO de resposta (`ErroLinha`), não na exception.
+  `EntityNotFoundException` (jakarta) também tem handler próprio, mantido por compatibilidade.
 
 - [ ] **T-05 — Acordo cross-service: `desvio_padrao_demanda` no ml-service** `MVP`
   ⚠️ **Não é código — é um alinhamento com o time.**
@@ -66,43 +73,48 @@
 
 > Entrega: `POST /api/auth/login` funcionando com JWT.
 
-- [ ] **T-06 — Entidade `Estabelecimento` + `EstabelecimentoRepository`** `MVP`
+- [x] **T-06 — Entidade `Estabelecimento` + `EstabelecimentoRepository`** `MVP`
   Entidade: `id` (auto), `nomeFantasia`, `cnpj`, `endereco`, `email` (unique), `senhaHash`.
   Repository: `JpaRepository<Estabelecimento, Int>` +
   `findByEmail(email: String): Estabelecimento?` (necessário para login).
   _Depende de: T-01_
 
-- [ ] **T-07 — `JwtConfig` + `JwtService`** `MVP`
+- [x] **T-07 — `JwtConfig` + `JwtService`** `MVP`
   `JwtConfig`: bean com `jwt.secret` e `jwt.expiration-ms` via `application.yml` — nunca hardcodar.
   `JwtService`: `gerarToken(estabelecimentoId: Int): String`,
   `validarToken(token: String): Boolean`,
   `extrairEstabelecimentoId(token: String): Int`.
   Subject do token = `estabelecimentoId.toString()`.
   _Depende de: T-02_
+  `JwtConfig` implementado como `@ConfigurationProperties(prefix = "jwt")`, registrado via
+  `@EnableConfigurationProperties(JwtConfig::class)` em `StockSenseApplication`.
 
-- [ ] **T-08 — DTOs de auth + `AuthService`** `MVP`
+- [x] **T-08 — DTOs de auth + `AuthService`** `MVP`
   DTOs: `LoginRequest(email, senha)` com `@field:NotBlank`; `LoginResponse(token, estabelecimentoId, nomeFantasia)`.
   `AuthService.login(email, senha)`: busca por email, valida BCrypt, lança
   `RecursoNaoEncontradoException` para email não encontrado ou senha errada
   (mesma mensagem — não vazar qual falhou). Retorna `LoginResponse` com JWT.
   _Depende de: T-04, T-06, T-07_
 
-- [ ] **T-09 — `JwtAuthFilter` + `SecurityConfig` definitivo** `MVP`
+- [x] **T-09 — `JwtAuthFilter` + `SecurityConfig` definitivo** `MVP`
   `JwtAuthFilter` (`OncePerRequestFilter`): extrai Bearer token, valida via `JwtService`,
   popula `SecurityContextHolder`.
   `SecurityConfig` definitivo: substitui T-03. Libera `POST /api/auth/login`;
   protege todo o resto (`authenticated()`). Adiciona `JwtAuthFilter` antes de
   `UsernamePasswordAuthenticationFilter`.
   _Depende de: T-07_
+  ⚠️ Consequência: `/api/importacao/produtos` e `/api/importacao/vendas` (Épico 2) agora
+  exigem `Authorization: Bearer <token>` — antes estavam completamente abertos.
 
-- [ ] **T-10 — `AuthController`** `MVP`
+- [x] **T-10 — `AuthController`** `MVP`
   `POST /api/auth/login` → chama `AuthService.login()`, retorna `LoginResponse`.
   _Depende de: T-04, T-08, T-09_
 
-- [ ] **T-11 — Testes unitários: `AuthService`** `MVP`
+- [x] **T-11 — Testes unitários: `AuthService`** `MVP`
   Cenários: credenciais válidas, email não encontrado, senha incorreta.
   MockK em `EstabelecimentoRepository` e `BCryptPasswordEncoder`.
   _Depende de: T-08_
+  `AuthServiceTest` com MockK — 3 testes, todos passando (`./gradlew test`).
 
 ---
 

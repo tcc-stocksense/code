@@ -9,11 +9,13 @@
 | **Repositório** | Monorepo: `backend/`, `ml-service/`, `frontend/` |
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
-| **Branch de desenvolvimento atual** | `feat/motor-abc` (pushed, PR ainda não aberta) |
+| **Branches abertas** | `feat/auth-login-jwt`, `feat/motor-abc`, `test/importacao-services` (todas pushed, sem PR) |
 
-> **Ordem de merge das branches abertas:** `main` → `feat/auth-login-jwt` (Épico 1) →
-> `feat/motor-abc` (Épico 3). O Motor depende do Spring Security do Épico 1, então a
-> `feat/auth-login-jwt` **precisa ser mergeada antes** da `feat/motor-abc`.
+> **Ordem de merge das branches abertas:** `feat/auth-login-jwt` (Épico 1) →
+> `feat/motor-abc` (Épico 3) → `test/importacao-services` (Épico 2 testes/doc).
+> O Motor depende do Spring Security do Épico 1, então a `feat/auth-login-jwt`
+> **precisa ser mergeada antes** da `feat/motor-abc`. A `test/importacao-services`
+> é independente (base `main` limpa) e pode ir a qualquer momento.
 
 ---
 
@@ -69,15 +71,36 @@ no ar + 90 dias de dados) — coberto pelos testes unitários.
 | Backend ignora `classe_abc` do motor e calcula ABC próprio | Segue a ADR #3, mesmo com o ml-service ainda devolvendo o campo |
 | Transação por produto (proxy) no lote do controller | Falha de um produto não aborta o recálculo dos demais |
 
+#### Sobras do Épico 2 — branch `test/importacao-services`
+
+Fechamento do núcleo do Épico 2 (Importação), independente da pilha auth/motor
+(o código de importação já estava na `main`):
+
+- **T-17 — testes de importação** (13, todos passando): `ProdutoImportacaoServiceTest` (6)
+  e `VendaImportacaoServiceTest` (7), construindo planilhas `.xlsx` reais em memória com
+  Apache POI + `MockMultipartFile`. Cobrem planilha válida, `produto_id` duplicado, coluna
+  obrigatória ausente, estoque negativo, campo calculado, arquivo não-`.xlsx`, produto
+  inexistente, data inválida, `quantidade ≤ 0`, `valor_venda` com vírgula, histórico < 90 dias.
+- **`backend/CLAUDE.md`** atualizado (§5 + tabela de endpoints) para refletir os **dois
+  endpoints reais** (`/api/importacao/produtos` e `/vendas`). ⚠️ Essa mudança está **só na
+  branch** `test/importacao-services` — a `main` ainda descreve 1 endpoint até o merge.
+- **`tasks.md`**: Épico 2 (T-12 a T-17) marcado conforme o implementado.
+- **Fora do escopo (deliberado):** `Fornecedor`/`ProdutoFornecedor` (MVP-opcional) — habilitaria
+  o lead time real no Motor (hoje no default 3/1.0).
+
 ### Status do backend ao final desta sessão
 
 - **Épico 1 (Auth):** completo na `feat/auth-login-jwt` (pushed, PR não aberta).
-- **Épico 2 (Importação):** núcleo pronto na `main`; falta T-17 (testes),
-  `Fornecedor`/`ProdutoFornecedor` (MVP-opcional). O `estabelecimentoId` do `Produto`
-  foi adicionado agora (via Épico 3).
+- **Épico 2 (Importação):** núcleo + testes (T-17) prontos; testes/doc na branch
+  `test/importacao-services` (pushed, PR não aberta). Falta só `Fornecedor`/`ProdutoFornecedor`
+  (MVP-opcional). `estabelecimentoId` do `Produto` adicionado via Épico 3.
 - **Épico 3 (Motor + ABC):** completo na `feat/motor-abc` (pushed, PR não aberta).
-- **Épicos 4–6 e Pós-MVP:** não iniciados. T-30 (detalhe do produto) bloqueado por T-05.
+- **Épicos 4–6 e Pós-MVP:** não iniciados. T-27 (detalhe do produto) bloqueado por T-05.
 - **ml-service e frontend:** sem mudanças nesta sessão.
+
+**Três branches abertas** (todas pushed, sem PR): `feat/auth-login-jwt`, `feat/motor-abc`
+(depende da auth), `test/importacao-services` (base `main` limpa). Ordem de merge:
+auth → motor → importacao.
 
 ---
 
@@ -271,11 +294,12 @@ ml-service/
 | Código Kotlin no backend | ✅ Em andamento | Épico 2 (Importação) e Épico 1 (Auth) já implementados — ver sessão 2026-07-03 acima |
 | PR de `feat/auth-login-jwt` (Épico 1) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **mergear antes** da motor-abc |
 | PR de `feat/motor-abc` (Épico 3) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **depende da auth-login-jwt** |
-| T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ⚠️ Pendente | Confirmado: o ml-service não devolve. Bloqueia T-30 (detalhe do produto, Épico 4) |
+| PR de `test/importacao-services` (Épico 2 testes/doc) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — independente, base `main` limpa |
+| T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ⚠️ Pendente | Confirmado: o ml-service não devolve. Bloqueia T-27 (detalhe do produto, Épico 4) |
 | ml-service ainda devolve `classe_abc`/`abc_proxy` | ⚠️ Dívida técnica | ABC migrou pro backend (ADR #3); backend ignora, mas o campo deveria sair do ml-service |
-| T-17 — testes unitários de `ImportacaoService` | ❌ Não feito | Fecha o núcleo do Épico 2 |
+| T-17 — testes unitários de importação | ✅ Feito | 13 testes na `test/importacao-services`, todos passando |
 | `estabelecimentoId` ausente na entidade `Produto` | ✅ Resolvido | Adicionado na `feat/motor-abc` (Épico 3) |
-| CLAUDE.md do backend desatualizado sobre `/api/importacao` | ⚠️ Pendente | Doc descreve 1 endpoint único; código tem 2 (`/produtos`, `/vendas`) — decisão aceita do time, falta documentar |
+| CLAUDE.md do backend sobre `/api/importacao` | ✅ Corrigido na branch | Atualizado para 2 endpoints na `test/importacao-services`; chega na `main` no merge |
 | Fornecedor / ProdutoFornecedor (MVP-opcional) | ❌ Não feito | Sem essas entidades, o lead time do Motor cai sempre no default (3 / 1.0) |
 
 ---

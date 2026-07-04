@@ -42,7 +42,8 @@ Status: **MVP** (núcleo da entrega) · **MVP-opcional** (funciona sem, agrega v
 | Método | Rota | Funcionalidade / Tela | Prioridade |
 |---|---|---|---|
 | POST | `/api/auth/login` | Login no estabelecimento (T1) | **MVP** |
-| POST | `/api/importacao` | Ingestão de planilhas `.xlsx` (T3) | **MVP** |
+| POST | `/api/importacao/produtos` | Ingestão da planilha de produtos `.xlsx` (T3) | **MVP** |
+| POST | `/api/importacao/vendas` | Ingestão da planilha de vendas `.xlsx` (T3) | **MVP** |
 | POST | `/api/motor/recalcular` | Dispara o motor para todos os produtos (demo + cron) | **MVP** |
 | GET | `/api/produtos` | Lista de estoque (T4) | **MVP** |
 | PATCH | `/api/produtos/{id}/estoque` | Edição manual de estoque (T4) | **MVP** |
@@ -59,7 +60,7 @@ Status: **MVP** (núcleo da entrega) · **MVP-opcional** (funciona sem, agrega v
 
 | Service | Responsabilidade | Prioridade |
 |---|---|---|
-| `ImportacaoService` | Parsing `.xlsx`, validação de schema, persistência | **MVP** |
+| `ProdutoImportacaoService` / `VendaImportacaoService` | Parsing `.xlsx`, validação de schema, persistência (um service por planilha) | **MVP** |
 | `MotorService` | Aciona ML, persiste `previsao` + `metrica_modelo`, atualiza `produto` | **MVP** |
 | `AbcService` | Classificação ABC (ranking por faturamento) — **veio do ml-service** | **MVP** |
 | `ProdutoService` | CRUD + leitura de estoque | **MVP** |
@@ -362,15 +363,31 @@ O nome `ml-service` em `config:` deve ser idêntico ao `name =` no `@FeignClient
 
 ---
 
-## 5. Importação de Planilhas (`ImportacaoService`) — Tela 3
+## 5. Importação de Planilhas — Tela 3
 
 Núcleo do MVP. Recebe `.xlsx` via multipart, valida pelo **Guia de Importação v2.0** e persiste.
 
-- **Endpoint:** `POST /api/importacao` (multipart). Planilhas **obrigatórias**: `2_produtos`, `5_vendas`. **Desejáveis**: `1_estabelecimento`, `3_fornecedores`, `4_produto_fornecedor`.
+> **Decisão do time:** a importação foi implementada como **dois endpoints separados**
+> (um por planilha obrigatória), não como um único `POST /api/importacao` multipart com
+> vários blocos. Cada um tem seu próprio service e sua própria resposta.
+
+- **Endpoints (campo multipart `arquivo`, um `.xlsx` por chamada):**
+  - `POST /api/importacao/produtos` → `ProdutoImportacaoService` (planilha `2_produtos`).
+  - `POST /api/importacao/vendas` → `VendaImportacaoService` (planilha `5_vendas`).
+  - As planilhas **desejáveis** (`1_estabelecimento`, `3_fornecedores`, `4_produto_fornecedor`)
+    ainda **não têm endpoint** — ficam para quando `Fornecedor`/`ProdutoFornecedor` existirem.
 - **Parsing:** Apache POI (`poi-ooxml`).
-- **Validações (rejeitar com `400` + lista de erros):** `produto_id` único e inteiro; `data` em ISO `YYYY-MM-DD`; `quantidade > 0`; decimais com ponto; todo `produto_id` de vendas existe em produtos; mínimo de 90 dias de histórico.
-- **Defaults quando desejáveis ausentes:** vincular produtos ao **Fornecedor Padrão** (seed `V2`, `fornecedor_id = 1`) → `lead_time_medio = 3`, `variabilidade_lead_time = 1.0` (defaults do schema).
-- **Resposta:** `{ planilha, linhas_processadas, status, erros[] }` por bloco.
+- **Validações por linha (acumuladas em `erros[]`, não param no primeiro):** `produto_id` único e
+  inteiro; `estoque_atual` inteiro ≥ 0; `data_hora` em ISO `YYYY-MM-DD[ HH:MM:SS]`; `quantidade > 0`;
+  decimais com ponto; todo `produto_id` de vendas existe em produtos. Erros de **estrutura**
+  (coluna obrigatória ausente, arquivo não-`.xlsx`) lançam `ImportacaoException` → `400`.
+- **Comportamento do histórico < 90 dias:** vira **aviso** (não erro) — as vendas são importadas
+  mesmo assim, com alerta de acurácia reduzida.
+- **Produtos:** upsert por `produto_id`. **Vendas:** deduplicação por produto no período importado
+  (`deleteByProdutoIdAndDataHoraBetween`) antes de inserir.
+- **Respostas:**
+  - Produtos: `{ totalLinhas, importados, erros: [{ linha, mensagem }] }`.
+  - Vendas: `{ totalLinhas, importados, diasDeHistorico, erros, avisos }`.
 
 > Após uma importação bem-sucedida, o backend deve disparar o `MotorService` (recálculo) para os produtos afetados, ou orientar o gestor a acionar `POST /api/motor/recalcular`.
 

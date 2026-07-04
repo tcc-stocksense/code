@@ -120,52 +120,50 @@
 
 ## Épico 2 — Domínio Importação / T3 `MVP`
 
-> Entrega: `POST /api/importacao` processando `.xlsx` e persistindo no banco.
-> Sem motor ainda — apenas carga de dados.
+> Entrega: ingestão de `.xlsx` processando e persistindo no banco. Sem motor ainda.
+> **Decisão do time:** implementado como **dois endpoints separados**
+> (`POST /api/importacao/produtos` e `POST /api/importacao/vendas`), não um único
+> `POST /api/importacao` multipart. Cada planilha tem seu service e sua resposta.
 
-- [ ] **T-12 — Entidades de importação + Repositories** `MVP` / `MVP-opcional`
-  **MVP:** `Produto` (todos os campos do V1, calculados como `var nullable`),
-  `Venda` (`id` auto, `produtoId`, `dataHora: LocalDateTime`, `quantidade`, `valorVenda?`, `isPromocional`).
-  **MVP-opcional:** `Fornecedor` (PK natural, sem `@GeneratedValue`),
-  `ProdutoFornecedor` (chave composta `@EmbeddedId`, `leadTimeMedio`, `variabilidadeLeadTime`).
-  Repositories: `ProdutoRepository`, `VendaRepository`, `FornecedorRepository`,
-  `ProdutoFornecedorRepository`.
-  FK de `Produto` → `Estabelecimento` (do Épico 1).
+- [x] **T-12 — Entidades de importação + Repositories** `MVP` / `MVP-opcional`
+  **MVP:** `Produto`, `Venda` (+ `ProdutoRepository`, `VendaRepository`) — feitos.
+  **MVP-opcional:** `Fornecedor` / `ProdutoFornecedor` + repositories — **ainda não feitos**
+  (o Motor usa lead time no default enquanto não existirem).
   _Depende de: T-06_
 
-- [ ] **T-13 — DTOs de produto e importação** `MVP`
-  `ProdutoResponse` (todos os campos incluindo calculados nullable).
-  `ProdutoEstoqueRequest(@field:Min(0) estoqueAtual: Int)`.
-  `ImportacaoResponse` (lista de `{ planilha, linhas_processadas, status, erros[] }` por bloco).
-  Campos calculados (`classeAbc`, `pontoReposicao`, etc.) **nunca** aparecem em request.
+- [x] **T-13 — DTOs de importação** `MVP`
+  `ProdutoImportacaoResponse(totalLinhas, importados, erros)`,
+  `VendaImportacaoResponse(totalLinhas, importados, diasDeHistorico, erros, avisos)`,
+  `ErroLinha(linha, mensagem)`.
+  ⚠️ `ProdutoResponse`/`ProdutoEstoqueRequest` (consumo/edição de produto) pertencem ao Épico 4,
+  ainda não criados.
   _Depende de: T-01_
 
-- [ ] **T-14 — `ImportacaoService` — parsing e validação** `MVP`
-  Recebe `MultipartFile` (`.xlsx`). Usa Apache POI para ler:
-  - `2_produtos` (obrigatória): `produto_id` único e inteiro, `nome` e `estoque_atual` presentes
-  - `5_vendas` (obrigatória): `produto_id` existe em produtos, data ISO `YYYY-MM-DD`,
-    `quantidade > 0`, decimais com ponto, mínimo 90 dias de histórico
-  - `1_estabelecimento`, `3_fornecedores`, `4_produto_fornecedor` (desejáveis):
-    processar se presentes; se ausentes, aplicar defaults (`fornecedor_id = 1`,
-    `lead_time_medio = 3`, `variabilidade_lead_time = 1.0`)
-  Acumular todos os erros e lançar `ImportacaoException(erros)` ao final — nunca parar no primeiro.
+- [x] **T-14 — Parsing e validação** `MVP`
+  `ProdutoImportacaoService` e `VendaImportacaoService` com Apache POI. Erros por linha
+  acumulados em `erros[]`; erros de estrutura lançam `ImportacaoException` → `400`.
+  Histórico < 90 dias vira **aviso** (não erro). Planilhas desejáveis ainda sem endpoint.
   _Depende de: T-04, T-12, T-13_
 
-- [ ] **T-15 — `ImportacaoService` — persistência** `MVP`
-  Após validação sem erros: persistir em ordem (produtos antes de vendas por FK).
-  Retornar `ImportacaoResponse` com status por bloco.
+- [x] **T-15 — Persistência** `MVP`
+  Produtos: upsert por `produto_id`. Vendas: deduplicação por produto no período
+  (`deleteByProdutoIdAndDataHoraBetween`) antes de inserir.
   _Depende de: T-14_
 
-- [ ] **T-16 — `ImportacaoController`** `MVP`
-  `POST /api/importacao` (multipart/form-data, campo `file`).
-  Retorna `ImportacaoResponse`. Zero lógica no controller.
+- [x] **T-16 — `ImportacaoController`** `MVP`
+  `POST /api/importacao/produtos` e `POST /api/importacao/vendas` (multipart, campo `arquivo`).
+  Zero lógica no controller.
   _Depende de: T-04, T-15_
 
-- [ ] **T-17 — Testes unitários: `ImportacaoService`** `MVP`
-  Cenários: planilha válida, `produto_id` duplicado, data em formato errado,
-  `quantidade ≤ 0`, histórico com < 90 dias, `produto_id` de venda inexistente em produtos,
-  planilhas desejáveis ausentes (defaults aplicados).
+- [x] **T-17 — Testes unitários de importação** `MVP`
+  `ProdutoImportacaoServiceTest` (6) e `VendaImportacaoServiceTest` (7) — planilhas `.xlsx`
+  reais em memória (POI + `MockMultipartFile`). Cenários: planilha válida, `produto_id`
+  duplicado, coluna obrigatória ausente, `estoque_atual` negativo, campo calculado preenchido,
+  arquivo não-`.xlsx`, produto inexistente, data inválida, `quantidade ≤ 0`, `valor_venda` com
+  vírgula, histórico < 90 dias (aviso). Todos passando.
   _Depende de: T-15_
+  ⚠️ Cenário "planilhas desejáveis ausentes (defaults)" do spec original não se aplica: os
+  endpoints atuais só recebem produtos e vendas.
 
 ---
 

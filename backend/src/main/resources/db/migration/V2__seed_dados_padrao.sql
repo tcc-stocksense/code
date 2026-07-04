@@ -11,11 +11,11 @@
 -- INSERT IGNORE garante idempotência: re-executar não gera erro.
 -- =====================================================================
 
--- ⚠️ SUBSTITUIR senha_hash por um hash REAL (bcrypt/argon2) gerado no backend
---    antes de qualquer uso fora do ambiente de desenvolvimento.
---    O valor abaixo é um PLACEHOLDER inválido de propósito — não autentica.
+-- ⚠️ Credencial de DESENVOLVIMENTO LOCAL apenas — email: admin@stocksense.local,
+--    senha: admin123 (hash BCrypt abaixo). NUNCA usar este valor em ambiente
+--    compartilhado, staging ou produção — trocar por hash gerado no cadastro real.
 INSERT IGNORE INTO estabelecimento (id, nome_fantasia, email, senha_hash)
-    VALUES (1, 'StockSense Padrão', 'admin@stocksense.local', 'TROCAR_POR_HASH_BCRYPT');
+    VALUES (1, 'StockSense Padrão', 'admin@stocksense.local', '$2a$10$ismpcFwGGZWgu9Df1MVmyeE9V00haDVPtIM66rmt2k9SQ9..515K6');
 
 INSERT IGNORE INTO fornecedor (fornecedor_id, nome)
     VALUES (1, 'Fornecedor Padrão');

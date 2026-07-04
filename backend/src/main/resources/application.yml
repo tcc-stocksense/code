@@ -33,6 +33,10 @@ ml:
   service:
     url: ${ML_SERVICE_URL:http://localhost:8000}
 
+jwt:
+  secret: ${JWT_SECRET:stocksense-dev-secret-troque-em-producao-min-32-bytes-1234567890}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
 server:
   port: ${SERVER_PORT:8080}
 

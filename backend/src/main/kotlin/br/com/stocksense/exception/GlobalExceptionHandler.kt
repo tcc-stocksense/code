@@ -26,6 +26,10 @@ class GlobalExceptionHandler {
     fun handleNotFound(ex: EntityNotFoundException): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.message ?: "Recurso não encontrado")
 
+    @ExceptionHandler(RecursoNaoEncontradoException::class)
+    fun handleRecursoNaoEncontrado(ex: RecursoNaoEncontradoException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.message ?: "Recurso não encontrado")
+
     @ExceptionHandler(ImportacaoException::class)
     fun handleImportacao(ex: ImportacaoException): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.message ?: "Arquivo inválido")

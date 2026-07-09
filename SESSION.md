@@ -19,7 +19,35 @@
 
 ---
 
-## Última Sessão — 2026-07-04
+## Última Sessão — 2026-07-08
+
+### O que foi desenvolvido
+
+#### backend (Kotlin/Spring Boot) — branch `claude/branch-status-gcfufm`
+
+- **Reorganização de branch:** a `claude/branch-status-gcfufm` foi recriada a partir da
+  `feat/motor-abc` (que já contém Épico 1 — Auth e Épico 3 — Motor + ABC, ainda sem PR),
+  e os 5 commits de docs que só existiam na `main` (tutorial local, SESSION.md de auth/
+  motor, guia de revisão de arquitetura) foram trazidos por cima via cherry-pick, sem
+  conflitos. Motivo: a `main` sozinha não tem `estabelecimentoId` em `Produto` nem
+  `RecursoNaoEncontradoException` — pré-requisitos reais da T-26.
+- **T-26 — `ProdutoService` (listagem e edição de estoque):** implementada.
+  `ProdutoController` (`GET /api/produtos`, `PATCH /api/produtos/{id}/estoque`) foi
+  criado junto, antecipando parte da T-29. `atualizarEstoque` valida que o produto
+  pertence ao estabelecimento do JWT antes de editar.
+- **`ProdutoServiceTest`** — 4 testes (MockK), cobrindo a fatia de T-26 dentro da T-30
+  (listagem ordenada por nome, edição de estoque persiste só o campo, produto
+  inexistente e produto de outro estabelecimento → `RecursoNaoEncontradoException`).
+  Os cenários de detalhe do produto (T-27) continuam bloqueados por T-05.
+- ⚠️ **JDK 17 ausente no ambiente:** só há JDK 21 instalado, sem rede para o Gradle
+  provisionar o toolchain (mirror de segurança do Ubuntu 404, sem `foojay-resolver`).
+  Contornado apontando o toolchain para 21 **apenas localmente** (mudança revertida
+  logo depois, nunca commitada) só para rodar `./gradlew test`: suíte completa passou,
+  14 testes / 0 falhas. Recomendo rodar de novo com JDK 17 real antes do PR.
+
+---
+
+## Sessão — 2026-07-04
 
 ### O que foi desenvolvido
 

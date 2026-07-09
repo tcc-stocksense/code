@@ -244,11 +244,22 @@
 > Entrega: todos os endpoints de `/api/produtos/*` funcionando.
 > ⚠️ Épico 3 deve estar concluído — os campos calculados de `produto` só existem após o motor rodar.
 
-- [ ] **T-26 — `ProdutoService` — listagem e edição de estoque** `MVP`
+- [x] **T-26 — `ProdutoService` — listagem e edição de estoque** `MVP`
   `listarTodos(estabelecimentoId: Int): List<ProdutoResponse>`
   `atualizarEstoque(produtoId: Int, estoqueAtual: Int): ProdutoResponse`
   Lançar `RecursoNaoEncontradoException` se produto não encontrado.
   _Depende de: T-04, T-12, T-13_
+  `ProdutoController` criado junto (`GET /api/produtos`, `PATCH /api/produtos/{id}/estoque`)
+  — antecipa parte da T-29, já que os dois endpoints não dependem de T-27/T-28.
+  `atualizarEstoque` recebe também o `estabelecimentoId` do JWT e só atualiza o produto
+  se ele pertencer ao estabelecimento autenticado (senão, `RecursoNaoEncontradoException`)
+  — não estava explícito na task, mas evita edição cross-tenant agora que `Produto` tem
+  `estabelecimentoId`.
+  ⚠️ O ambiente de dev não tem JDK 17 instalado (só JDK 21) nem rede para o Gradle
+  provisionar o toolchain (mirror de segurança do Ubuntu retornou 404; sem plugin
+  `foojay-resolver`). Build e testes foram verificados apontando o toolchain para 21
+  **apenas localmente** (mudança não commitada, revertida em seguida) — `test` passou
+  100% (14 testes, 0 falhas). Rodar de novo com JDK 17 real antes de abrir PR, por garantia.
 
 - [ ] **T-27 — `ProdutoService` — detalhe do produto** `MVP`
   DTO: `ProdutoDetalheResponse` com KPIs calculados (`pontoReposicao`, `estoqueSeguranca`,

@@ -255,11 +255,11 @@
   se ele pertencer ao estabelecimento autenticado (senão, `RecursoNaoEncontradoException`)
   — não estava explícito na task, mas evita edição cross-tenant agora que `Produto` tem
   `estabelecimentoId`.
-  ⚠️ Build não verificado localmente: `build.gradle.kts` fixa toolchain Java 17, mas o
-  ambiente só tem JDK 21 e sem rede para provisionar o 17 (mirror de segurança do Ubuntu
-  retornou 404; sem plugin `foojay-resolver` configurado). Revisão foi manual, por
-  convenção de código — rodar `./gradlew compileKotlin`/`test` num ambiente com JDK 17
-  antes de mergear.
+  ⚠️ O ambiente de dev não tem JDK 17 instalado (só JDK 21) nem rede para o Gradle
+  provisionar o toolchain (mirror de segurança do Ubuntu retornou 404; sem plugin
+  `foojay-resolver`). Build e testes foram verificados apontando o toolchain para 21
+  **apenas localmente** (mudança não commitada, revertida em seguida) — `test` passou
+  100% (14 testes, 0 falhas). Rodar de novo com JDK 17 real antes de abrir PR, por garantia.
 
 - [ ] **T-27 — `ProdutoService` — detalhe do produto** `MVP`
   DTO: `ProdutoDetalheResponse` com KPIs calculados (`pontoReposicao`, `estoqueSeguranca`,

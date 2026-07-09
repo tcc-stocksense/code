@@ -35,10 +35,15 @@
   `ProdutoController` (`GET /api/produtos`, `PATCH /api/produtos/{id}/estoque`) foi
   criado junto, antecipando parte da T-29. `atualizarEstoque` valida que o produto
   pertence ao estabelecimento do JWT antes de editar.
-- ⚠️ **Build não verificado neste ambiente:** falta JDK 17 (só há JDK 21 instalado) e não
-  há rede para o Gradle provisionar o toolchain. Revisão feita manualmente contra as
-  convenções do `AuthService`/`MotorService`/`MotorController` já existentes. Rodar
-  `./gradlew compileKotlin test` num ambiente com JDK 17 antes de abrir PR.
+- **`ProdutoServiceTest`** — 4 testes (MockK), cobrindo a fatia de T-26 dentro da T-30
+  (listagem ordenada por nome, edição de estoque persiste só o campo, produto
+  inexistente e produto de outro estabelecimento → `RecursoNaoEncontradoException`).
+  Os cenários de detalhe do produto (T-27) continuam bloqueados por T-05.
+- ⚠️ **JDK 17 ausente no ambiente:** só há JDK 21 instalado, sem rede para o Gradle
+  provisionar o toolchain (mirror de segurança do Ubuntu 404, sem `foojay-resolver`).
+  Contornado apontando o toolchain para 21 **apenas localmente** (mudança revertida
+  logo depois, nunca commitada) só para rodar `./gradlew test`: suíte completa passou,
+  14 testes / 0 falhas. Recomendo rodar de novo com JDK 17 real antes do PR.
 
 ---
 

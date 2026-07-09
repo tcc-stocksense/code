@@ -19,7 +19,30 @@
 
 ---
 
-## Última Sessão — 2026-07-04
+## Última Sessão — 2026-07-08
+
+### O que foi desenvolvido
+
+#### backend (Kotlin/Spring Boot) — branch `claude/branch-status-gcfufm`
+
+- **Reorganização de branch:** a `claude/branch-status-gcfufm` foi recriada a partir da
+  `feat/motor-abc` (que já contém Épico 1 — Auth e Épico 3 — Motor + ABC, ainda sem PR),
+  e os 5 commits de docs que só existiam na `main` (tutorial local, SESSION.md de auth/
+  motor, guia de revisão de arquitetura) foram trazidos por cima via cherry-pick, sem
+  conflitos. Motivo: a `main` sozinha não tem `estabelecimentoId` em `Produto` nem
+  `RecursoNaoEncontradoException` — pré-requisitos reais da T-26.
+- **T-26 — `ProdutoService` (listagem e edição de estoque):** implementada.
+  `ProdutoController` (`GET /api/produtos`, `PATCH /api/produtos/{id}/estoque`) foi
+  criado junto, antecipando parte da T-29. `atualizarEstoque` valida que o produto
+  pertence ao estabelecimento do JWT antes de editar.
+- ⚠️ **Build não verificado neste ambiente:** falta JDK 17 (só há JDK 21 instalado) e não
+  há rede para o Gradle provisionar o toolchain. Revisão feita manualmente contra as
+  convenções do `AuthService`/`MotorService`/`MotorController` já existentes. Rodar
+  `./gradlew compileKotlin test` num ambiente com JDK 17 antes de abrir PR.
+
+---
+
+## Sessão — 2026-07-04
 
 ### O que foi desenvolvido
 

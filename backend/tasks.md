@@ -244,11 +244,22 @@
 > Entrega: todos os endpoints de `/api/produtos/*` funcionando.
 > ⚠️ Épico 3 deve estar concluído — os campos calculados de `produto` só existem após o motor rodar.
 
-- [ ] **T-26 — `ProdutoService` — listagem e edição de estoque** `MVP`
+- [x] **T-26 — `ProdutoService` — listagem e edição de estoque** `MVP`
   `listarTodos(estabelecimentoId: Int): List<ProdutoResponse>`
   `atualizarEstoque(produtoId: Int, estoqueAtual: Int): ProdutoResponse`
   Lançar `RecursoNaoEncontradoException` se produto não encontrado.
   _Depende de: T-04, T-12, T-13_
+  `ProdutoController` criado junto (`GET /api/produtos`, `PATCH /api/produtos/{id}/estoque`)
+  — antecipa parte da T-29, já que os dois endpoints não dependem de T-27/T-28.
+  `atualizarEstoque` recebe também o `estabelecimentoId` do JWT e só atualiza o produto
+  se ele pertencer ao estabelecimento autenticado (senão, `RecursoNaoEncontradoException`)
+  — não estava explícito na task, mas evita edição cross-tenant agora que `Produto` tem
+  `estabelecimentoId`.
+  ⚠️ Build não verificado localmente: `build.gradle.kts` fixa toolchain Java 17, mas o
+  ambiente só tem JDK 21 e sem rede para provisionar o 17 (mirror de segurança do Ubuntu
+  retornou 404; sem plugin `foojay-resolver` configurado). Revisão foi manual, por
+  convenção de código — rodar `./gradlew compileKotlin`/`test` num ambiente com JDK 17
+  antes de mergear.
 
 - [ ] **T-27 — `ProdutoService` — detalhe do produto** `MVP`
   DTO: `ProdutoDetalheResponse` com KPIs calculados (`pontoReposicao`, `estoqueSeguranca`,

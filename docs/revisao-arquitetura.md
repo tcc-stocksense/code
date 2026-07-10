@@ -46,8 +46,8 @@ Fonte: `CLAUDE.md` raiz §9. Uma seção por decisão.
 
 ### ADR #3 — Classificação ABC no backend
 - **Decisão:** ABC é ranking relativo entre todos os produtos → vive no backend (`AbcService`), não no ml-service.
-- **Como verificar:** backend tem `AbcService` ✅. **MAS** o ml-service **ainda calcula e devolve** `classe_abc`/`abc_proxy` (`prediction_service.py` linhas ~106-109 e ~131-132; `abc_service.py` ainda existe no ml-service).
-- **Status:** ⚠️ **divergência parcial** — o backend faz o certo, mas o ml-service não foi limpo. O DTO Feign do backend **ignora** esses campos (`@JsonIgnoreProperties`), então funciona — mas é *boundary leak*. **Ação sugerida:** remover ABC do ml-service (dívida técnica registrada). **Notas:** ______________________
+- **Como verificar:** backend tem `AbcService` ✅. `abc_service.py`/`test_abc_service.py` foram removidos do ml-service em 2026-07-09; `prediction_service.py` não calcula mais `classe_abc`/`abc_proxy`.
+- **Status:** ✅ **resolvido em 2026-07-09** — *boundary leak* eliminado; nenhum dos dois lados calcula ABC fora do backend agora. **Notas:** ______________________
 
 ### ADR #4 — Login no estabelecimento (sem tabela `usuario`)
 - **Decisão:** uma credencial por mercado; login não é o foco.
@@ -86,11 +86,11 @@ backend (`client/dto/PredictResponse.kt`). É onde divergência dói mais.
 | `estoque_seguranca` | ✅ | ✅ | — |
 | `dias_ate_ruptura` | ✅ | ✅ | nullable |
 | `aviso` | ✅ | ✅ | MAPE > 50% |
-| `classe_abc` | ✅ **(deveria ter saído — ADR #3)** | ❌ ignorado | *boundary leak* — remover do ml-service |
-| `abc_proxy` | ✅ **(idem)** | ❌ ignorado | idem |
-| `desvio_padrao_demanda` | ❌ **não devolve** (calcula e descarta) | ❌ | **T-05 pendente** — coluna `produto.desvio_padrao_demanda` existe e a Tela 6 precisa; decidir se o ml-service passa a devolver (recomendado) ou o backend recalcula de `venda` |
+| `classe_abc` | ✅ removido em 2026-07-09 | nunca existiu no DTO | *boundary leak* corrigido — `abc_service.py` deletado do ml-service |
+| `abc_proxy` | ✅ removido em 2026-07-09 | nunca existiu no DTO | idem |
+| `desvio_padrao_demanda` | ✅ devolvido desde 2026-07-09 | ✅ mapeado em 2026-07-10 | **T-05 resolvido** — `MotorService` grava em `produto.desvioPadraoDemanda`, testado (`MotorServiceTest`) |
 
-**Decisão a tomar (T-05):** ⬜ o ml-service passa a devolver `desvio_padrao_demanda`  ⬜ o backend recalcula de `venda`
+**Decisão tomada (T-05):** ✅ o ml-service passa a devolver `desvio_padrao_demanda` (opção *a*, como recomendado) — resolvido em 2026-07-10.
 
 ---
 
@@ -115,8 +115,8 @@ Preencher ao final da revisão.
 - **Decisões que continuam válidas:** ______________________
 - **Decisões a revisar/mudar:** ______________________
 - **Dívidas técnicas confirmadas:**
-  - [ ] Remover ABC (`classe_abc`/`abc_proxy`) do ml-service (ADR #3)
-  - [ ] Resolver T-05 (`desvio_padrao_demanda`)
+  - [x] Remover ABC (`classe_abc`/`abc_proxy`) do ml-service (ADR #3) — resolvido 2026-07-09
+  - [x] Resolver T-05 (`desvio_padrao_demanda`) — resolvido 2026-07-10
   - [ ] Decidir sobre lead time real (`Fornecedor`/`ProdutoFornecedor`)
   - [ ] Definir postura sobre performance do recálculo síncrono
   - [ ] ______________________

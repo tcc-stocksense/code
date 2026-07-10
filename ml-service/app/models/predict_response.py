@@ -28,6 +28,5 @@ class PredictResponse(BaseModel):
     ponto_reposicao: float
     estoque_seguranca: float
     dias_ate_ruptura: float | None
-    classe_abc: str
-    abc_proxy: bool = False
+    desvio_padrao_demanda: float
     aviso: str | None = None

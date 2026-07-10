@@ -169,11 +169,12 @@ class PredictResponse(BaseModel):
     ponto_reposicao: float
     estoque_seguranca: float
     dias_ate_ruptura: float | None        # null quando demanda média = 0 (ver §7 e §9)
+    desvio_padrao_demanda: float          # σ da série usada no cálculo de Ballou — alimenta a Tela 6
     aviso: str | None = None              # preenchido quando MAPE > 50% (ver §9) — MVP-opcional
 ```
 
-> **Removido:** o campo `classe_abc` (ABC migrou para o backend).
-> **Correções:** `dias_ate_ruptura` agora é `float | None` — `float("inf")` não é JSON válido e quebraria a serialização. O campo `aviso` foi adicionado para alinhar o schema ao comportamento descrito no §9.
+> **Removido:** o campo `classe_abc` (ABC migrou para o backend) — `abc_service.py` e `test_abc_service.py` foram removidos deste serviço.
+> **Correções:** `dias_ate_ruptura` agora é `float | None` — `float("inf")` não é JSON válido e quebraria a serialização. O campo `aviso` foi adicionado para alinhar o schema ao comportamento descrito no §9. `desvio_padrao_demanda` foi adicionado para resolver a "decisão pendente" registrada no CLAUDE.md do backend (§4, opção *a*) — necessária para a Tela 6 exibir a variabilidade/CV. **Ação de acompanhamento:** o backend precisa parar de ignorar `classe_abc`/`abc_proxy` (não são mais enviados) e passar a mapear `desvio_padrao_demanda` em `PredictResponse.kt`.
 
 ---
 

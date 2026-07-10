@@ -37,8 +37,7 @@ def _resposta_mock(produto_id: int = 1) -> PredictResponse:
         ponto_reposicao=52.0,
         estoque_seguranca=10.0,
         dias_ate_ruptura=18.0,
-        classe_abc="C",
-        abc_proxy=True,
+        desvio_padrao_demanda=3.2,
         aviso=None,
     )
 
@@ -139,7 +138,7 @@ class TestPostPredictSucesso:
         campos_esperados = {
             "produto_id", "modelo_selecionado", "previsoes", "metricas",
             "ponto_reposicao", "estoque_seguranca", "dias_ate_ruptura",
-            "classe_abc", "abc_proxy",
+            "desvio_padrao_demanda",
         }
         with patch(
             "app.routers.predict_router.executar_previsao",

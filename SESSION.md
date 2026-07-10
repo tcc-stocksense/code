@@ -19,7 +19,66 @@
 
 ---
 
-## Última Sessão — 2026-07-08
+## Última Sessão — 2026-07-10
+
+### O que foi desenvolvido
+
+#### ml-service (Python/FastAPI)
+
+- **Revisão completa do `ml-service/tasks.md`** contra o código real: o arquivo dizia
+  que só existiam `__init__.py` vazios, mas quase todo o MVP já estava implementado.
+  Tabela "Estado atual" e as 19 tasks corrigidas para refletir a realidade —
+  **15/19 concluídas**.
+- **Dívida técnica da ADR #3 resolvida:** `app/services/abc_service.py` e
+  `app/tests/test_abc_service.py` foram **removidos** — o ml-service ainda calculava e
+  devolvia `classe_abc`/`abc_proxy` no `PredictResponse`, contrariando a decisão de que
+  ABC vive só no backend (`AbcService`). `prediction_service.py` não chama mais
+  `classificar_abc`.
+- **T-05 (cross-service) resolvido:** `desvio_padrao_demanda` adicionado ao
+  `PredictResponse` do ml-service — `prediction_service.py` agora expõe o `σ` da série
+  (já calculado internamente para a fórmula de Ballou). Verificado ponta a ponta:
+  `executar_previsao()` chamado com série sintética, valor retornado bate exatamente
+  com `serie.std()`.
+- Suíte de testes do ml-service ajustada (`test_predict_router.py`) para o novo schema.
+  53/53 testes relevantes passando (Prophet excluído — 11 falhas por
+  `AttributeError: 'Prophet' object has no attribute 'stan_backend'`, problema de
+  instalação do CmdStan neste venv, não bug de código).
+
+#### backend (Kotlin/Spring Boot)
+
+- **T-05 fechado do lado do backend também:** `PredictResponse.kt` (Feign DTO) ganhou o
+  campo `desvioPadraoDemanda: BigDecimal?`; `MotorService.executarMotor()` agora grava
+  `produto.desvioPadraoDemanda = resp.desvioPadraoDemanda` a cada execução;
+  `MotorServiceTest` atualizado para cobrir a persistência.
+  `@JsonIgnoreProperties(ignoreUnknown = true)` mantido por tolerância a campos futuros
+  — `classe_abc`/`abc_proxy` nunca existiram neste DTO.
+- Suíte completa (`./gradlew test`) validada com toolchain temporário JDK 21 (mesma
+  situação da sessão 2026-07-08: só há JDK 21 no ambiente, sem rede para o Gradle
+  provisionar o 17) — **build successful**, toolchain revertido para 17 antes de
+  qualquer commit.
+
+#### Documentação atualizada em conjunto
+
+`ml-service/CLAUDE.md`, `ml-service/tasks.md`, `backend/CLAUDE.md` (§4), `backend/tasks.md`
+(T-05, T-19, T-21, T-27), `docs/mapeamento-funcionalidades.md` (T6),
+`docs/revisao-arquitetura.md` (ADR #3, tabela de contrato, checklist de dívidas
+técnicas) — todos os lugares que citavam a pendência de `desvio_padrao_demanda` ou a
+divergência do ABC no ml-service foram atualizados para refletir a resolução.
+
+### Pendências que ficaram em aberto
+
+- **T-03 (ml-service)** — `.env.example` ainda não existe.
+- **T-10 (ml-service)** — regressor `is_promocional` do Prophet não implementado
+  (`MVP-opcional`, não bloqueia).
+- **Ambiente Prophet quebrado localmente** — CmdStan precisa ser reinstalado no venv do
+  ml-service (ver seção "Pendente e Bugs Conhecidos" abaixo).
+- **`backend/REVIEW.md`** — arquivo staged no git (`A backend/REVIEW.md`) espelhando o
+  `CLAUDE.md` antigo do backend, aparentemente um artefato de revisão do usuário. Não foi
+  tocado nesta sessão.
+
+---
+
+## Sessão — 2026-07-08
 
 ### O que foi desenvolvido
 
@@ -84,8 +143,10 @@ no ar + 90 dias de dados) — coberto pelos testes unitários.
 - O ml-service **ainda devolve `classe_abc` e `abc_proxy`** no `PredictResponse`, apesar
   da ADR #3 (ABC migrou para o backend). O backend os **ignora**
   (`@JsonIgnoreProperties`) e calcula ABC no `AbcService`. Dívida técnica do ml-service.
+  **[Resolvido em 2026-07-10 — ver sessão no topo.]**
 - O ml-service **não devolve `desvio_padrao_demanda`** (calcula e descarta) — confirma a
   pendência **T-05**. Fora do contrato Feign por ora; bloqueia só a T-30 (Épico 4).
+  **[Resolvido em 2026-07-10 — ver sessão no topo.]**
 - O `_preparar_serie` do ml-service **não agrupa por dia** → o `MotorService` agrega as
   vendas por data (SUM) antes de enviar.
 
@@ -192,6 +253,7 @@ commitada na `main`.
 
 - **Épico 0 (Fundação):** T-01, T-02, T-04 feitos; T-03 pulado deliberadamente; T-05
   (acordo `desvio_padrao_demanda` com o ml-service) ainda pendente de decisão.
+  **[T-05 resolvido em 2026-07-10 — ver sessão no topo.]**
 - **Épico 1 (Auth):** T-06 a T-11 completos, testados localmente, na branch
   `feat/auth-login-jwt` (pushed, PR não aberta).
 - **Épico 2 (Importação):** núcleo já existia antes desta sessão, sem mudanças de
@@ -323,8 +385,8 @@ ml-service/
 | PR de `feat/auth-login-jwt` (Épico 1) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **mergear antes** da motor-abc |
 | PR de `feat/motor-abc` (Épico 3) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **depende da auth-login-jwt** |
 | PR de `test/importacao-services` (Épico 2 testes/doc) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — independente, base `main` limpa |
-| T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ⚠️ Pendente | Confirmado: o ml-service não devolve. Bloqueia T-27 (detalhe do produto, Épico 4) |
-| ml-service ainda devolve `classe_abc`/`abc_proxy` | ⚠️ Dívida técnica | ABC migrou pro backend (ADR #3); backend ignora, mas o campo deveria sair do ml-service |
+| T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ✅ Resolvido (2026-07-10) | ml-service devolve o campo; `MotorService` grava em `produto.desvioPadraoDemanda`; não bloqueia mais T-27 |
+| ml-service ainda devolve `classe_abc`/`abc_proxy` | ✅ Resolvido (2026-07-10) | `abc_service.py` removido do ml-service; ABC só existe no `AbcService` do backend |
 | T-17 — testes unitários de importação | ✅ Feito | 13 testes na `test/importacao-services`, todos passando |
 | `estabelecimentoId` ausente na entidade `Produto` | ✅ Resolvido | Adicionado na `feat/motor-abc` (Épico 3) |
 | CLAUDE.md do backend sobre `/api/importacao` | ✅ Corrigido na branch | Atualizado para 2 endpoints na `test/importacao-services`; chega na `main` no merge |
@@ -354,7 +416,7 @@ ml-service/
 
 - `ProdutoService` (listagem, edição de estoque, detalhe), `MetricaService`
   (comparativo Holt-Winters × Prophet), `ProdutoController`.
-- ⚠️ T-30 (detalhe do produto) depende de resolver **T-05** (`desvio_padrao_demanda`).
+- ✅ T-05 (`desvio_padrao_demanda`) resolvido em 2026-07-10 — T-30/T-27 já podem seguir.
 
 ### Backlog antigo do ml-service (ainda não resolvido, sem mudanças nesta sessão)
 

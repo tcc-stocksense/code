@@ -77,6 +77,7 @@ class MotorServiceTest {
             pontoReposicao = BigDecimal("55.00"),
             estoqueSeguranca = BigDecimal("15.00"),
             diasAteRuptura = BigDecimal("3.48"),
+            desvioPadraoDemanda = BigDecimal("2.2561"),
         )
         every { mlServiceClient.predict(any()) } returns resposta
 
@@ -101,6 +102,7 @@ class MotorServiceTest {
         // Produto atualizado com os KPIs do motor
         assertEquals(BigDecimal("55.00"), produto.pontoReposicao)
         assertEquals(BigDecimal("15.00"), produto.estoqueSeguranca)
+        assertEquals(BigDecimal("2.2561"), produto.desvioPadraoDemanda)
         assertNotNull(produto.dataUltimoCalculo)
         verify { produtoRepository.save(produto) }
     }

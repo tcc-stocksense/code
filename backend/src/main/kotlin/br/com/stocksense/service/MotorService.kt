@@ -90,6 +90,7 @@ class MotorService(
 
         produto.pontoReposicao = resp.pontoReposicao
         produto.estoqueSeguranca = resp.estoqueSeguranca
+        produto.desvioPadraoDemanda = resp.desvioPadraoDemanda
         produto.dataUltimoCalculo = agora
         produtoRepository.save(produto)
 

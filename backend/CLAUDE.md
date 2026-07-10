@@ -199,7 +199,7 @@ class Produto(
     var classeAbc: String? = null,            // setado pelo AbcService
 
     @Column(name = "desvio_padrao_demanda", precision = 10, scale = 4)
-    var desvioPadraoDemanda: BigDecimal? = null,  // ⚠ ver "Decisão pendente" no §4
+    var desvioPadraoDemanda: BigDecimal? = null,  // setado pelo MotorService a partir do PredictResponse (§4)
 
     @Column(name = "ponto_reposicao", precision = 10, scale = 2)
     var pontoReposicao: BigDecimal? = null,
@@ -302,11 +302,12 @@ data class PredictResponse(
     val pontoReposicao: BigDecimal,
     val estoqueSeguranca: BigDecimal,
     val diasAteRuptura: BigDecimal?,               // null quando demanda média = 0
+    val desvioPadraoDemanda: BigDecimal?,          // σ da demanda — alimenta produto.desvioPadraoDemanda e a Tela 6
     val aviso: String? = null,                     // MAPE > 50%
 )
 ```
 
-> **Mudou:** o `PredictResponse` **não tem mais `classeAbc`** (ABC virou responsabilidade do backend). `diasAteRuptura` é nullable e há o campo `aviso`.
+> **Mudou:** o `PredictResponse` **não tem mais `classeAbc`** (ABC virou responsabilidade do backend). `diasAteRuptura` é nullable e há o campo `aviso`. **`desvioPadraoDemanda` foi adicionado** (T-05 resolvido em 2026-07-10) — o `MotorService` grava esse valor em `produto.desvioPadraoDemanda` a cada execução.
 
 ### Persistência do resultado do motor (`MotorService`)
 
@@ -357,8 +358,8 @@ spring:
 
 O nome `ml-service` em `config:` deve ser idêntico ao `name =` no `@FeignClient`.
 
-> ### ⚠ Decisão pendente — fonte de `desvio_padrao_demanda` e da variabilidade da T6
-> A coluna `produto.desvio_padrao_demanda` existe, e a Tela 6 exibe "Variabilidade (σ + CV)". Mas o `PredictResponse` **não devolve** o desvio — o ml-service o calcula internamente (para a fórmula de Ballou) e descarta. Duas opções: **(a)** o ml-service passa a retornar `desvio_padrao_demanda` no response (acréscimo pequeno, fonte única); **(b)** o backend calcula as estatísticas descritivas direto de `venda`. **Recomendo (a).** Decidir antes de implementar a T6.
+> ### ✅ Decisão tomada — fonte de `desvio_padrao_demanda` e da variabilidade da T6
+> Resolvido em 2026-07-10: o ml-service passou a devolver `desvio_padrao_demanda` no `PredictResponse` (opção *a*, como recomendado — fonte única, sem recalcular no backend). O `MotorService` grava o valor em `produto.desvioPadraoDemanda` a cada `executarMotor()`. A Tela 6 já pode consumir esse campo para exibir a variabilidade (σ + CV).
 
 ---
 

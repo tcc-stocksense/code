@@ -99,7 +99,7 @@ ES = Z · √(LT · σ²_demanda + demanda² · σ²_leadtime)
 
 A tela deve exibir os valores que o motor devolve. Atenção: o modal "Editar parâmetros" (lead time, nível de serviço) precisa, no real, **persistir e fazer o cálculo reagir** ao novo nível — com 1,65 cravado, mudar o nível não teria efeito.
 
-**Pendência de contrato:** a variabilidade (σ) exibida aqui depende de o ml-service devolver `desvio_padrao_demanda` no `PredictResponse`, ou de o backend recalculá-la a partir de `venda`. **Decidir antes de implementar esta tela.**
+**Contrato resolvido (2026-07-10):** o ml-service devolve `desvio_padrao_demanda` no `PredictResponse`; o backend grava em `produto.desvioPadraoDemanda` a cada execução do motor. A tela pode consumir o campo diretamente.
 
 ---
 

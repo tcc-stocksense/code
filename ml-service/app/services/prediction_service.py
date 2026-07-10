@@ -1,8 +1,8 @@
 """
 Orquestrador central do motor preditivo do StockSense.
 
-Coordena os modelos Holt-Winters e Prophet, seleciona o vencedor por MAPE,
-calcula os KPIs de estoque e a classificação ABC para um único produto.
+Coordena os modelos Holt-Winters e Prophet, seleciona o vencedor por MAPE
+e calcula os KPIs de estoque para um único produto.
 """
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ import pandas as pd
 from app.models.predict_request import PredictRequest
 from app.models.predict_response import MetricasModelo, PrevisaoDiaria, PredictResponse
 from app.services import holt_winters_service, prophet_service
-from app.services.abc_service import classificar_abc
 from app.services.stock_service import (
     calcular_dias_ate_ruptura,
     calcular_estoque_seguranca,
@@ -31,9 +30,8 @@ async def executar_previsao(request: PredictRequest) -> PredictResponse:
     Orquestra o fluxo completo de previsão e cálculo de KPIs para um produto.
 
     Prepara a série temporal, treina Holt-Winters e Prophet em paralelo lógico
-    (tolerando falha individual), seleciona o modelo de menor MAPE, calcula os
-    KPIs de estoque pela fórmula de Ballou (2006) e classifica o produto na
-    curva ABC usando a quantidade histórica como proxy de faturamento.
+    (tolerando falha individual), seleciona o modelo de menor MAPE e calcula os
+    KPIs de estoque pela fórmula de Ballou (2006).
 
     Args:
         request: Payload validado do endpoint POST /predict.
@@ -103,11 +101,6 @@ async def executar_previsao(request: PredictRequest) -> PredictResponse:
         demanda_media_diaria=demanda_media,
     )
 
-    quantidade_total = int(serie.sum())
-    dados_abc = [{"produto_id": pid, "faturamento": None, "quantidade": quantidade_total}]
-    resultados_abc, abc_proxy = classificar_abc(dados_abc)
-    classe_abc = resultados_abc[0].classe if resultados_abc else "C"
-
     aviso: str | None = None
     if metricas_vencedor.mape > _MAPE_AVISO_LIMIAR:
         aviso = "Acurácia baixa — previsões com confiança reduzida"
@@ -128,8 +121,7 @@ async def executar_previsao(request: PredictRequest) -> PredictResponse:
         ponto_reposicao=round(ponto_reposicao, 4),
         estoque_seguranca=round(estoque_seguranca, 4),
         dias_ate_ruptura=round(dias_ate_ruptura, 4) if dias_ate_ruptura is not None else None,
-        classe_abc=classe_abc,
-        abc_proxy=abc_proxy,
+        desvio_padrao_demanda=round(desvio_demanda, 4),
         aviso=aviso,
     )
 

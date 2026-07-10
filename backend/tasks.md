@@ -60,12 +60,17 @@
   — a lista de erros por linha vai no DTO de resposta (`ErroLinha`), não na exception.
   `EntityNotFoundException` (jakarta) também tem handler próprio, mantido por compatibilidade.
 
-- [ ] **T-05 — Acordo cross-service: `desvio_padrao_demanda` no ml-service** `MVP`
+- [x] **T-05 — Acordo cross-service: `desvio_padrao_demanda` no ml-service** `MVP`
   ⚠️ **Não é código — é um alinhamento com o time.**
   O ml-service precisa adicionar `desvio_padrao_demanda: float` ao `PredictResponse`
   antes de implementar T-30 (detalhe do produto, Épico 4).
   Registrar a decisão e atualizar o CLAUDE.md do ml-service quando confirmado.
   _Não bloqueia os épicos 1–3, bloqueia T-30._
+  **Resolvido em 2026-07-10:** ml-service passou a devolver `desvio_padrao_demanda` no
+  `PredictResponse` (confirmado com teste ponta a ponta batendo com `serie.std()`). Backend
+  atualizado em conjunto: `PredictResponse.kt` mapeia o campo, `MotorService.executarMotor()`
+  grava em `produto.desvioPadraoDemanda`, `MotorServiceTest` cobre a persistência. T-27 já
+  pode ser implementada sem essa dependência pendente.
 
 ---
 
@@ -192,12 +197,13 @@
   `MetricasModelo(mape, rmse, mae)`.
   `PrevisaoDiaria(data, quantidadePrevista)`.
   `PredictResponse(produtoId, modeloSelecionado, previsoes, metricas, pontoReposicao,
-  estoqueSeguranca, diasAteRuptura?, aviso?)`.
+  estoqueSeguranca, diasAteRuptura?, desvioPadraoDemanda?, aviso?)`.
   _Depende de: T-01_
   Mapeamento snake_case via `@JsonNaming` (sem mexer no ObjectMapper global).
-  ⚠️ `desvioPadraoDemanda` **fora do contrato** — o ml-service não o devolve (T-05 pendente).
-  ⚠️ `@JsonIgnoreProperties(ignoreUnknown = true)`: o ml-service ainda devolve `classe_abc`
-  e `abc_proxy` (dívida técnica — deveriam ter saído de lá na ADR #3); o backend os ignora.
+  ✅ **Atualizado em 2026-07-10 (T-05):** `desvioPadraoDemanda` **agora está no contrato** —
+  o ml-service passou a devolvê-lo. `@JsonIgnoreProperties(ignoreUnknown = true)` mantido por
+  tolerância a campos futuros; `classe_abc`/`abc_proxy` (a antiga dívida técnica da ADR #3)
+  foram removidos do response do ml-service e nunca existiram neste DTO.
 
 - [x] **T-20 — `MlServiceClient`** `MVP`
   `@FeignClient(name = "ml-service", url = "\${ml.service.url}")`.
@@ -213,7 +219,10 @@
   `pontoReposicao`/`estoqueSeguranca`/`dataUltimoCalculo`.
   _Depende de: T-18, T-19, T-20_
   ⚠️ Lead time usa os **defaults** (3 / 1.0) — `ProdutoFornecedor` ainda não existe.
-  ⚠️ `desvioPadraoDemanda` não é atualizado (o motor não o devolve — T-05).
+  ✅ **Atualizado em 2026-07-10 (T-05):** `executarMotor()` agora grava
+  `produto.desvioPadraoDemanda = resp.desvioPadraoDemanda`. `MotorServiceTest` cobre a
+  persistência (build validado localmente com toolchain temporário JDK 21 — revertido
+  para 17 antes do commit).
 
 - [x] **T-22 — `AbcService`** `MVP`
   `recalcularAbc(estabelecimentoId): AbcResultado`. Ranking por faturamento (SUM valor_venda),
@@ -267,7 +276,8 @@
   (calculada de `venda`: `SUM(quantidade) / dias_de_historico`) e série de previsão
   mais recente (últimas 30 linhas de `previsao` pelo maior `executadoEm`).
   `detalhe(produtoId: Int): ProdutoDetalheResponse`
-  ⚠️ Depende de T-05 (ml-service retornando `desvio_padrao_demanda`).
+  ✅ T-05 resolvido (2026-07-10) — `produto.desvioPadraoDemanda` já é populado pelo motor,
+  não bloqueia mais esta task.
   _Depende de: T-04, T-12, T-18, T-21_
 
 - [ ] **T-28 — `MetricaService` — comparativo de modelos** `MVP`

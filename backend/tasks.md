@@ -270,35 +270,55 @@
   **apenas localmente** (mudança não commitada, revertida em seguida) — `test` passou
   100% (14 testes, 0 falhas). Rodar de novo com JDK 17 real antes de abrir PR, por garantia.
 
-- [ ] **T-27 — `ProdutoService` — detalhe do produto** `MVP`
+- [x] **T-27 — `ProdutoService` — detalhe do produto** `MVP`
   DTO: `ProdutoDetalheResponse` com KPIs calculados (`pontoReposicao`, `estoqueSeguranca`,
-  `diasAteRuptura`, `desvioPadraoDemanda`), demanda média diária
-  (calculada de `venda`: `SUM(quantidade) / dias_de_historico`) e série de previsão
+  `diasAteRuptura`, `desvioPadraoDemanda`), demanda média diária e série de previsão
   mais recente (últimas 30 linhas de `previsao` pelo maior `executadoEm`).
   `detalhe(produtoId: Int): ProdutoDetalheResponse`
-  ✅ T-05 resolvido (2026-07-10) — `produto.desvioPadraoDemanda` já é populado pelo motor,
-  não bloqueia mais esta task.
+  ✅ T-05 resolvido (2026-07-10) — `produto.desvioPadraoDemanda` já é populado pelo motor.
+  **Implementado em 2026-07-10 (branch `feat/produto-detalhe-metricas`):**
+  - **Decisão de fonte da demanda:** `demandaMediaDiaria` e `diasAteRuptura` são derivados
+    da **previsão** (média dos 30 pontos de `previsao` mais recentes), não do histórico de
+    vendas como dizia o texto original. Motivo: a premissa do `mapeamento` exige "demanda
+    prevista", e a tabela `previsao` já tem esses pontos — sem migration, sem tocar no
+    ml-service. `diasAteRuptura = estoqueAtual / demandaMedia` (null se demanda 0/ausente).
+  - **DTO completo (mapeamento T6):** além dos KPIs, inclui `coeficienteVariacao`
+    (σ/demandaMedia) e `tendenciaPercentual` (média dos primeiros 14 × últimos 14 dias com
+    venda; null se < 28 dias). Query nova `PrevisaoRepository.findPrevisaoMaisRecente`;
+    reuso de `VendaRepository.agregarVendasDiarias` para a tendência.
+  - Checagem de tenant (produto de outro estabelecimento → `RecursoNaoEncontradoException`),
+    igual ao `atualizarEstoque`. Degrada com graça quando o motor ainda não rodou.
   _Depende de: T-04, T-12, T-18, T-21_
 
-- [ ] **T-28 — `MetricaService` — comparativo de modelos** `MVP`
+- [x] **T-28 — `MetricaService` — comparativo de modelos** `MVP`
   DTO: `MetricaResponse(modelo, mape, rmse, mae, selecionado, executadoEm)`.
   `metricas(produtoId: Int): List<MetricaResponse>`: retorna as 2 linhas mais recentes
   de `metrica_modelo` para o produto (pelo maior `executadoEm`) — alimenta a Tela 10.
   Lançar `RecursoNaoEncontradoException` se produto não encontrado.
   _Depende de: T-04, T-18_
+  **Implementado em 2026-07-10:** `MetricaService` próprio (não dentro do `ProdutoService`).
+  Query `MetricaModeloRepository.findMetricasMaisRecentes`; vencedor (`selecionado`) primeiro
+  na lista; checagem de tenant; lista vazia quando o motor ainda não rodou.
 
-- [ ] **T-29 — `ProdutoController`** `MVP`
+- [x] **T-29 — `ProdutoController`** `MVP`
   Todos os endpoints de produto em um único controller:
   - `GET /api/produtos` → `listarTodos()`
   - `PATCH /api/produtos/{id}/estoque` → `atualizarEstoque()` com `@Valid @RequestBody`
   - `GET /api/produtos/{id}/detalhe` → `detalhe()`
   - `GET /api/produtos/{id}/metricas` → `metricas()`
   _Depende de: T-04, T-26, T-27, T-28_
+  **Implementado em 2026-07-10:** os dois endpoints novos ligados ao `ProdutoController` que
+  já existia da T-26; `metricas` delega ao `MetricaService`.
 
-- [ ] **T-30 — Testes unitários: `ProdutoService`** `MVP`
+- [x] **T-30 — Testes unitários: `ProdutoService`** `MVP`
   Cenários: listagem retorna lista correta, edição de estoque atualiza apenas o campo,
   produto não encontrado → exception, detalhe calcula demanda média corretamente.
   _Depende de: T-26, T-27_
+  **Implementado em 2026-07-10:** `ProdutoServiceTest` estendido para 9 testes (detalhe:
+  demanda/dias/CV/tendência corretos, sem previsão → nulos, < 28 dias → sem tendência,
+  inexistente e cross-tenant → exception) + `MetricaServiceTest` novo (4 testes). Suíte
+  completa: 23 testes, 0 falhas (build validado com toolchain temporário JDK 21, revertido
+  para 17 antes do commit).
 
 ---
 

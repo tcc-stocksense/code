@@ -36,7 +36,9 @@ class MotorService(
     companion object {
         // Defaults do Guia de Importação quando não há vínculo produto×fornecedor.
         // Enquanto ProdutoFornecedor não existir, todo produto usa estes valores.
-        private const val LEAD_TIME_PADRAO = 3
+        // LEAD_TIME_PADRAO é público: o AlertaService exibe o mesmo default que o
+        // motor usou no cálculo do ponto de reposição (fonte única).
+        const val LEAD_TIME_PADRAO = 3
         private const val VARIABILIDADE_LEAD_TIME_PADRAO = 1.0
     }
 
@@ -91,6 +93,7 @@ class MotorService(
         produto.pontoReposicao = resp.pontoReposicao
         produto.estoqueSeguranca = resp.estoqueSeguranca
         produto.desvioPadraoDemanda = resp.desvioPadraoDemanda
+        produto.diasAteRuptura = resp.diasAteRuptura
         produto.dataUltimoCalculo = agora
         produtoRepository.save(produto)
 

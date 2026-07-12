@@ -127,6 +127,83 @@ Arquivos em `js/core/` e `js/components/` só são editados nas tarefas de Funda
 
 ---
 
+# FASE 1.5 — Motor assíncrono (evolução do recálculo)
+
+> **Por quê.** O recálculo do motor (disparado ao importar e por um botão manual) processa
+> **todos os produtos no backend**; com volume alto de SKUs isso leva **minutos**. Se o front
+> chamar `POST /api/motor/recalcular` e **esperar a resposta síncrona**, o navegador estoura o
+> timeout muito antes de terminar. A decisão de arquitetura (ver `docs/relatorio-motor-assincrono.md`)
+> é: o backend responde **`202` na hora** e o front **acompanha por polling** de um endpoint de
+> status. Rastreabilidade com o backend: `backend/tasks.md` Épico 7 (`T-41`, `T-42`, `T-44`, `T-47`–`T-51`).
+>
+> 🔒 **STATUS: SUSPENSO (validação do orientador, 2026-07-12).** Não iniciar a implementação
+> destas tarefas até o backend liberar o Épico 7 — que por sua vez aguarda a **confirmação do
+> volume de SKUs** pelo parceiro (ver `backend/tasks.md` Épico 7 e `docs/relatorio-motor-assincrono.md`).
+> Boa notícia: o **contrato de `GET /api/motor/status` foi CONGELADO** na validação, então
+> `motorStatus.js` (F9) já pode ser escrito contra um formato estável assim que o épico for liberado.
+>
+> ⚠️ **Depende do backend.** Estas tarefas só podem ser concluídas depois que `T-41`
+> (recalcular async → 202), `T-42` (`GET /api/motor/status`, contrato congelado), `T-44` (disparo
+> na importação) e `T-52` (guard de concorrência → `409`) estiverem prontos.
+>
+> ⚠️ **Regra anti-conflito.** `F9` é **tarefa de Fundação** — cria módulo em `core/` e
+> componente em `components/`; só o dono da fundação edita esses arquivos. `S3+` e `S6+` são
+> ajustes de tela e **apenas importam** de `F9`.
+
+### F9 · Núcleo de acompanhamento do motor (`motorStatus.js` + UI de progresso) — **MVP** · Depende de: F3, F8
+- **Objetivo:** módulo de fundação que **dispara** o recálculo, recebe o `202`, faz o **polling**
+  de `GET /api/motor/status` a cada ~3 s e reporta progresso/conclusão/erro via callbacks; mais
+  um componente visual de progresso (banner/barra com "N de M"). Substitui qualquer espera
+  síncrona pelo recálculo. Cobre `T-47` (disparo + estado processando), `T-48` (polling) e
+  `T-51` (erros/falha parcial) do backend.
+- **Arquivos:** `js/core/motorStatus.js`, `js/components/progressoMotor.js`, estilos em `css/components.css`.
+- **API consumida:** `POST /api/motor/recalcular` → `202 { statusUrl }`; `GET /api/motor/status`
+  → `{ estado: "PENDENTE|PROCESSANDO|CONCLUIDO|FALHOU", feitos, total, produtosComFalha?, executadoEm? }`.
+- **Contrato do módulo (estável — telas dependem):**
+  ```js
+  // dispara o recálculo e acompanha até terminar; retorna o resumo final.
+  export async function recalcularMotor({ onProgresso, onConcluido, onErro }) // -> Promise<resumo>
+  export function acompanharStatus({ onProgresso, onConcluido, onErro })      // só polling (sem disparar)
+  ```
+- **Estados:** processando (barra + "N de M"); concluído (resumo: "N processados, X falhas");
+  `409 Conflict` (já há recálculo em andamento) → apenas acompanha o job existente; `FALHOU` /
+  timeout do polling → `toast.erro` + opção de tentar de novo. Teto de tentativas para não pollar
+  infinito se o backend cair.
+- **Critério de pronto:** disparar recálculo mostra progresso; ao concluir, `onConcluido` recebe
+  o resumo; falha e `409` tratados; nenhum `fetch` fora do `apiClient`; loop de polling encerra
+  em `CONCLUIDO`/`FALHOU` e no teto de tentativas.
+
+### S3+ · Ajustar Tela Importar ao fluxo assíncrono — **MVP** · Depende de: F9, S3
+- **Objetivo:** trocar a antiga sequência síncrona (`POST /importacao` → `POST /motor/recalcular`
+  e **esperar**) pelo fluxo assíncrono: no sucesso do **"Processar dados"**, disparar via
+  `motorStatus.recalcularMotor`, exibir o progresso e, ao concluir, **recarregar os dados** (ou
+  orientar a navegar ao Dashboard já atualizado). Cobre `T-49` (recarregar ao concluir).
+- ⚠️ **Disparo único (alinhado à T-44):** o recálculo é disparado **uma só vez**, no clique de
+  "Processar dados" (com as obrigatórias OK) — **nunca** por bloco/planilha individual, ainda que
+  Produtos e Vendas sejam enviados em uploads separados. Se o backend responder `409` (já há
+  recálculo em andamento), apenas **acompanhar** o job existente em vez de disparar outro.
+- **Arquivos:** `js/pages/importar.page.js`, `css/pages/importar.css` (sem tocar em `core/`/`components/`).
+- **API consumida:** `POST /api/importacao/*` (multipart); recálculo via `F9` (não chamar
+  `/motor/recalcular` direto).
+- **Estados:** importando (por bloco, já existente) → recalculando (progresso do motor) →
+  concluído (resumo + CTA "ver dashboard"); erro em qualquer etapa via toast.
+- **Critério de pronto:** importação real dispara o recálculo assíncrono; a tela mostra o
+  progresso sem travar; ao concluir, os dados refletem o novo cálculo (recarga/redirecionamento);
+  o botão "Processar" não fica preso esperando minutos.
+
+### S6+ · Botão "recalcular este produto" na Tela Detalhe (síncrono) — **MVP-opcional** · Depende de: S6
+- **Objetivo:** ação para recalcular **um único produto** (rápido — sem polling, é síncrono),
+  útil após reimportar vendas de um item. Ao concluir, atualiza os KPIs do produto na tela.
+  Cobre `T-50`.
+- **Arquivos:** `js/pages/produto-detalhe.page.js`, `css/pages/produto-detalhe.css`.
+- **API consumida:** `POST /api/produtos/{id}/recalcular` (ou `POST /api/motor/recalcular/{id}` —
+  confirmar a rota final com o backend, `T-43`).
+- **Estados:** loading local no botão (spinner); sucesso → KPIs atualizados + toast; erro → toast.
+- **Critério de pronto:** o botão dispara o recálculo do produto, aguarda a resposta (rápida, sem
+  polling) e re-renderiza os KPIs; erro tratado; não afeta as demais telas.
+
+---
+
 # FASE 2 — Pós-MVP
 
 ### S9 · Tela Sugestão de compra — **Pós-MVP** · Depende de: F4, F6, F7

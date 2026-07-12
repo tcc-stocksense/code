@@ -345,9 +345,237 @@
 - [ ] **T-35 — `MotorScheduler`** `MVP-opcional`
   Habilitar `@EnableScheduling` na classe principal.
   `@Scheduled(cron = "0 0 3 1 * *")` → roda todo dia 1 às 3h.
-  Chama `MotorService.executarMotor()` para cada produto ativo do estabelecimento,
-  depois `AbcService.recalcularAbc()`. Logar início, fim e quantidade processada.
-  _Depende de: T-21, T-22_
+  Chama o **núcleo compartilhado** `processarLoteMotor()` (ver T-39) para cada
+  estabelecimento — **passando pelo guard de concorrência da T-52** (não dispara se já houver
+  job `PROCESSANDO`) —, que roda `executarMotor()` por produto e depois `recalcularAbc()`.
+  Logar início, fim e quantidade processada.
+  _Depende de: T-39, T-52_
+  ⚠️ Antes do Épico 7 esta task chamaria `MotorService.executarMotor()` direto num loop.
+  Após o Épico 7, deve reusar o núcleo `processarLoteMotor()` e o guard da T-52 — é um dos
+  **três gatilhos** que compartilham o mesmo ponto de entrada (manual, pós-importação, cron).
+
+---
+
+## Épico 7 — Motor Assíncrono + Progresso `SUSPENSO`
+
+> 🔒 **STATUS: SUSPENSO (validado pelo orientador com ressalvas em 2026-07-12).**
+> **Não iniciar a implementação** das tarefas de async (T-39–T-44, T-46) até o **parceiro
+> confirmar o volume real de SKUs** por estabelecimento — esse número decide se o épico é
+> `MVP` ou `MVP-opcional`. **Exceção:** a **T-54 (benchmark)** tem prioridade **IMEDIATA** e
+> **deve** rodar antes da confirmação — é ela que substitui a estimativa "10–20+ min" por um
+> número medido e destrava a decisão de prioridade. As demais tarefas ficam desenhadas e
+> prontas para começar assim que o volume for confirmado.
+>
+> **Motivação.** Hoje `POST /api/motor/recalcular` (T-23) processa **todos os produtos
+> sequencialmente numa única requisição HTTP síncrona**: `for` sobre os produtos, cada
+> um com uma chamada Feign bloqueante ao ml-service (Prophet é CPU-bound, ~1–5 s/produto).
+> Com volume alto de SKUs (o Guia cita ~312, número **ainda não confirmado**), o lote leva
+> **minutos** e estoura o timeout do navegador/proxy muito antes de terminar — mesmo com o
+> read-timeout Feign de 30 s protegendo cada produto individualmente. Este épico remove esse
+> risco tornando o lote assíncrono, sem perder a opção síncrona onde ela é barata.
+>
+> **Decisões de validação (orientador, 2026-07-12):**
+> - **Volume de SKUs — pendente.** Épico SUSPENSO até confirmação do parceiro (ver status acima).
+> - **Estado do job em memória (T-40) — APROVADO.** Limitação consciente documentada: *o estado
+>   se perde em restart; o lote é idempotente e pode ser re-disparado manualmente*. Não justifica
+>   tabela `execucao_motor` no escopo do TCC.
+> - **Contrato de `GET /api/motor/status` (T-42) — APROVADO e CONGELADO** como proposto.
+> - **Lote síncrono de debug (antiga T-45) — DESCARTADO.** Removido do épico. O caminho síncrono
+>   que **permanece** é só o de **1 produto** (T-43).
+> - **3 lacunas identificadas na revisão** viraram tarefas: **T-52** (guard de concorrência 409),
+>   **T-53** (warm-up do Prophet), **T-54** (benchmark do lote). E **T-55** trata a omissão do
+>   `is_promocional` (reclassificada como risco ALTO para a validade acadêmica da comparação).
+>
+> **Decisões de desenho (registradas em 2026-07-12):**
+> - **Núcleo único, duas cascas.** O loop do lote vira um método `processarLoteMotor()`; os
+>   endpoints síncrono/assíncrono e o scheduler (T-35) são invólucros finos em volta dele.
+>   Adicionar/remover uma casca é reversível (~10 linhas) — a decisão **não** prende o projeto.
+> - **Editar estoque de 1 produto NÃO re-roda o motor.** Previsão, ponto de reposição e
+>   estoque de segurança dependem do *histórico de vendas*, não do `estoque_atual`. Só mudam
+>   `dias_ate_ruptura` (`estoque ÷ demanda`) e o semáforo (relativo ao PR) — aritmética barata,
+>   **calculada na leitura** pelos endpoints de tela (T-31/T-32), sem chamar o ml-service.
+>   `PATCH /estoque` (T-26) continua sendo só um `UPDATE`. **Não criar recálculo no PATCH.**
+> - **O contrato assíncrono (202 + status) é o que o front consome por padrão.** É um
+>   **superconjunto**: com poucos SKUs o status volta "concluído" quase instantâneo (polling
+>   para na 1ª tentativa); com muitos, aguenta. O caminho síncrono que sobra é só o de 1 produto.
+> - **Quem faz o polling é o FRONTEND.** O backend só **expõe** `GET /api/motor/status`
+>   (uma leitura). O loop que chama esse endpoint a cada ~3 s é responsabilidade do front.
+> - **Não há "endpoint de resultado" novo.** O resultado do motor é o banco atualizado; ao
+>   concluir, o front apenas re-busca os endpoints de tela já existentes (`/dashboard`,
+>   `/produtos`, `/alertas`).
+
+### Backend
+
+- [ ] **T-39 — Extrair núcleo compartilhado `processarLoteMotor()`** `MVP`
+  Refatorar a lógica de lote hoje embutida no `MotorController.recalcular()` (T-23) para um
+  método reutilizável — em `MotorService` ou num novo `MotorLoteService`:
+  `processarLoteMotor(estabelecimentoId: Int, onProgress: (feitos: Int, total: Int) -> Unit = {}): ResultadoLote`.
+  Faz o loop por produto (cada `executarMotor` na sua transação, falha isolada não aborta o
+  lote — comportamento atual preservado), depois `recalcularAbc()`, e chama `onProgress` a
+  cada produto concluído. Retorna `{ produtosProcessados, produtosComFalha, produtosClassificadosAbc, abcProxy }`.
+  **Sem mudança de comportamento** — só extração; `POST /recalcular` continua funcionando igual até T-41.
+  _Depende de: T-21, T-22, T-23_
+
+- [ ] **T-40 — Estado do job em memória (`MotorJobStatus`)** `MVP`
+  Bean singleton que guarda o estado do recálculo por estabelecimento:
+  `{ estado: PENDENTE|PROCESSANDO|CONCLUIDO|FALHOU, feitos: Int, total: Int, iniciadoEm, concluidoEm?, resumo?: ResultadoLote }`.
+  *(o "executando" citado na revisão = estado `PROCESSANDO` do contrato congelado — ver T-42/T-52.)*
+  Thread-safe (`AtomicReference`/`ConcurrentHashMap` por `estabelecimentoId`).
+  ✅ **APROVADO na validação (2026-07-12)** como solução do escopo TCC. **Limitação consciente a
+  documentar** (no `PredictResponse`/README e na metodologia): *o estado se perde em restart; o
+  lote é idempotente e pode ser re-disparado manualmente*. Evolução futura (fora do escopo):
+  tabela `execucao_motor`.
+  _Depende de: T-39_
+
+- [ ] **T-41 — `POST /api/motor/recalcular` assíncrono (202)** `MVP`
+  Habilitar `@EnableAsync` na classe principal + configurar um `TaskExecutor` dedicado
+  (pool pequeno, ex. 1–2 threads — o gargalo é o ml-service single-worker).
+  O endpoint: valida estabelecimento (JWT), passa pelo **guard de concorrência da T-52**
+  (`409 Conflict` se já houver job `PROCESSANDO`), marca `PROCESSANDO`, dispara
+  `processarLoteMotor()` em background (atualizando `MotorJobStatus` via `onProgress`) e
+  responde **`202 Accepted`** na hora, com `{ status: "processando", statusUrl: "/api/motor/status" }`.
+  _Depende de: T-39, T-40, T-52_
+  ⚠️ Substitui o comportamento síncrono da T-23 (que deixa de existir — o lote síncrono de debug
+  foi **descartado**, ver T-45). O único caminho síncrono que resta é o de 1 produto (T-43).
+
+- [ ] **T-42 — `GET /api/motor/status`** `MVP`
+  Lê `MotorJobStatus` do estabelecimento autenticado e devolve o **contrato de status**:
+  - processando → `{ estado: "PROCESSANDO", feitos, total }`
+  - concluído → `{ estado: "CONCLUIDO", feitos, total, produtosComFalha, produtosClassificadosAbc, abcProxy, executadoEm }`
+  - nunca rodou → `{ estado: "PENDENTE" }`
+  Endpoint **leve e idempotente** — é o que o front vai chamar em loop (polling). Sem efeitos colaterais.
+  ✅ **Contrato CONGELADO na validação (2026-07-12)** — aprovado como proposto. Não alterar o
+  formato (nomes de estado, campos) sem novo acordo com o front, que passa a depender dele.
+  _Depende de: T-40_
+
+- [ ] **T-43 — `POST /api/motor/recalcular/{produtoId}` síncrono** `MVP-opcional`
+  Recálculo de **um único produto** — rápido (~1–5 s), cabe nos 30 s do Feign, então
+  **síncrono** é o paradigma certo aqui. Chama `motorService.executarMotor(produtoId)` (valida
+  posse pelo estabelecimento do JWT) e devolve o resumo do produto. Uso: re-importou vendas de
+  1 item, ou botão "recalcular este produto". **Não** recalcula ABC (ranking relativo — deixar
+  para o lote), ou recalcula só se for barato — decidir na implementação.
+  _Depende de: T-21_
+
+- [ ] **T-44 — Disparar motor assíncrono ao fim da importação** `MVP`
+  Dispara o lote assíncrono (reusa o caminho da T-41 — passa pelo guard da T-52, marca
+  `PROCESSANDO`, `processarLoteMotor()` em background).
+  ⚠️ **Disparo ÚNICO (validação 2026-07-12):** o recálculo acontece **uma só vez, no sucesso do
+  "Processar dados"** (quando o gestor conclui a importação do conjunto obrigatório) — **nunca**
+  por planilha individual (`/produtos` e `/vendas` são enviadas separadamente, mas o motor só roda
+  ao final, uma vez). Se o guard indicar job em andamento, não dispara de novo (o lote pendente já
+  cobre os dados novos).
+  A resposta inclui `statusUrl` para o front acompanhar via polling. Importar produtos sem vendas
+  novas **não** dispara o motor.
+  _Depende de: T-41, T-52, T-16_
+
+- [x] **T-45 — ~~Lote síncrono como ferramenta de debug~~ — DESCARTADO** `—`
+  ❌ **Descartado na validação (2026-07-12).** Decisão do orientador: não expor um endpoint de
+  lote síncrono (`/recalcular-sync`) — evita um caminho paralelo que o front poderia usar por
+  engano e que reintroduziria o risco de timeout. O único caminho síncrono que **permanece** é o
+  de **1 produto** (T-43). O corpo síncrono do lote da T-23 é substituído de vez pelo assíncrono (T-41).
+
+- [ ] **T-46 — Testes: núcleo, async e status** `MVP`
+  `processarLoteMotor()`: progresso reportado, falha isolada não aborta o lote, ABC ao final.
+  `MotorJobStatus`: transições de estado, rejeição de job concorrente (409).
+  `/api/motor/status`: os três estados (pendente/processando/concluído).
+  Recálculo por produto (T-43): sucesso e produto de outro estabelecimento → 404.
+  _Depende de: T-39, T-40, T-41, T-42, T-43_
+
+### Frontend
+
+> Estas tasks vivem no repositório do front (`frontend/`), registradas aqui só para manter o
+> plano do fluxo assíncrono completo num lugar. **O "polling" é inteiramente frontend** — o
+> backend só expõe `GET /api/motor/status` (T-42).
+
+- [ ] **T-47 — Disparo + estado "processando" (consumir o 202)** `MVP`
+  Ao acionar "Recalcular" ou concluir uma importação: tratar a resposta **`202`**, guardar o
+  `statusUrl` e entrar em estado visual "processando" (spinner/banner, botão desabilitado para
+  não disparar em duplicidade). Tratar `409 Conflict` (já há recálculo rodando) mostrando
+  "recálculo em andamento".
+  _Depende de: T-41, T-44_
+
+- [ ] **T-48 — Polling de `GET /api/motor/status`** `MVP`
+  Loop no front: chamar `/api/motor/status` a cada ~3 s enquanto `estado == "PROCESSANDO"`,
+  atualizando o progresso (`feitos/total`) quando disponível. Parar o loop ao receber
+  `CONCLUIDO` ou `FALHOU`. Incluir teto de tentativas/tempo para não pollar infinito se o
+  backend cair. **Substitui o "dar reload manual"** — evita o usuário ver estado pela metade.
+  _Depende de: T-42, T-47_
+
+- [ ] **T-49 — Recarregar as telas ao concluir** `MVP`
+  Quando o polling receber `CONCLUIDO`: parar o spinner, mostrar resumo (ex.: "312 processados,
+  2 falhas") e **re-buscar os endpoints de tela** já existentes (`/api/dashboard`,
+  `/api/produtos`, `/api/alertas`, `/api/curva-abc`) para refletir os dados novos. Não existe
+  "endpoint de resultado" do motor — o resultado é o banco, lido por essas telas.
+  _Depende de: T-48, T-32, T-33_
+
+- [ ] **T-50 — Recálculo por produto (síncrono) na tela de detalhe** `MVP-opcional`
+  Botão "recalcular este produto" na Tela 6, chamando `POST /api/motor/recalcular/{id}` e
+  aguardando a resposta (é rápido — spinner local, sem polling). Atualiza os KPIs do produto
+  ao retornar.
+  _Depende de: T-43_
+
+- [ ] **T-51 — Estados de erro e falha parcial** `MVP`
+  Tratar: `FALHOU` no status (motor indisponível → mensagem amigável, opção de retry);
+  falha parcial (`produtosComFalha > 0` → aviso não-bloqueante "N produtos não recalculados");
+  timeout/queda do polling (mensagem + botão "tentar de novo").
+  _Depende de: T-48_
+
+### Backend — lacunas identificadas na revisão (2026-07-12)
+
+> Três lacunas apontadas na validação do orientador + o tratamento da omissão do `is_promocional`.
+> A **T-54 (benchmark)** é a única com prioridade **IMEDIATA** — roda antes da confirmação do
+> volume de SKUs e calibra a prioridade de todo o épico.
+
+- [ ] **T-52 — Guard de concorrência do motor (409)** `MVP`
+  Ponto único de proteção contra recálculos simultâneos: antes de chamar `processarLoteMotor()`,
+  verificar o `MotorJobStatus` do estabelecimento e **rejeitar com `409 Conflict`** se já houver um
+  job em andamento (estado `PROCESSANDO`). O guard vale para os **três gatilhos**, que passam todos
+  por ele: manual (T-41), pós-importação (T-44) e cron mensal (T-35). Implementar como método/aspecto
+  reutilizável (ex. `iniciarJobOuConflitar(estabelecimentoId)`), não duplicado em cada gatilho.
+  - **Teste:** dois disparos concorrentes para o mesmo estabelecimento → o segundo recebe `409`.
+  - **Teste:** disparo para estabelecimento diferente **não** é bloqueado (guard é por estabelecimento).
+  _Depende de: T-40_
+  ⚠️ Pré-requisito de qualquer gatilho múltiplo — implementar junto/antes de T-41, T-44 e T-35.
+
+- [ ] **T-53 — Warm-up do Prophet no startup do ml-service** `MVP`
+  Cobre o risco "cold start do Prophet" (compilação Stan na primeira chamada), hoje sem tarefa.
+  Adicionar ao startup do FastAPI (evento `lifespan`/`startup`) uma **previsão dummy** com série
+  sintética mínima, para que a primeira chamada real ao `/predict` não pague o custo de compilação
+  nem estoure o `read-timeout` de 30 s do Feign.
+  - Não deve derrubar a subida do serviço se falhar (log de aviso + segue).
+  - Documentar no `ml-service/CLAUDE.md` (§ startup) e no README.
+  _Depende de: —_ (serviço Python; independente do backend)
+  ⚠️ Tarefa do **ml-service**, registrada aqui por pertencer ao Épico 7. Refletir no `ml-service/tasks.md`.
+
+- [ ] **T-54 — Benchmark do lote (calibra a prioridade do épico)** `IMEDIATA`
+  Script Python que **gera dados sintéticos** de vendas (90+ dias) para **50, 150 e 300 produtos**,
+  dispara o lote atual (`POST /api/motor/recalcular` síncrono de hoje, T-23) e **mede o tempo total
+  e o tempo médio por produto** em cada volume. Reusar `generate_synthetic_data.py` do ml-service.
+  - **Objetivo:** substituir a estimativa "10–20+ min" por **número medido** e decidir com
+    evidência se o Épico 7 é `MVP` ou `MVP-opcional`.
+  - **Saída:** registrar os resultados numa **tabela em `docs/`** (ex.: `docs/benchmark-motor.md`) —
+    será usada na **metodologia do TCC**.
+  _Depende de: T-23 (já implementado), ml-service no ar_
+  ✅ **Pode e deve rodar ANTES da confirmação do volume de SKUs** — é o que destrava a decisão.
+  📝 **Esboço pronto (2026-07-12):** `ml-service/benchmark_motor.py` — mede N chamadas `/predict`
+  sequenciais (custo dominante do lote), reusa `generate_synthetic_data.py`, faz warm-up do Prophet
+  e grava a tabela em `docs/benchmark-motor.md`. **Só a sintaxe foi validada; falta EXECUTAR** com o
+  ml-service no ar e o **Prophet ativo** (CmdStan — hoje quebrado localmente, ver SESSION.md). Se o
+  Prophet estiver caído, o script mede só Holt-Winters e avisa que os números não são confiáveis.
+  O caminho ponta a ponta via `POST /api/motor/recalcular` está como stub (`medir_e2e()`) para o
+  número "oficial", se necessário.
+
+- [ ] **T-55 — `is_promocional` no `montarRequest` (validade da comparação HW × Prophet)** `MVP`
+  A omissão do `is_promocional` (o `MotorService.montarRequest` não popula o regressor) estava
+  classificada como risco **baixo para carga**, mas é **ALTA para a validade acadêmica da
+  comparação**: o regressor exógeno é uma **vantagem potencial do Prophet** que está sendo
+  desligada silenciosamente. **Não deixar a omissão silenciosa.** Escolher **um** caminho:
+  - **(a) Corrigir:** `montarRequest` passa a enviar `is_promocional` (a `Venda` já tem o campo);
+    o ml-service usa o regressor no Prophet (ver `ml-service` T-10, hoje `MVP-opcional`). **OU**
+  - **(b) Documentar explicitamente** na metodologia do TCC que a comparação roda **sem regressores
+    exógenos** (ambos os modelos em igualdade de condições), registrando a limitação e a justificativa.
+  _Depende de: T-21 (montarRequest) — e, se optar por (a), do regressor no ml-service_
+  ⚠️ Decisão metodológica: alinhar com o orientador qual caminho seguir antes de fechar a redação do TCC.
 
 ---
 
@@ -376,9 +604,14 @@
 | 4 — Produto | `/api/produtos/*` (4 endpoints) | T-26 → T-30 | MVP |
 | 5 — Dashboard | `/api/alertas`, `/api/dashboard`, `/api/curva-abc` | T-31 → T-34 | MVP |
 | 6 — Agendamento | Recálculo mensal automático | T-35 | MVP-opcional |
+| 7 — Motor Assíncrono | Lote async + status + polling + lacunas da revisão (BE T-39→44,46,52→55 · FE T-47→51) | T-39 → T-55 | **SUSPENSO** (T-54 imediata) |
 | Pós-MVP | Sugestão de compra, configurações, reset senha | T-36 → T-38 | Pós-MVP |
 
-**38 tasks no total.** Épicos em ordem estrita de dependência — não pular.
+**54 tasks no total** (38 originais + 16 do Épico 7: 11 backend, 5 frontend; a antiga T-45 foi
+**descartada** na validação e não conta). Épicos 0–6 em ordem estrita de dependência.
+O Épico 7 está **SUSPENSO** (aguarda confirmação do volume de SKUs) — exceto a **T-54 (benchmark)**,
+de prioridade **imediata**, que calibra a decisão. Evolui o Épico 3 (torna o lote da T-23
+assíncrono); o scheduler (T-35) foi religado para reusar o núcleo da T-39 e passar pelo guard da T-52.
 
 ---
 

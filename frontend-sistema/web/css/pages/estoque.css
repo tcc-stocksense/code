@@ -1,0 +1,57 @@
+/* Edição inline de estoque */
+.estoque-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--raio-sm);
+  padding: 4px 8px;
+  margin: -4px -8px;
+  cursor: pointer;
+  color: var(--cor-texto);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+.estoque-cell svg { color: var(--cor-texto-terc); opacity: 0; transition: opacity 100ms ease; }
+.estoque-cell:hover { background: var(--cor-fundo-sutil); border-color: var(--cor-borda); }
+.estoque-cell:hover svg { opacity: 1; }
+
+.estoque-edit { display: inline-flex; align-items: center; gap: 6px; }
+.step-btn {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  background: #fff;
+  color: var(--cor-texto-sec);
+  cursor: pointer;
+}
+.step-btn:hover { background: var(--cor-fundo-sutil); color: var(--cor-texto); }
+
+.estoque-input {
+  width: 56px; height: 28px;
+  text-align: center;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  padding: 0 4px;
+  -moz-appearance: textfield;
+}
+.estoque-input::-webkit-outer-spin-button,
+.estoque-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.estoque-input:focus { outline: none; border-color: var(--cor-primaria-clara); box-shadow: 0 0 0 3px var(--cor-primaria-50); }
+
+.confirm-btn {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: var(--raio-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.confirm-btn.ok { background: var(--cor-primaria); color: #fff; }
+.confirm-btn.ok:hover { background: var(--cor-primaria-forte); }
+.confirm-btn.no { background: #fff; border-color: var(--cor-borda-forte); color: var(--cor-texto-sec); }
+.confirm-btn.no:hover { background: var(--cor-fundo-sutil); }

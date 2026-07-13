@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockSense</title>
+  <script type="module">
+    const token = sessionStorage.getItem('stocksense_token');
+    window.location.replace(token ? 'pages/dashboard.html' : 'pages/login.html');
+  </script>
+</head>
+<body></body>
+</html>

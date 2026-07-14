@@ -34,7 +34,7 @@ content.appendChild(skeletonTable(8, 8));
 
 async function carregarComparativo() {
   try {
-    const dados = await apiGet('/metricas');
+    const dados = await apiGet('/produtos/metricas');
     dadosCache = dados;
 
     if (!dados || (!dados.agregado && (!dados.porProduto || dados.porProduto.length === 0))) {

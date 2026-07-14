@@ -285,8 +285,8 @@ const handlers = {
     };
   },
 
-  // --- Métricas (Comparativo) ---
-  'GET /metricas': async () => {
+  // --- Métricas (Comparativo T10) — listagem geral por produto + agregado ---
+  'GET /produtos/metricas': async () => {
     await delay(600);
     return {
       agregado: {

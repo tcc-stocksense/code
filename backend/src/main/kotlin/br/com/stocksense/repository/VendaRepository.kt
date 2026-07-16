@@ -55,6 +55,28 @@ interface VendaRepository : JpaRepository<Venda, Int> {
     fun agregarFaturamentoPorProduto(
         @Param("estabelecimentoId") estabelecimentoId: Int,
     ): List<FaturamentoProdutoProjecao>
+
+    /**
+     * Soma o faturamento (valor_venda) por dia a partir de uma data, restrito aos
+     * produtos do estabelecimento. O agrupamento por semana é feito no service
+     * (testável em unidade e independente de função de data do MySQL).
+     */
+    @Query(
+        """
+        SELECT CAST(v.dataHora AS date) AS data, SUM(v.valorVenda) AS total
+        FROM Venda v
+        WHERE v.dataHora >= :inicio
+          AND v.produtoId IN (
+              SELECT p.produtoId FROM Produto p WHERE p.estabelecimentoId = :estabelecimentoId
+          )
+        GROUP BY CAST(v.dataHora AS date)
+        ORDER BY CAST(v.dataHora AS date)
+        """,
+    )
+    fun agregarFaturamentoDiario(
+        @Param("estabelecimentoId") estabelecimentoId: Int,
+        @Param("inicio") inicio: LocalDateTime,
+    ): List<FaturamentoDiarioProjecao>
 }
 
 /** Projeção de venda agregada por dia (`agregarVendasDiarias`). */
@@ -68,4 +90,10 @@ interface FaturamentoProdutoProjecao {
     val produtoId: Int
     val faturamento: BigDecimal?
     val quantidade: Long
+}
+
+/** Projeção de faturamento agregado por dia (`agregarFaturamentoDiario`). */
+interface FaturamentoDiarioProjecao {
+    val data: LocalDate
+    val total: BigDecimal?
 }

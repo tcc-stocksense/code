@@ -51,6 +51,9 @@ class Produto(
     @Column(name = "estoque_seguranca", precision = 10, scale = 2)
     var estoqueSeguranca: BigDecimal? = null,
 
+    @Column(name = "dias_ate_ruptura", precision = 10, scale = 2)
+    var diasAteRuptura: BigDecimal? = null,
+
     @Column(name = "data_ultimo_calculo")
     var dataUltimoCalculo: LocalDateTime? = null,
 )

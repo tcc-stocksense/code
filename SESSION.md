@@ -9,7 +9,7 @@
 | **Repositório** | Monorepo: `backend/`, `ml-service/`, `frontend/` |
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
-| **Branches abertas** | `feat/produto-detalhe-metricas` (Épico 4, esta sessão — sem commit ainda); `test/importacao-services` (T-17 testes + doc, pushed, sem PR) |
+| **Branches abertas** | `feat/produto-detalhe-metricas` (Épico 4, pushed, sem PR); `feat/dashboard-alertas` (Épico 5, empilhada na anterior); `test/importacao-services` (T-17 testes + doc, pushed, sem PR) |
 
 > **Já mergeadas na `main`:** `feat/auth-login-jwt` (Épico 1, PR #4), `feat/motor-abc`
 > (Épico 3, PR #5), `feat/t26-produto-listagem-edicao-estoque` (T-26, PR #6). A `main`
@@ -21,35 +21,54 @@
 
 ---
 
-## Última Sessão — 2026-07-10 (Épico 4 — Produto: detalhe + métricas)
+## Última Sessão — 2026-07-10 (Épico 5 — Dashboard + Alertas + Curva ABC)
 
-> Branch: `feat/produto-detalhe-metricas` (criada a partir da `main`). **Ainda não
-> commitada** ao final da redação deste bloco — o usuário controla o fluxo de git.
+> Branch: `feat/dashboard-alertas`, **empilhada** sobre a `feat/produto-detalhe-metricas`
+> (decisão do usuário — o Épico 4 ainda não foi mergeado). O PR do Épico 5 só fica limpo
+> depois que o do 4 entrar na `main`.
 
 ### O que foi desenvolvido
 
-Fechado o **Épico 4 (Produto)** — T-27 a T-30. Completa os 4 endpoints de
-`/api/produtos/*` e entrega as telas T6 (detalhe) e T10 (comparativo de modelos).
+Fechado o **Épico 5** — T-31 a T-34. Entrega `GET /api/alertas` (T5),
+`GET /api/dashboard` (T2) e `GET /api/curva-abc` (T7).
 
-- **T-27 — Detalhe do produto** (`GET /api/produtos/{id}/detalhe`): `ProdutoService.detalhe`
-  + `ProdutoDetalheResponse`. DTO completo conforme o mapeamento T6 — demanda média,
-  variabilidade (σ + CV), tendência (média dos primeiros 14 × últimos 14 dias com venda),
-  KPIs de reposição e série de previsão mais recente.
-- **T-28 — Comparativo de modelos** (`GET /api/produtos/{id}/metricas`): `MetricaService`
-  próprio + `MetricaResponse`. Retorna as 2 métricas mais recentes (uma por modelo),
-  vencedor primeiro. Alimenta a Tela 10.
-- **T-29 — Controller:** os dois endpoints novos ligados ao `ProdutoController` que já
-  existia da T-26; ambos com checagem de tenant (produto de outro estabelecimento → 404).
-- **T-30 — Testes:** `ProdutoServiceTest` de 4 → 9 testes; `MetricaServiceTest` novo (4).
-  Suíte completa: **23 testes, 0 falhas**.
-
-**Arquivos:** 4 novos (`ProdutoDetalheResponse`, `MetricaResponse`, `MetricaService`,
-`MetricaServiceTest`) + 5 modificados (`PrevisaoRepository`, `MetricaModeloRepository`,
-`ProdutoService`, `ProdutoController`, `ProdutoServiceTest`) + `backend/tasks.md`
-(T-27→T-30 marcadas).
+- **Migration `V3__add_dias_ate_ruptura.sql` + persistência no Motor:** `dias_ate_ruptura`
+  não era coluna de `produto` (o ml-service devolvia e o backend descartava). Decisão:
+  **persistir** (não derivar em memória) — alertas e dashboard precisam do valor em lote
+  (ordenação + COUNT). `MotorService` agora grava `produto.diasAteRuptura`.
+- **T-31 Alertas:** `AlertaService`/`Controller` + `AlertaResponse`. Semáforo relativo ao
+  ponto de reposição (VERMELHO ≤ PR; AMARELO ≤ PR×1.5; VERDE acima), ordenado por urgência.
+  Produtos sem PR (motor nunca rodou) ficam fora. `leadTimeMedio` expõe
+  `MotorService.LEAD_TIME_PADRAO` (3, tornado público — fonte única).
+- **T-32 Dashboard:** `DashboardService`/`Controller` + `DashboardResponse`. Contagens por
+  queries derivadas na nova coluna; `mapeMedioSelecionado` via JPQL considerando só a
+  execução mais recente por produto; série de faturamento agregada por dia no SQL e por
+  semana (segunda-feira) no Kotlin. **Só histórico** (~8 semanas) — projeção e "valor em
+  risco" ficaram fora por decisão.
+- **T-33 Curva ABC:** método de leitura `curvaAbc` no `AbcService` + `AbcController`.
+  Resposta `CurvaAbcResponse(abcProxy, itens)` — wrapper deliberado para expor a limitação
+  do proxy, conforme CLAUDE.md §6.
+- **T-34 Testes:** `AlertaServiceTest` (7), `DashboardServiceTest` (6), +4 de curva no
+  `AbcServiceTest`, +1 assert no `MotorServiceTest`. Suíte completa: **40 testes, 0 falhas**
+  (JDK 21 temporário, revertido para 17).
 
 ### Decisões técnicas tomadas nesta sessão
 
+| Decisão | Motivo |
+|---|---|
+| Persistir `dias_ate_ruptura` (migration V3) em vez de derivar da `previsao` em memória | Dashboard faz COUNT e alertas ordenam por urgência — em lote, derivar exigiria N consultas ou query complexa; o ml-service já devolve o valor |
+| `leadTimeMedio` no alerta = default 3 do Motor | `ProdutoFornecedor` não existe; exibir o mesmo valor que o motor usou no PR é honesto; campo passa a refletir o real quando a entidade existir |
+| Série de faturamento só histórico (sem 4 semanas projetadas) | Texto da T-32; projeção exigiria previsao × preço por produto — fica para a integração do frontend |
+| Agregação diária no SQL + semana no Kotlin | Testável em unidade; independe de função de data do MySQL |
+| `mapeMedioSelecionado` só da execução mais recente por produto | O motor grava em append; média sobre o histórico todo distorceria o KPI |
+| Branch empilhada sobre a do Épico 4 | Decisão do usuário; PRs devem ser mergeados em ordem (4 → 5) |
+
+### Pendências que ficaram em aberto
+
+- **PRs em ordem:** mergear `feat/produto-detalhe-metricas` (Épico 4) e depois
+  `feat/dashboard-alertas` (Épico 5).
+- Restam no backend: **T-35** (`MotorScheduler`, MVP-opcional) e Pós-MVP (T-36 a T-38).
+- `test/importacao-services` continua sem merge.
 | Decisão | Motivo |
 |---|---|
 | `demandaMediaDiaria` e `diasAteRuptura` derivados da tabela `previsao` (média dos 30 pontos mais recentes), **não** do histórico de vendas como o texto da T-27 dizia | A premissa do `mapeamento` exige "demanda **prevista**"; a tabela `previsao` já tem os pontos → sem migration, sem tocar no ml-service. Nenhum dos dois valores é persistido em `produto` |
@@ -148,6 +167,59 @@ registrada na T-54 do `backend/tasks.md`.
 ---
 
 ## Sessão — 2026-07-10
+## Sessão — 2026-07-10 (Épico 4 — Produto: detalhe + métricas)
+
+> Branch: `feat/produto-detalhe-metricas` (criada a partir da `main`). Commitada
+> (`ca09c15`) e pushed; PR ainda não aberto.
+
+### O que foi desenvolvido
+
+Fechado o **Épico 4 (Produto)** — T-27 a T-30. Completa os 4 endpoints de
+`/api/produtos/*` e entrega as telas T6 (detalhe) e T10 (comparativo de modelos).
+
+- **T-27 — Detalhe do produto** (`GET /api/produtos/{id}/detalhe`): `ProdutoService.detalhe`
+  + `ProdutoDetalheResponse`. DTO completo conforme o mapeamento T6 — demanda média,
+  variabilidade (σ + CV), tendência (média dos primeiros 14 × últimos 14 dias com venda),
+  KPIs de reposição e série de previsão mais recente.
+- **T-28 — Comparativo de modelos** (`GET /api/produtos/{id}/metricas`): `MetricaService`
+  próprio + `MetricaResponse`. Retorna as 2 métricas mais recentes (uma por modelo),
+  vencedor primeiro. Alimenta a Tela 10.
+- **T-29 — Controller:** os dois endpoints novos ligados ao `ProdutoController` que já
+  existia da T-26; ambos com checagem de tenant (produto de outro estabelecimento → 404).
+- **T-30 — Testes:** `ProdutoServiceTest` de 4 → 9 testes; `MetricaServiceTest` novo (4).
+  Suíte completa: **23 testes, 0 falhas**.
+
+**Arquivos:** 4 novos (`ProdutoDetalheResponse`, `MetricaResponse`, `MetricaService`,
+`MetricaServiceTest`) + 5 modificados (`PrevisaoRepository`, `MetricaModeloRepository`,
+`ProdutoService`, `ProdutoController`, `ProdutoServiceTest`) + `backend/tasks.md`
+(T-27→T-30 marcadas).
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| `demandaMediaDiaria` e `diasAteRuptura` derivados da tabela `previsao` (média dos 30 pontos mais recentes), **não** do histórico de vendas como o texto da T-27 dizia | A premissa do `mapeamento` exige "demanda **prevista**"; a tabela `previsao` já tem os pontos → sem migration, sem tocar no ml-service. Nenhum dos dois valores é persistido em `produto` |
+| `ProdutoDetalheResponse` completo (σ + CV + tendência 14×14), não só os KPIs de reposição | O `mapeamento` (fonte de verdade das telas) pede variabilidade e tendência na T6; σ vem de `produto.desvioPadraoDemanda` (resolvido antes), CV e tendência são baratos |
+| `MetricaService` separado, não embutido no `ProdutoService` | Padrão "um service por responsabilidade" do CLAUDE.md; a T10 é um domínio próprio (comparativo de modelos) |
+| Detalhe e métricas com checagem de tenant (estabelecimento do JWT) | Consistência com `atualizarEstoque` (T-26); evita leitura cross-tenant |
+
+### Verificação
+
+Build e suíte validados com toolchain temporário **JDK 21** (o ambiente só tem JDK 21 e
+não há rede para o Gradle provisionar o 17 — mesma situação das sessões anteriores);
+`./gradlew test` → **BUILD SUCCESSFUL, 23 testes, 0 falhas**. Toolchain **revertido para
+17** antes de qualquer commit (sem diff no `build.gradle.kts`).
+
+### Pendências que ficaram em aberto
+
+- Épico 4 **não commitado** ainda (aguardando o usuário).
+- **Épico 5 (Dashboard/Alertas)** é o próximo — T-31 a T-34 (ver "Próxima Sessão").
+- `test/importacao-services` (T-17 testes + fix de doc dos 2 endpoints) continua **sem
+  merge** na `main` — os testes de importação não estão na `main`.
+
+---
+
+## Sessão — 2026-07-10 (ml-service: remoção do ABC + T-05)
 
 ### O que foi desenvolvido
 
@@ -526,36 +598,31 @@ ml-service/
 
 ## Próxima Sessão — Fazer nesta ordem
 
-> Atualizado em 2026-07-10.
+> Atualizado em 2026-07-10 (após o Épico 5).
 
-### Passo 1: Commitar e subir o Épico 4
+### Passo 1: Mergear os PRs em ordem
 
-- Commitar a branch `feat/produto-detalhe-metricas` (T-27 a T-30) e abrir PR / mergear na
-  `main`. Suíte já validada (23 testes, 0 falhas).
+1. Abrir e mergear o PR da `feat/produto-detalhe-metricas` (Épico 4, commit `ca09c15`).
+2. Depois abrir e mergear o PR da `feat/dashboard-alertas` (Épico 5 — empilhada na
+   anterior; o diff só fica limpo após o merge do 4).
+3. Mergear `test/importacao-services` (T-17 + fix de doc) — independente, pode ir a
+   qualquer momento; enquanto não mergeada, os testes de importação não estão na `main`.
 
-### Passo 2: Fechar o Épico 2 (Importação) que ficou para trás
+### Passo 2: Validar ponta a ponta com o banco real
 
-- Mergear `test/importacao-services` na `main` — traz os testes T-17 e o fix do
-  `CLAUDE.md` do backend (2 endpoints de importação: `/api/importacao/produtos` e
-  `/api/importacao/vendas`). Enquanto não mergeada, esses testes não estão na `main`.
-- Avaliar se vale implementar `Fornecedor`/`ProdutoFornecedor` agora (habilita o
-  lead time real no Motor, hoje no default 3 / 1.0).
+- Subir MySQL + backend (`docker-compose up -d db && ./gradlew bootRun`) — a migration
+  **V3** roda na subida. Importar planilhas, rodar `POST /api/motor/recalcular` e conferir
+  `GET /api/alertas`, `GET /api/dashboard` e `GET /api/curva-abc` com dados reais.
 
-### Passo 3: Épico 5 — Dashboard + Alertas (T2 + T5 + T7)
+### Passo 3: O que resta no backend
 
-- **T-31** `AlertaService` + `AlertaController` (`GET /api/alertas`, semáforo relativo ao
-  ponto de reposição) e **T-34** seus testes.
-- **T-32** `DashboardService` + `DashboardController` (`GET /api/dashboard`, KPIs +
-  série de faturamento).
-- **T-33** `AbcController` (`GET /api/curva-abc`, Pareto).
-- ⚠️ Ponto de atenção herdado do Épico 4: `dias_ate_ruptura` **não é coluna** de `produto`.
-  A T-32 pede `COUNT WHERE dias_ate_ruptura <= 7` — decidir se calcula na query (derivando
-  de `previsao` como no detalhe) ou se persiste o valor. Resolver antes de começar a T-32.
+- **T-35** `MotorScheduler` (`@Scheduled` mensal) — MVP-opcional, pequeno.
+- Avaliar `Fornecedor`/`ProdutoFornecedor` (lead time real no Motor, hoje default 3/1.0).
+- Pós-MVP: T-36 a T-38.
 
-### Épico 6 (MVP-opcional) e Pós-MVP
+### Depois: frontend
 
-- T-35 `MotorScheduler` (`@Scheduled` mensal). T-36 a T-38 (sugestão de compra,
-  configurações, reset de senha) ficam para depois.
+- Integração das telas com os endpoints já prontos (T1–T7 e T10 têm API completa).
 
 ### Backlog antigo do ml-service (ainda não resolvido, sem mudanças nesta sessão)
 

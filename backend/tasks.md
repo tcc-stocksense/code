@@ -327,7 +327,7 @@
 > Entrega: endpoints de consulta e visualização.
 > ⚠️ Épicos 3 e 4 devem estar concluídos — dashboards consomem dados do motor e do ABC.
 
-- [ ] **T-31 — `AlertaService` + `AlertaController`** `MVP`
+- [x] **T-31 — `AlertaService` + `AlertaController`** `MVP`
   DTO: `AlertaResponse(produtoId, nome, estoqueAtual, pontoReposicao, diasAteRuptura,
   leadTimeMedio, semaforo: String)`.
   Semáforo calculado:
@@ -336,8 +336,20 @@
   - `"VERDE"` → acima
   `GET /api/alertas`: lista ordenada por urgência (vermelhos primeiro).
   _Depende de: T-04, T-12, T-22_
+  **Implementado em 2026-07-10 (branch `feat/dashboard-alertas`):**
+  - **Pré-requisito resolvido junto:** `dias_ate_ruptura` não era coluna de `produto` — o
+    ml-service devolvia e o backend descartava. Criada **migration
+    `V3__add_dias_ate_ruptura.sql`** e o `MotorService` passou a persistir
+    `produto.diasAteRuptura = resp.diasAteRuptura` (decisão: persistir em vez de derivar em
+    memória — alertas e dashboard precisam do valor em lote).
+  - `leadTimeMedio` exibe `MotorService.LEAD_TIME_PADRAO` (3) — mesmo default que o motor
+    usa no cálculo do PR, fonte única (constante tornada pública). Quando
+    `ProdutoFornecedor` existir, o campo passa a refletir o lead time real.
+  - Produtos sem `pontoReposicao` (motor nunca rodou) ficam **fora** da lista — sem PR não
+    há como classificar urgência. Ordenação: vermelhos → amarelos → verdes; dentro do
+    grupo, menor `diasAteRuptura` primeiro (nulos por último).
 
-- [ ] **T-32 — `DashboardService` + `DashboardController`** `MVP`
+- [x] **T-32 — `DashboardService` + `DashboardController`** `MVP`
   DTO: `DashboardResponse(riscoDeFaltar7Dias, criticoAgora, mapeMedioModeloSelecionado,
   seriesFaturamento: List<{ semana, total }>)`.
   `GET /api/dashboard`:
@@ -347,16 +359,35 @@
     (não fixo no Prophet — usa o modelo vencedor de cada produto)
   - `seriesFaturamento`: `SUM(valor_venda)` agrupado por semana dos últimos 2 meses
   _Depende de: T-04, T-12, T-18, T-31_
+  **Implementado em 2026-07-10:**
+  - Contagens via queries derivadas sobre a nova coluna `dias_ate_ruptura` (V3).
+  - `mapeMedioSelecionado`: JPQL com subquery — considera só a **execução mais recente**
+    de cada produto (o motor grava em append; média sobre todas as linhas históricas
+    distorceria o KPI).
+  - Série: agregação **diária** no SQL (`agregarFaturamentoDiario`) + agrupamento por
+    semana (segunda-feira) no Kotlin — testável em unidade, sem função de data do MySQL.
+    **Só histórico** (~8 semanas); as 4 semanas projetadas do mapeamento T2 ficam para a
+    integração do frontend. Card "Valor em risco" fora (regra indefinida — ver mapeamento).
 
-- [ ] **T-33 — `AbcController`** `MVP`
+- [x] **T-33 — `AbcController`** `MVP`
   DTO: `AbcItemResponse(produtoId, nome, classeAbc, faturamento, percentualDoTotal, percentualAcumulado)`.
   `GET /api/curva-abc`: produtos com `classe_abc` preenchida, ordenados por faturamento DESC,
   com % do total e % acumulada calculadas na query ou no service.
   _Depende de: T-04, T-12, T-22_
+  **Implementado em 2026-07-10:** método de leitura `curvaAbc` no próprio `AbcService`
+  (mesmo domínio do recálculo, mesmo critério de valor com proxy por quantidade).
+  Resposta é um wrapper `CurvaAbcResponse(abcProxy, itens)` — o CLAUDE.md §6 manda expor a
+  limitação `abc_proxy` na resposta, então o formato diverge de propósito da lista pura
+  do texto original. Produtos sem `classe_abc` preenchida são ignorados na curva.
 
-- [ ] **T-34 — Testes unitários: `AlertaService`** `MVP`
+- [x] **T-34 — Testes unitários: `AlertaService`** `MVP`
   Cenários: semáforo vermelho (`estoque ≤ PR`), amarelo (`PR < estoque ≤ PR×1.5`), verde.
   _Depende de: T-31_
+  **Implementado em 2026-07-10:** `AlertaServiceTest` (7 testes: 3 do semáforo, ordenação
+  por urgência, produto sem PR fora da lista, lead time padrão, lista vazia) +
+  `DashboardServiceTest` novo (6) + 4 testes de `curvaAbc` no `AbcServiceTest` +
+  assert do novo campo no `MotorServiceTest`. Suíte completa: **40 testes, 0 falhas**
+  (validado com toolchain temporário JDK 21, revertido para 17 antes do commit).
 
 ---
 

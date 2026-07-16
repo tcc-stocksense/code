@@ -22,4 +22,24 @@ interface MetricaModeloRepository : JpaRepository<MetricaModelo, Int> {
         """,
     )
     fun findMetricasMaisRecentes(@Param("produtoId") produtoId: Int): List<MetricaModelo>
+
+    /**
+     * MAPE médio do modelo selecionado entre os produtos do estabelecimento,
+     * considerando apenas a execução mais recente de cada produto (o motor grava em
+     * append). Alimenta o KPI "acurácia do modelo" do dashboard — usa o modelo
+     * vencedor por produto, nunca fixo num modelo só. Null quando o motor nunca rodou.
+     */
+    @Query(
+        """
+        SELECT AVG(m.mape) FROM MetricaModelo m
+        WHERE m.selecionado = true
+          AND m.produtoId IN (
+              SELECT p.produtoId FROM Produto p WHERE p.estabelecimentoId = :estabelecimentoId
+          )
+          AND m.executadoEm = (
+              SELECT MAX(m2.executadoEm) FROM MetricaModelo m2 WHERE m2.produtoId = m.produtoId
+          )
+        """,
+    )
+    fun mapeMedioSelecionado(@Param("estabelecimentoId") estabelecimentoId: Int): Double?
 }

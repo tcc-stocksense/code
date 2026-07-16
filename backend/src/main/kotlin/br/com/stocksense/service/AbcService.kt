@@ -1,10 +1,14 @@
 package br.com.stocksense.service
 
+import br.com.stocksense.dto.response.AbcItemResponse
+import br.com.stocksense.dto.response.CurvaAbcResponse
 import br.com.stocksense.repository.ProdutoRepository
 import br.com.stocksense.repository.VendaRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 /**
  * Resultado de uma execução da classificação ABC.
@@ -34,6 +38,7 @@ class AbcService(
     companion object {
         private const val LIMITE_CLASSE_A = 80.0
         private const val LIMITE_CLASSE_B = 95.0
+        private const val ESCALA_PERCENTUAL = 4
     }
 
     private data class ItemRanking(val produtoId: Int, val valor: Double)
@@ -96,4 +101,53 @@ class AbcService(
         )
         return AbcResultado(classificados, abcProxy)
     }
+
+    /**
+     * Curva ABC / Pareto (Tela 7): ranking por faturamento decrescente com percentual
+     * individual e acumulado. Mesmo critério de valor do `recalcularAbc` (proxy por
+     * quantidade quando falta `valor_venda`). Só entram produtos com `classe_abc`
+     * preenchida — a classe exibida é a persistida pelo recálculo, garantindo
+     * consistência com o restante do sistema.
+     */
+    @Transactional(readOnly = true)
+    fun curvaAbc(estabelecimentoId: Int): CurvaAbcResponse {
+        val agregados = vendaRepository.agregarFaturamentoPorProduto(estabelecimentoId)
+        if (agregados.isEmpty()) return CurvaAbcResponse(abcProxy = false, itens = emptyList())
+
+        val abcProxy = agregados.any { it.faturamento == null }
+        val produtosPorId = produtoRepository.findByEstabelecimentoId(estabelecimentoId)
+            .associateBy { it.produtoId }
+
+        data class ItemCurva(val produtoId: Int, val valor: Double, val faturamento: BigDecimal?)
+
+        val ranking = agregados
+            .map { row ->
+                val valor = if (abcProxy) row.quantidade.toDouble() else (row.faturamento?.toDouble() ?: 0.0)
+                ItemCurva(row.produtoId, valor, row.faturamento)
+            }
+            .sortedByDescending { it.valor }
+
+        val total = ranking.sumOf { it.valor }
+        if (total <= 0.0) return CurvaAbcResponse(abcProxy = abcProxy, itens = emptyList())
+
+        var acumulado = 0.0
+        val itens = ranking.mapNotNull { item ->
+            acumulado += item.valor
+            val produto = produtosPorId[item.produtoId] ?: return@mapNotNull null
+            val classe = produto.classeAbc ?: return@mapNotNull null
+            AbcItemResponse(
+                produtoId = item.produtoId,
+                nome = produto.nome,
+                classeAbc = classe,
+                faturamento = item.faturamento,
+                percentualDoTotal = percentual(item.valor, total),
+                percentualAcumulado = percentual(acumulado, total),
+            )
+        }
+
+        return CurvaAbcResponse(abcProxy = abcProxy, itens = itens)
+    }
+
+    private fun percentual(valor: Double, total: Double): BigDecimal =
+        BigDecimal.valueOf(valor / total * 100.0).setScale(ESCALA_PERCENTUAL, RoundingMode.HALF_UP)
 }

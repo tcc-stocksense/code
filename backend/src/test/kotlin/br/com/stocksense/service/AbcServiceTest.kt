@@ -93,4 +93,75 @@ class AbcServiceTest {
         assertEquals(0, resultado.produtosClassificados)
         assertFalse(resultado.abcProxy)
     }
+
+    // ── curvaAbc (T-33) ────────────────────────────────────────────────────────
+
+    private fun produtoClassificado(id: Int, nome: String, classe: String?): Produto =
+        Produto(produtoId = id, estabelecimentoId = 1, nome = nome, estoqueAtual = 0, classeAbc = classe)
+
+    @Test
+    fun `curvaAbc ordena por faturamento e calcula percentuais individual e acumulado`() {
+        every { vendaRepository.agregarFaturamentoPorProduto(1) } returns listOf(
+            faturamento(20, BigDecimal("40.00"), 40),
+            faturamento(10, BigDecimal("60.00"), 60),
+        )
+        every { produtoRepository.findByEstabelecimentoId(1) } returns listOf(
+            produtoClassificado(10, "Arroz", "A"),
+            produtoClassificado(20, "Feijão", "B"),
+        )
+
+        val curva = abcService.curvaAbc(1)
+
+        assertFalse(curva.abcProxy)
+        assertEquals(listOf(10, 20), curva.itens.map { it.produtoId })
+        assertEquals(BigDecimal("60.0000"), curva.itens[0].percentualDoTotal)
+        assertEquals(BigDecimal("60.0000"), curva.itens[0].percentualAcumulado)
+        assertEquals(BigDecimal("40.0000"), curva.itens[1].percentualDoTotal)
+        assertEquals(BigDecimal("100.0000"), curva.itens[1].percentualAcumulado)
+        assertEquals("A", curva.itens[0].classeAbc)
+        assertEquals("Arroz", curva.itens[0].nome)
+    }
+
+    @Test
+    fun `curvaAbc sinaliza proxy quando falta valor_venda`() {
+        every { vendaRepository.agregarFaturamentoPorProduto(1) } returns listOf(
+            faturamento(10, null, 80),
+            faturamento(20, null, 20),
+        )
+        every { produtoRepository.findByEstabelecimentoId(1) } returns listOf(
+            produtoClassificado(10, "Arroz", "A"),
+            produtoClassificado(20, "Feijão", "C"),
+        )
+
+        val curva = abcService.curvaAbc(1)
+
+        assertTrue(curva.abcProxy)
+        assertEquals(BigDecimal("80.0000"), curva.itens[0].percentualDoTotal)
+    }
+
+    @Test
+    fun `curvaAbc ignora produto sem classe_abc preenchida`() {
+        every { vendaRepository.agregarFaturamentoPorProduto(1) } returns listOf(
+            faturamento(10, BigDecimal("60.00"), 60),
+            faturamento(20, BigDecimal("40.00"), 40),
+        )
+        every { produtoRepository.findByEstabelecimentoId(1) } returns listOf(
+            produtoClassificado(10, "Arroz", "A"),
+            produtoClassificado(20, "Feijão", null), // motor/ABC ainda não classificou
+        )
+
+        val curva = abcService.curvaAbc(1)
+
+        assertEquals(listOf(10), curva.itens.map { it.produtoId })
+    }
+
+    @Test
+    fun `curvaAbc sem vendas retorna curva vazia`() {
+        every { vendaRepository.agregarFaturamentoPorProduto(1) } returns emptyList()
+
+        val curva = abcService.curvaAbc(1)
+
+        assertFalse(curva.abcProxy)
+        assertTrue(curva.itens.isEmpty())
+    }
 }

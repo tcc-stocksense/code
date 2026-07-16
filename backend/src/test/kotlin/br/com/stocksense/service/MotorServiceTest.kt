@@ -103,6 +103,7 @@ class MotorServiceTest {
         assertEquals(BigDecimal("55.00"), produto.pontoReposicao)
         assertEquals(BigDecimal("15.00"), produto.estoqueSeguranca)
         assertEquals(BigDecimal("2.2561"), produto.desvioPadraoDemanda)
+        assertEquals(BigDecimal("3.48"), produto.diasAteRuptura)
         assertNotNull(produto.dataUltimoCalculo)
         verify { produtoRepository.save(produto) }
     }

@@ -1,0 +1,46 @@
+/* StockSense — Design Tokens (portados do protótipo) */
+
+:root {
+  /* Primary (verde profundo) */
+  --cor-primaria:       #1F4A30;
+  --cor-primaria-forte: #163B25;
+  --cor-primaria-clara: #2D6644;
+  --cor-primaria-100:   #E8F0EA;
+  --cor-primaria-50:    #F2F7F3;
+
+  /* Neutros */
+  --cor-fundo:      #FAFAF7;
+  --cor-superficie: #FFFFFF;
+  --cor-fundo-sutil:#F5F5F0;
+  --cor-texto:      #1A1F1B;
+  --cor-texto-sec:  #5A615C;
+  --cor-texto-terc: #8B918D;
+  --cor-borda:      #E5E5DF;
+  --cor-borda-forte:#CECEC5;
+
+  /* Semáforo de ruptura */
+  --status-ok:       #2D7A4A;  /* dias_ruptura > 7  */
+  --status-ok-bg:    #E1F0E6;
+  --status-atencao:  #A86C16;  /* 3 <= dias <= 7    */
+  --status-atencao-bg:#FBEFD4;
+  --status-critico:  #A8332E;  /* dias_ruptura < 3  */
+  --status-critico-bg:#F8DDDA;
+
+  /* Info */
+  --info:    #2E5A78;
+  --info-bg: #D9E5ED;
+
+  /* Espaçamento */
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 16px;
+  --gap-4: 24px;
+  --gap-5: 32px;
+  --raio: 8px;
+  --raio-sm: 6px;
+
+  /* Layout */
+  --sidebar-width: 220px;
+  --topbar-height: 60px;
+  --max-page-width: 1280px;
+}

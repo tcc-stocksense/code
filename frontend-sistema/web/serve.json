@@ -1,0 +1,9 @@
+{
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "directoryListing": false,
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/pages/:slug([^.]+)", "destination": "/pages/:slug.html" }
+  ]
+}

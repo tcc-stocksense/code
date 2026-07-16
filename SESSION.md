@@ -72,6 +72,80 @@ Fechado o **Épico 5** — T-31 a T-34. Entrega `GET /api/alertas` (T5),
 
 ---
 
+## Última Sessão — 2026-07-12 (Planejamento — Motor Assíncrono)
+
+> **Sessão de análise e documentação — nenhum código implementado.** Saída: um épico novo de
+> tarefas + um relatório técnico validado pelo orientador. Nada commitado; todas as mudanças estão
+> no working tree (arquivos de docs/tasks).
+
+### O que foi feito
+
+**1. Diagnóstico do motor preditivo (síncrono → assíncrono).** Análise do desenho atual: o motor
+roda **100% síncrono e sequencial** — `MotorController.recalcular()` faz um `for` sobre todos os
+produtos, cada um com chamada Feign bloqueante ao ml-service. Único gatilho real hoje é o endpoint
+manual (`@Scheduled` mensal e disparo pós-importação estão só nos docs, sem código). Risco central:
+com ~312 SKUs o lote leva **minutos** numa única requisição HTTP e estoura o timeout do
+navegador/proxy (o read-timeout Feign de 30 s protege só cada produto, não o agregado).
+
+**2. Decisões de arquitetura registradas** (D1–D5 no relatório): núcleo único + duas cascas;
+editar estoque de 1 produto **não** re-roda o motor (só `dias_ate_ruptura`/semáforo, calculados na
+leitura); o contrato assíncrono (202 + status) é superconjunto e vira o padrão do front; **o
+polling é responsabilidade do frontend** (backend só expõe `GET /api/motor/status`); não há
+"endpoint de resultado" novo.
+
+**3. Tarefas criadas:**
+- `backend/tasks.md` → **Épico 7 — Motor Assíncrono** (T-39–T-46 backend, T-47–T-51 frontend).
+- `frontend/tasks.md` → **FASE 1.5 — Motor assíncrono** (F9 núcleo `motorStatus.js` + polling;
+  S3+ ajuste da Importar; S6+ recálculo por produto).
+
+**4. Relatório técnico:** `docs/relatorio-motor-assincrono.md` (também publicado como Artifact para
+enviar ao orientador).
+
+**5. Validação do orientador (com ressalvas) — decisões aplicadas hoje:**
+- Volume de SKUs: **ainda não confirmado** → Épico 7 marcado **SUSPENSO** (não iniciar
+  implementação) até o parceiro confirmar.
+- Estado do job em memória (T-40): **aprovado**; limitação documentada (*perde em restart; lote
+  idempotente, re-disparável manualmente*).
+- Contrato de `GET /api/motor/status` (T-42): **aprovado e congelado**.
+- Lote síncrono de debug (T-45): **descartado** (T-43, síncrono de 1 produto, permanece).
+- **3 lacunas** viraram tarefas novas no Épico 7: **T-52** (guard de concorrência 409 nos três
+  gatilhos), **T-53** (warm-up do Prophet no startup do ml-service), **T-54** (benchmark do lote —
+  **prioridade imediata**, roda antes da confirmação de SKUs e alimenta a metodologia). **T-55**
+  trata a omissão do `is_promocional`, **reclassificada como risco ALTO para a validade acadêmica**
+  da comparação Holt-Winters × Prophet (corrigir o `montarRequest` **ou** documentar na metodologia).
+
+**6. Esboço do benchmark (T-54).** Criado `ml-service/benchmark_motor.py` — mede **N chamadas
+`/predict` sequenciais** (o custo dominante do lote; a orquestração Spring/DB é desprezível perto
+do Prophet), nos volumes **50/150/300**, reusando `generate_synthetic_data.py`. Faz **warm-up** do
+Prophet, conta chamadas que estouram os 30 s do Feign e grava a tabela em `docs/benchmark-motor.md`
+(para a metodologia). Envia `is_promocional` vazio de propósito (reproduz o backend atual). O
+caminho ponta a ponta via `POST /api/motor/recalcular` ficou como stub (`medir_e2e()`).
+⚠️ **Só a sintaxe foi validada** (`py -m py_compile` OK); **não executado** — depende do ml-service
+no ar e do **Prophet ativo** (CmdStan quebrado localmente, ver "Pendente e Bugs Conhecidos"). Com o
+Prophet caído, o script mede só Holt-Winters e **avisa** que os números não são confiáveis. Nota
+registrada na T-54 do `backend/tasks.md`.
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| Recálculo em lote vira **assíncrono** (202 + polling), síncrono só para 1 produto | Lote de ~312 SKUs estoura o timeout da requisição; 1 produto (~1–5 s) cabe nos 30 s do Feign |
+| Estado do job **em memória** (`MotorJobStatus`), sem tabela | Escopo TCC single-instance; lote idempotente cobre a perda em restart |
+| **Guard de concorrência único** (T-52) para os 3 gatilhos | Evita recálculos simultâneos; disparo pós-importação é único, no "Processar dados" |
+| Épico 7 **suspenso** até confirmar volume de SKUs, exceto benchmark | Decidir prioridade (MVP × MVP-opcional) com número medido, não estimativa |
+| `is_promocional`: reclassificado ALTO (validade acadêmica), não baixo | Regressor exógeno é vantagem potencial do Prophet sendo desligada — enviesa a Tela 10 |
+
+### Pendências que ficaram em aberto
+
+- **Volume real de SKUs** — pendente do parceiro; destrava o Épico 7.
+- **T-54 (benchmark)** — script **esboçado** (`ml-service/benchmark_motor.py`), falta **executar**;
+  bloqueado pelo CmdStan/Prophet quebrado localmente. É a única tarefa do épico liberada para rodar já.
+- **T-55 (`is_promocional`)** — decisão metodológica (corrigir × documentar) a alinhar com o orientador.
+- Mudanças desta sessão são **só documentação, não commitadas** — avaliar em que branch entram.
+
+---
+
+## Sessão — 2026-07-10
 ## Sessão — 2026-07-10 (Épico 4 — Produto: detalhe + métricas)
 
 > Branch: `feat/produto-detalhe-metricas` (criada a partir da `main`). Commitada

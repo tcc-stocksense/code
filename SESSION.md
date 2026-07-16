@@ -69,9 +69,30 @@ Fechado o **Épico 5** — T-31 a T-34. Entrega `GET /api/alertas` (T5),
   `feat/dashboard-alertas` (Épico 5).
 - Restam no backend: **T-35** (`MotorScheduler`, MVP-opcional) e Pós-MVP (T-36 a T-38).
 - `test/importacao-services` continua sem merge.
+| Decisão | Motivo |
+|---|---|
+| `demandaMediaDiaria` e `diasAteRuptura` derivados da tabela `previsao` (média dos 30 pontos mais recentes), **não** do histórico de vendas como o texto da T-27 dizia | A premissa do `mapeamento` exige "demanda **prevista**"; a tabela `previsao` já tem os pontos → sem migration, sem tocar no ml-service. Nenhum dos dois valores é persistido em `produto` |
+| `ProdutoDetalheResponse` completo (σ + CV + tendência 14×14), não só os KPIs de reposição | O `mapeamento` (fonte de verdade das telas) pede variabilidade e tendência na T6; σ vem de `produto.desvioPadraoDemanda` (resolvido antes), CV e tendência são baratos |
+| `MetricaService` separado, não embutido no `ProdutoService` | Padrão "um service por responsabilidade" do CLAUDE.md; a T10 é um domínio próprio (comparativo de modelos) |
+| Detalhe e métricas com checagem de tenant (estabelecimento do JWT) | Consistência com `atualizarEstoque` (T-26); evita leitura cross-tenant |
+
+### Verificação
+
+Build e suíte validados com toolchain temporário **JDK 21** (o ambiente só tem JDK 21 e
+não há rede para o Gradle provisionar o 17 — mesma situação das sessões anteriores);
+`./gradlew test` → **BUILD SUCCESSFUL, 23 testes, 0 falhas**. Toolchain **revertido para
+17** antes de qualquer commit (sem diff no `build.gradle.kts`).
+
+### Pendências que ficaram em aberto
+
+- Épico 4 **não commitado** ainda (aguardando o usuário).
+- **Épico 5 (Dashboard/Alertas)** é o próximo — T-31 a T-34 (ver "Próxima Sessão").
+- `test/importacao-services` (T-17 testes + fix de doc dos 2 endpoints) continua **sem
+  merge** na `main` — os testes de importação não estão na `main`.
 
 ---
 
+## Sessão — 2026-07-10 (ml-service: remoção do ABC + T-05)
 ## Última Sessão — 2026-07-12 (Planejamento — Motor Assíncrono)
 
 > **Sessão de análise e documentação — nenhum código implementado.** Saída: um épico novo de
@@ -564,8 +585,7 @@ ml-service/
 | PR de `feat/auth-login-jwt` (Épico 1) | ✅ Mergeada | PR #4 na `main` |
 | PR de `feat/motor-abc` (Épico 3) | ✅ Mergeada | PR #5 na `main` |
 | PR de `feat/t26-produto-listagem-edicao-estoque` (T-26) | ✅ Mergeada | PR #6 na `main` |
-| Épico 4 (Produto — T-27 a T-30) | ⚠️ Pushed, sem PR | Branch `feat/produto-detalhe-metricas` (commit `ca09c15`); falta abrir PR e mergear |
-| Épico 5 (Dashboard/Alertas/ABC — T-31 a T-34) | ⚠️ Feito, sem commit | Branch `feat/dashboard-alertas` (empilhada no Épico 4); 40 testes passando; inclui migration V3 |
+| Épico 4 (Produto — T-27 a T-30) | ⚠️ Feito, sem commit | Branch `feat/produto-detalhe-metricas`; 23 testes passando; falta commitar + PR |
 | PR de `test/importacao-services` (Épico 2 testes/doc) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — independente, base `main` limpa. **T-17 e o fix de doc dos 2 endpoints ainda não estão na `main`** |
 | T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ✅ Resolvido (2026-07-10) | ml-service devolve o campo; `MotorService` grava em `produto.desvioPadraoDemanda`; não bloqueia mais T-27 |
 | ml-service ainda devolve `classe_abc`/`abc_proxy` | ✅ Resolvido (2026-07-10) | `abc_service.py` removido do ml-service; ABC só existe no `AbcService` do backend |

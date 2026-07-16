@@ -1,0 +1,411 @@
+{
+  "info": {
+    "name": "StockSense — Teste E2E (Épicos 1–5)",
+    "description": "Fluxo ponta a ponta do backend: login → importação → motor → telas.\n\nPré-requisitos:\n- Backend na branch `feat/dashboard-alertas` (Épico 5 ainda não está na main)\n- MySQL up (`docker-compose up -d db`) e ml-service up (porta 8000)\n- Planilhas geradas por `ml-service/app/tests/generate_synthetic_data.py` (fixtures/2_produtos.xlsx e 5_vendas.xlsx)\n\nOrdem de execução: os requests estão numerados. O request 01 (login) grava o token automaticamente na variável da coleção — os demais já usam Bearer {{token}}.\n\nNos requests 02 e 03, selecione o arquivo .xlsx manualmente no body (form-data, campo `arquivo`) — o Postman não persiste caminho de arquivo na coleção.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "produtoId", "value": "1" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "01 — Login (T1)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 e token presente', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.token).to.be.a('string');",
+              "    pm.collectionVariables.set('token', body.token);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@stocksense.local\",\n  \"senha\": \"admin123\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+      }
+    },
+    {
+      "name": "02 — Importar produtos (T3)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 e todos importados', () => {",
+              "    pm.response.to.have.status(201);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.erros).to.be.empty;",
+              "    pm.expect(body.importados).to.eql(body.totalLinhas);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "arquivo",
+              "type": "file",
+              "src": "",
+              "description": "Selecione ml-service/app/tests/fixtures/2_produtos.xlsx"
+            }
+          ]
+        },
+        "url": { "raw": "{{baseUrl}}/api/importacao/produtos", "host": ["{{baseUrl}}"], "path": ["api", "importacao", "produtos"] }
+      }
+    },
+    {
+      "name": "03 — Importar vendas (T3)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 e histórico >= 90 dias', () => {",
+              "    pm.response.to.have.status(201);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.erros).to.be.empty;",
+              "    pm.expect(body.diasDeHistorico).to.be.at.least(90);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "arquivo",
+              "type": "file",
+              "src": "",
+              "description": "Selecione ml-service/app/tests/fixtures/5_vendas.xlsx"
+            }
+          ]
+        },
+        "url": { "raw": "{{baseUrl}}/api/importacao/vendas", "host": ["{{baseUrl}}"], "path": ["api", "importacao", "vendas"] }
+      }
+    },
+    {
+      "name": "04 — Recalcular motor + ABC (Épico 3)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 sem falhas por produto', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.produtosComFalha).to.eql(0);",
+              "    pm.expect(body.produtosProcessados).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/motor/recalcular", "host": ["{{baseUrl}}"], "path": ["api", "motor", "recalcular"] },
+        "description": "Síncrono: com 10 produtos leva ~10–60 s (Prophet é CPU-bound; a 1ª chamada paga o cold start do Stan). Aumente o request timeout do Postman se necessário (Settings → Request timeout = 0)."
+      }
+    },
+    {
+      "name": "05 — Listar produtos (T4)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 e campos calculados preenchidos', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.be.an('array').that.is.not.empty;",
+              "    pm.expect(body[0].pontoReposicao).to.not.be.null;",
+              "    pm.expect(body[0].classeAbc).to.not.be.null;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/produtos", "host": ["{{baseUrl}}"], "path": ["api", "produtos"] }
+      }
+    },
+    {
+      "name": "06 — Editar estoque (T4)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 e estoque atualizado', () => {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().estoqueAtual).to.eql(55);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"estoqueAtual\": 55\n}" },
+        "url": { "raw": "{{baseUrl}}/api/produtos/{{produtoId}}/estoque", "host": ["{{baseUrl}}"], "path": ["api", "produtos", "{{produtoId}}", "estoque"] }
+      }
+    },
+    {
+      "name": "07 — Detalhe do produto (T6)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 com KPIs e previsões', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.demandaMediaDiaria).to.not.be.null;",
+              "    pm.expect(body.previsoes).to.be.an('array').that.is.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/produtos/{{produtoId}}/detalhe", "host": ["{{baseUrl}}"], "path": ["api", "produtos", "{{produtoId}}", "detalhe"] }
+      }
+    },
+    {
+      "name": "08 — Métricas HW × Prophet (T10)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 com 2 modelos, vencedor primeiro', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.lengthOf(2);",
+              "    pm.expect(body[0].selecionado).to.be.true;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/produtos/{{produtoId}}/metricas", "host": ["{{baseUrl}}"], "path": ["api", "produtos", "{{produtoId}}", "metricas"] }
+      }
+    },
+    {
+      "name": "09 — Alertas de reposição (T5)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200, ordenado por urgência', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.be.an('array').that.is.not.empty;",
+              "    const ordem = { VERMELHO: 0, AMARELO: 1, VERDE: 2 };",
+              "    for (let i = 1; i < body.length; i++) {",
+              "        pm.expect(ordem[body[i].semaforo]).to.be.at.least(ordem[body[i-1].semaforo]);",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/alertas", "host": ["{{baseUrl}}"], "path": ["api", "alertas"] }
+      }
+    },
+    {
+      "name": "10 — Dashboard (T2)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 com KPIs e série de faturamento', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.mapeMedioModeloSelecionado).to.not.be.null;",
+              "    pm.expect(body.seriesFaturamento).to.be.an('array').that.is.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/dashboard", "host": ["{{baseUrl}}"], "path": ["api", "dashboard"] }
+      }
+    },
+    {
+      "name": "11 — Curva ABC (T7)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200, sem proxy, acumulado crescente até 100%', () => {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.abcProxy).to.be.false;",
+              "    pm.expect(body.itens).to.be.an('array').that.is.not.empty;",
+              "    const ultimo = body.itens[body.itens.length - 1];",
+              "    pm.expect(Number(ultimo.percentualAcumulado)).to.be.closeTo(100, 0.5);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/curva-abc", "host": ["{{baseUrl}}"], "path": ["api", "curva-abc"] }
+      }
+    },
+    {
+      "name": "Extras (negativos e ml-service)",
+      "item": [
+        {
+          "name": "Login inválido → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@stocksense.local\",\n  \"senha\": \"senha-errada\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Sem token → 401/403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('bloqueado sem token', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/produtos", "host": ["{{baseUrl}}"], "path": ["api", "produtos"] }
+          }
+        },
+        {
+          "name": "Produto inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/produtos/9999/detalhe", "host": ["{{baseUrl}}"], "path": ["api", "produtos", "9999", "detalhe"] }
+          }
+        },
+        {
+          "name": "Estoque negativo → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estoqueAtual\": -1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/produtos/{{produtoId}}/estoque", "host": ["{{baseUrl}}"], "path": ["api", "produtos", "{{produtoId}}", "estoque"] }
+          }
+        },
+        {
+          "name": "ml-service /health (direto, só diagnóstico)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:8000/health", "host": ["localhost"], "port": "8000", "path": ["health"] },
+            "description": "Só para diagnosticar se o ml-service está de pé antes do request 04. No fluxo real o frontend NUNCA chama o ml-service direto."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -7,12 +7,19 @@ com 10 produtos representando diferentes perfis de demanda.
 Uso como script:
     python generate_synthetic_data.py
 
+Saídas:
+    fixtures/5_vendas_sintetico.csv  — 365 dias (2024), para os testes do motor
+    fixtures/2_produtos.xlsx         — catálogo p/ POST /api/importacao/produtos
+    fixtures/5_vendas.xlsx           — 180 dias terminando ontem, p/ POST /api/importacao/vendas
+                                       (o backend rejeita data futura e o dashboard só agrega
+                                       as últimas ~8 semanas — por isso a janela recente)
+
 Uso como módulo nos testes:
     from app.tests.generate_synthetic_data import gerar_dataset, PRODUTOS_META
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -39,21 +46,23 @@ _FERIADOS_2024: set[date] = {
 
 # ── Catálogo de produtos ───────────────────────────────────────────────────────
 # variabilidade: desvio padrão relativo do ruído (0.05 = constante, 0.45 = alta)
+# estoque_atual: calibrado p/ o teste do semáforo dos alertas (T5) — valores baixos
+# em relação à demanda diária tendem ao VERMELHO (estoque ≤ PR), altos ao VERDE.
 PRODUTOS_META: list[dict] = [
     # demanda estável
-    {"produto_id": 1,  "nome": "Arroz 5kg",          "categoria": "Grãos",       "demanda_base": 12, "variabilidade": 0.15, "preco_venda": 28.90},
-    {"produto_id": 2,  "nome": "Feijão Carioca 1kg",  "categoria": "Grãos",       "demanda_base":  8, "variabilidade": 0.15, "preco_venda":  8.50},
+    {"produto_id": 1,  "nome": "Arroz 5kg",          "categoria": "Grãos",       "demanda_base": 12, "variabilidade": 0.15, "preco_venda": 28.90, "unidade_medida": "un", "estoque_atual": 15},
+    {"produto_id": 2,  "nome": "Feijão Carioca 1kg",  "categoria": "Grãos",       "demanda_base":  8, "variabilidade": 0.15, "preco_venda":  8.50, "unidade_medida": "un", "estoque_atual": 120},
     # alta variabilidade — perecíveis
-    {"produto_id": 3,  "nome": "Leite Integral 1L",   "categoria": "Laticínios",  "demanda_base": 20, "variabilidade": 0.35, "preco_venda":  4.99},
-    {"produto_id": 4,  "nome": "Pão Francês",          "categoria": "Padaria",     "demanda_base": 30, "variabilidade": 0.40, "preco_venda":  0.75},
-    {"produto_id": 5,  "nome": "Banana Prata kg",      "categoria": "Frutas",      "demanda_base": 15, "variabilidade": 0.45, "preco_venda":  5.90},
+    {"produto_id": 3,  "nome": "Leite Integral 1L",   "categoria": "Laticínios",  "demanda_base": 20, "variabilidade": 0.35, "preco_venda":  4.99, "unidade_medida": "lt", "estoque_atual": 60},
+    {"produto_id": 4,  "nome": "Pão Francês",          "categoria": "Padaria",     "demanda_base": 30, "variabilidade": 0.40, "preco_venda":  0.75, "unidade_medida": "un", "estoque_atual": 25},
+    {"produto_id": 5,  "nome": "Banana Prata kg",      "categoria": "Frutas",      "demanda_base": 15, "variabilidade": 0.45, "preco_venda":  5.90, "unidade_medida": "kg", "estoque_atual": 200},
     # demanda quase constante
-    {"produto_id": 6,  "nome": "Sal Refinado 1kg",     "categoria": "Condimentos", "demanda_base":  5, "variabilidade": 0.05, "preco_venda":  2.50},
-    {"produto_id": 7,  "nome": "Açúcar Cristal 1kg",   "categoria": "Condimentos", "demanda_base":  7, "variabilidade": 0.05, "preco_venda":  4.20},
+    {"produto_id": 6,  "nome": "Sal Refinado 1kg",     "categoria": "Condimentos", "demanda_base":  5, "variabilidade": 0.05, "preco_venda":  2.50, "unidade_medida": "un", "estoque_atual": 60},
+    {"produto_id": 7,  "nome": "Açúcar Cristal 1kg",   "categoria": "Condimentos", "demanda_base":  7, "variabilidade": 0.05, "preco_venda":  4.20, "unidade_medida": "un", "estoque_atual": 10},
     # demanda moderada
-    {"produto_id": 8,  "nome": "Óleo de Soja 900ml",   "categoria": "Óleos",       "demanda_base":  6, "variabilidade": 0.20, "preco_venda":  7.80},
-    {"produto_id": 9,  "nome": "Frango Inteiro kg",    "categoria": "Carnes",      "demanda_base": 10, "variabilidade": 0.30, "preco_venda": 12.90},
-    {"produto_id": 10, "nome": "Refrigerante 2L",      "categoria": "Bebidas",     "demanda_base": 14, "variabilidade": 0.25, "preco_venda":  9.50},
+    {"produto_id": 8,  "nome": "Óleo de Soja 900ml",   "categoria": "Óleos",       "demanda_base":  6, "variabilidade": 0.20, "preco_venda":  7.80, "unidade_medida": "un", "estoque_atual": 90},
+    {"produto_id": 9,  "nome": "Frango Inteiro kg",    "categoria": "Carnes",      "demanda_base": 10, "variabilidade": 0.30, "preco_venda": 12.90, "unidade_medida": "kg", "estoque_atual": 45},
+    {"produto_id": 10, "nome": "Refrigerante 2L",      "categoria": "Bebidas",     "demanda_base": 14, "variabilidade": 0.25, "preco_venda":  9.50, "unidade_medida": "un", "estoque_atual": 300},
 ]
 
 # ── Fatores de sazonalidade semanal (0 = segunda … 6 = domingo) ──────────────
@@ -198,12 +207,82 @@ def exportar_csv(df: pd.DataFrame, destino: Path | None = None) -> Path:
     return destino.resolve()
 
 
+def exportar_planilha_produtos(destino: Path | None = None) -> Path:
+    """
+    Gera a planilha 2_produtos.xlsx no formato do Guia de Importação v2.0,
+    pronta para o POST /api/importacao/produtos.
+
+    Contém apenas os campos de entrada — os calculados (classe_abc,
+    ponto_reposicao, etc.) são rejeitados pelo backend se preenchidos.
+
+    Args:
+        destino: Caminho do arquivo. Padrão: app/tests/fixtures/2_produtos.xlsx.
+
+    Returns:
+        Caminho absoluto do arquivo gerado.
+    """
+    if destino is None:
+        destino = Path(__file__).parent / "fixtures" / "2_produtos.xlsx"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+
+    df = pd.DataFrame([
+        {
+            "produto_id":         p["produto_id"],
+            "nome":               p["nome"],
+            "categoria":          p["categoria"],
+            "unidade_medida":     p["unidade_medida"],
+            "preco_custo":        round(p["preco_venda"] * 0.70, 2),
+            "preco_venda":        p["preco_venda"],
+            "estoque_atual":      p["estoque_atual"],
+            "nivel_servico_alvo": 0.95,
+        }
+        for p in PRODUTOS_META
+    ])
+    df.to_excel(destino, index=False)
+    return destino.resolve()
+
+
+def exportar_planilha_vendas(
+    dias: int = 180,
+    destino: Path | None = None,
+) -> Path:
+    """
+    Gera a planilha 5_vendas.xlsx com a janela de datas terminando ONTEM,
+    pronta para o POST /api/importacao/vendas.
+
+    A janela recente é necessária porque o backend rejeita vendas com data
+    futura e o dashboard (T2) agrega o faturamento das últimas ~8 semanas —
+    com o dataset padrão de 2024 a série do dashboard voltaria vazia.
+
+    Args:
+        dias: Tamanho do histórico. Mínimo exigido pelo motor: 90.
+        destino: Caminho do arquivo. Padrão: app/tests/fixtures/5_vendas.xlsx.
+
+    Returns:
+        Caminho absoluto do arquivo gerado.
+    """
+    if destino is None:
+        destino = Path(__file__).parent / "fixtures" / "5_vendas.xlsx"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+
+    inicio = date.today() - timedelta(days=dias)
+    df, _ = gerar_dataset(data_inicio=inicio.isoformat(), dias=dias)
+    df.to_excel(destino, index=False)
+    return destino.resolve()
+
+
 if __name__ == "__main__":
     df_csv, series = gerar_dataset()
 
     caminho = exportar_csv(df_csv)
     print(f"CSV exportado : {caminho}")
     print(f"Total registros: {len(df_csv)}\n")
+
+    caminho_produtos = exportar_planilha_produtos()
+    print(f"XLSX produtos : {caminho_produtos}")
+
+    caminho_vendas = exportar_planilha_vendas()
+    print(f"XLSX vendas   : {caminho_vendas} (180 dias terminando ontem)\n")
 
     nomes = {p["produto_id"]: p["nome"] for p in PRODUTOS_META}
 

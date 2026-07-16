@@ -9,16 +9,71 @@
 | **Repositório** | Monorepo: `backend/`, `ml-service/`, `frontend/` |
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
-| **Branches abertas** | `feat/auth-login-jwt`, `feat/motor-abc`, `test/importacao-services` (todas pushed, sem PR) |
+| **Branches abertas** | `feat/produto-detalhe-metricas` (Épico 4, esta sessão — sem commit ainda); `test/importacao-services` (T-17 testes + doc, pushed, sem PR) |
 
-> **Ordem de merge das branches abertas:** `feat/auth-login-jwt` (Épico 1) →
-> `feat/motor-abc` (Épico 3) → `test/importacao-services` (Épico 2 testes/doc).
-> O Motor depende do Spring Security do Épico 1, então a `feat/auth-login-jwt`
-> **precisa ser mergeada antes** da `feat/motor-abc`. A `test/importacao-services`
-> é independente (base `main` limpa) e pode ir a qualquer momento.
+> **Já mergeadas na `main`:** `feat/auth-login-jwt` (Épico 1, PR #4), `feat/motor-abc`
+> (Épico 3, PR #5), `feat/t26-produto-listagem-edicao-estoque` (T-26, PR #6). A `main`
+> contém Épicos 0–3 + T-26 + o Épico 4 desta sessão (após commit).
+>
+> **Ainda sem merge:** `test/importacao-services` (Épico 2 — testes T-17 + fix de doc dos
+> 2 endpoints de importação). Independente, base `main` limpa; pode ir a qualquer momento.
+> Enquanto não mergeada, os testes de importação **não estão na `main`**.
 
 ---
 
+## Última Sessão — 2026-07-10 (Épico 4 — Produto: detalhe + métricas)
+
+> Branch: `feat/produto-detalhe-metricas` (criada a partir da `main`). **Ainda não
+> commitada** ao final da redação deste bloco — o usuário controla o fluxo de git.
+
+### O que foi desenvolvido
+
+Fechado o **Épico 4 (Produto)** — T-27 a T-30. Completa os 4 endpoints de
+`/api/produtos/*` e entrega as telas T6 (detalhe) e T10 (comparativo de modelos).
+
+- **T-27 — Detalhe do produto** (`GET /api/produtos/{id}/detalhe`): `ProdutoService.detalhe`
+  + `ProdutoDetalheResponse`. DTO completo conforme o mapeamento T6 — demanda média,
+  variabilidade (σ + CV), tendência (média dos primeiros 14 × últimos 14 dias com venda),
+  KPIs de reposição e série de previsão mais recente.
+- **T-28 — Comparativo de modelos** (`GET /api/produtos/{id}/metricas`): `MetricaService`
+  próprio + `MetricaResponse`. Retorna as 2 métricas mais recentes (uma por modelo),
+  vencedor primeiro. Alimenta a Tela 10.
+- **T-29 — Controller:** os dois endpoints novos ligados ao `ProdutoController` que já
+  existia da T-26; ambos com checagem de tenant (produto de outro estabelecimento → 404).
+- **T-30 — Testes:** `ProdutoServiceTest` de 4 → 9 testes; `MetricaServiceTest` novo (4).
+  Suíte completa: **23 testes, 0 falhas**.
+
+**Arquivos:** 4 novos (`ProdutoDetalheResponse`, `MetricaResponse`, `MetricaService`,
+`MetricaServiceTest`) + 5 modificados (`PrevisaoRepository`, `MetricaModeloRepository`,
+`ProdutoService`, `ProdutoController`, `ProdutoServiceTest`) + `backend/tasks.md`
+(T-27→T-30 marcadas).
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| `demandaMediaDiaria` e `diasAteRuptura` derivados da tabela `previsao` (média dos 30 pontos mais recentes), **não** do histórico de vendas como o texto da T-27 dizia | A premissa do `mapeamento` exige "demanda **prevista**"; a tabela `previsao` já tem os pontos → sem migration, sem tocar no ml-service. Nenhum dos dois valores é persistido em `produto` |
+| `ProdutoDetalheResponse` completo (σ + CV + tendência 14×14), não só os KPIs de reposição | O `mapeamento` (fonte de verdade das telas) pede variabilidade e tendência na T6; σ vem de `produto.desvioPadraoDemanda` (resolvido antes), CV e tendência são baratos |
+| `MetricaService` separado, não embutido no `ProdutoService` | Padrão "um service por responsabilidade" do CLAUDE.md; a T10 é um domínio próprio (comparativo de modelos) |
+| Detalhe e métricas com checagem de tenant (estabelecimento do JWT) | Consistência com `atualizarEstoque` (T-26); evita leitura cross-tenant |
+
+### Verificação
+
+Build e suíte validados com toolchain temporário **JDK 21** (o ambiente só tem JDK 21 e
+não há rede para o Gradle provisionar o 17 — mesma situação das sessões anteriores);
+`./gradlew test` → **BUILD SUCCESSFUL, 23 testes, 0 falhas**. Toolchain **revertido para
+17** antes de qualquer commit (sem diff no `build.gradle.kts`).
+
+### Pendências que ficaram em aberto
+
+- Épico 4 **não commitado** ainda (aguardando o usuário).
+- **Épico 5 (Dashboard/Alertas)** é o próximo — T-31 a T-34 (ver "Próxima Sessão").
+- `test/importacao-services` (T-17 testes + fix de doc dos 2 endpoints) continua **sem
+  merge** na `main` — os testes de importação não estão na `main`.
+
+---
+
+## Sessão — 2026-07-10 (ml-service: remoção do ABC + T-05)
 ## Última Sessão — 2026-07-12 (Planejamento — Motor Assíncrono)
 
 > **Sessão de análise e documentação — nenhum código implementado.** Saída: um épico novo de
@@ -455,9 +510,11 @@ ml-service/
 | ml-service executado localmente | ⚠️ Parcial | Servidor não foi levantado; testes rodaram via TestClient |
 | Branch `feat/ml-service-motor-preditivo` | ✅ Mergeada | Mergeada na `main` via PR #3 |
 | Código Kotlin no backend | ✅ Em andamento | Épico 2 (Importação) e Épico 1 (Auth) já implementados — ver sessão 2026-07-03 acima |
-| PR de `feat/auth-login-jwt` (Épico 1) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **mergear antes** da motor-abc |
-| PR de `feat/motor-abc` (Épico 3) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — **depende da auth-login-jwt** |
-| PR de `test/importacao-services` (Épico 2 testes/doc) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — independente, base `main` limpa |
+| PR de `feat/auth-login-jwt` (Épico 1) | ✅ Mergeada | PR #4 na `main` |
+| PR de `feat/motor-abc` (Épico 3) | ✅ Mergeada | PR #5 na `main` |
+| PR de `feat/t26-produto-listagem-edicao-estoque` (T-26) | ✅ Mergeada | PR #6 na `main` |
+| Épico 4 (Produto — T-27 a T-30) | ⚠️ Feito, sem commit | Branch `feat/produto-detalhe-metricas`; 23 testes passando; falta commitar + PR |
+| PR de `test/importacao-services` (Épico 2 testes/doc) | ⚠️ Pendente | Branch pushed, falta abrir e mergear — independente, base `main` limpa. **T-17 e o fix de doc dos 2 endpoints ainda não estão na `main`** |
 | T-05 — acordo `desvio_padrao_demanda` no `PredictResponse` | ✅ Resolvido (2026-07-10) | ml-service devolve o campo; `MotorService` grava em `produto.desvioPadraoDemanda`; não bloqueia mais T-27 |
 | ml-service ainda devolve `classe_abc`/`abc_proxy` | ✅ Resolvido (2026-07-10) | `abc_service.py` removido do ml-service; ABC só existe no `AbcService` do backend |
 | T-17 — testes unitários de importação | ✅ Feito | 13 testes na `test/importacao-services`, todos passando |
@@ -469,27 +526,36 @@ ml-service/
 
 ## Próxima Sessão — Fazer nesta ordem
 
-> Atualizado em 2026-07-04.
+> Atualizado em 2026-07-10.
 
-### Passo 1: Mergear as branches abertas na ordem certa
+### Passo 1: Commitar e subir o Épico 4
 
-- Abrir e mergear a PR de `feat/auth-login-jwt` (Épico 1) na `main`.
-- Depois abrir e mergear a PR de `feat/motor-abc` (Épico 3) na `main`.
+- Commitar a branch `feat/produto-detalhe-metricas` (T-27 a T-30) e abrir PR / mergear na
+  `main`. Suíte já validada (23 testes, 0 falhas).
 
-### Passo 2: Fechar o Épico 2 (Importação)
+### Passo 2: Fechar o Épico 2 (Importação) que ficou para trás
 
-- T-17 — testes unitários de `ProdutoImportacaoService` e `VendaImportacaoService`.
-- Atualizar o `CLAUDE.md` do backend para refletir os 2 endpoints de importação
-  (`/api/importacao/produtos`, `/api/importacao/vendas`) em vez do único
-  `/api/importacao` descrito hoje.
+- Mergear `test/importacao-services` na `main` — traz os testes T-17 e o fix do
+  `CLAUDE.md` do backend (2 endpoints de importação: `/api/importacao/produtos` e
+  `/api/importacao/vendas`). Enquanto não mergeada, esses testes não estão na `main`.
 - Avaliar se vale implementar `Fornecedor`/`ProdutoFornecedor` agora (habilita o
-  lead time real no Motor, hoje no default).
+  lead time real no Motor, hoje no default 3 / 1.0).
 
-### Passo 3: Épico 4 — Produto (T4 + T6 + T10)
+### Passo 3: Épico 5 — Dashboard + Alertas (T2 + T5 + T7)
 
-- `ProdutoService` (listagem, edição de estoque, detalhe), `MetricaService`
-  (comparativo Holt-Winters × Prophet), `ProdutoController`.
-- ✅ T-05 (`desvio_padrao_demanda`) resolvido em 2026-07-10 — T-30/T-27 já podem seguir.
+- **T-31** `AlertaService` + `AlertaController` (`GET /api/alertas`, semáforo relativo ao
+  ponto de reposição) e **T-34** seus testes.
+- **T-32** `DashboardService` + `DashboardController` (`GET /api/dashboard`, KPIs +
+  série de faturamento).
+- **T-33** `AbcController` (`GET /api/curva-abc`, Pareto).
+- ⚠️ Ponto de atenção herdado do Épico 4: `dias_ate_ruptura` **não é coluna** de `produto`.
+  A T-32 pede `COUNT WHERE dias_ate_ruptura <= 7` — decidir se calcula na query (derivando
+  de `previsao` como no detalhe) ou se persiste o valor. Resolver antes de começar a T-32.
+
+### Épico 6 (MVP-opcional) e Pós-MVP
+
+- T-35 `MotorScheduler` (`@Scheduled` mensal). T-36 a T-38 (sugestão de compra,
+  configurações, reset de senha) ficam para depois.
 
 ### Backlog antigo do ml-service (ainda não resolvido, sem mudanças nesta sessão)
 

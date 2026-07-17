@@ -8,6 +8,11 @@ Este projeto tem uma **base de conhecimento** em `wiki/` (vault Obsidian). Para 
 2. **`wiki/index.md`** — catálogo de todas as páginas.
 3. **`wiki/conceitos/integracao-backend.md`** — plano e contratos da integração (foco atual).
 
+**Contrato de API (fonte da verdade):** `../docs/contrato-api-frontend.md` (raiz do monorepo) —
+rotas, shapes JSON reais e divergências validadas contra o backend. As tarefas da integração
+estão em `docs/tasks-integracao.md`. Em caso de conflito com o wiki ou com `backend/CLAUDE.md`,
+o contrato prevalece.
+
 **Mantenha o conhecimento vivo:** ao decidir/aprender algo (reunião, contrato de API, decisão), atualize a página relevante em `wiki/` e registre uma linha em `wiki/log.md`. Ver `wiki/README.md` para as convenções.
 
 ## Estrutura

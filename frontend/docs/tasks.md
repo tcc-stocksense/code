@@ -1,6 +1,8 @@
 # tasks.md — Front-end StockSense
 
-> Backlog de execução do front-end. Cada tarefa é **autocontida**: pode ser dada a uma IA (Claude Code) ou a uma pessoa e executada isoladamente. Leia `frontend.md` antes de qualquer tarefa — ele define a estrutura, os contratos de `core/` e os componentes. Contrato de API: `backend/CLAUDE.md` é a fonte da verdade.
+> Backlog de execução do front-end. Cada tarefa é **autocontida**: pode ser dada a uma IA (Claude Code) ou a uma pessoa e executada isoladamente. Leia `frontend.md` antes de qualquer tarefa — ele define a estrutura, os contratos de `core/` e os componentes.
+>
+> ⚠️ **Contrato de API: a fonte da verdade é [`docs/contrato-api-frontend.md`](../../docs/contrato-api-frontend.md)** (raiz do monorepo), validado contra o backend real — **não** o `backend/CLAUDE.md` (desatualizado em pontos como a importação). Algumas rotas citadas nas tarefas abaixo divergem do contrato real (importação em 2 endpoints, sem `?periodo=` no ABC, métricas por produto etc.) — a reconciliação está em **[`tasks-integracao.md`](tasks-integracao.md)**, que prevalece sobre a seção "API consumida" destas tarefas.
 
 ## Como usar este arquivo
 - Tarefas têm **dependências**. Não comece uma tarefa sem que suas dependências estejam concluídas.

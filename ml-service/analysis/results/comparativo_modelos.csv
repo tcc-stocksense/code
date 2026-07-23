@@ -1,0 +1,11 @@
+produto_id,nome,modelo,mape,rmse,mae,vencedor
+1,Arroz 5kg,holt_winters,12.4886,2.2521,1.7583,True
+2,Feijão Carioca 1kg,holt_winters,13.2643,1.4155,1.1231,True
+3,Leite Integral 1L,holt_winters,42.049,9.1052,7.4062,True
+4,Pão Francês,holt_winters,83.4253,16.2211,12.0806,True
+5,Banana Prata kg,holt_winters,66.7259,8.0726,6.1822,True
+6,Sal Refinado 1kg,holt_winters,9.625,1.0852,0.5875,True
+7,Açúcar Cristal 1kg,holt_winters,8.8945,1.7412,0.9415,True
+8,Óleo de Soja 900ml,holt_winters,21.4335,2.1356,1.421,True
+9,Frango Inteiro kg,holt_winters,25.3948,3.7548,2.651,True
+10,Refrigerante 2L,holt_winters,28.3011,4.7084,3.3909,True

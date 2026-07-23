@@ -1,0 +1,16 @@
+# Dependências EXCLUSIVAS da camada de análise/TCC.
+# NÃO fazem parte do runtime do serviço — por isso ficam separadas do
+# requirements.txt raiz (não incham a imagem Docker; ver §2 do CLAUDE.md).
+#
+# Instale por cima das dependências do serviço:
+#   pip install -r requirements.txt -r analysis/requirements-analysis.txt
+#
+# Depois registre o kernel do Jupyter e abra o notebook:
+#   python -m ipykernel install --user --name stocksense-analysis
+#   jupyter lab analysis/analise_modelos.ipynb
+
+matplotlib==3.9.2      # gráficos (previsto×real, resíduos, barras de erro, KPIs)
+jupyterlab==4.2.5      # ambiente do notebook
+ipykernel==6.29.5      # kernel Python para o Jupyter
+nbformat==5.10.4       # leitura/escrita do .ipynb
+openpyxl==3.1.5        # leitura do dataset real (.xlsx) da Tela 3

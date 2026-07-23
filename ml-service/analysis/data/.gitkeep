@@ -1,0 +1,3 @@
+# Mantém a pasta data/ no versionamento.
+# Coloque aqui o dataset real: vendas_real.xlsx (formato planilha 5_vendas).
+# O .xlsx real NÃO deve ser commitado (dados do estabelecimento).

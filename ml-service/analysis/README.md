@@ -67,19 +67,23 @@ planilha `5_vendas` do Guia de Importação (colunas `produto_id`, `data_hora`,
 `quantidade`). A última seção do notebook repete a avaliação sobre ela. Sem o
 arquivo, essa seção é **pulada** com aviso.
 
-## ⚠️ Prophet (T-12)
+## ⚠️ Prophet (T-12) — resolvido em 2026-07-24
 
-O comparativo completo exige o Prophet funcionando. Se, ao rodar o notebook, a
-saída indicar `Prophet disponível: False`, o backend do Prophet (CmdStan) está
-quebrado no ambiente — erro `'Prophet' object has no attribute 'stan_backend'`.
-Conserto (instalação de dependência, **não** alteração de código):
+O comparativo completo exige o Prophet funcionando. Se a saída indicar
+`Prophet disponível: False` com o erro `'Prophet' object has no attribute 'stan_backend'`,
+a causa **não** é CmdStan ausente — é **conflito de versões**: o `cmdstanpy 1.3.0` (puxado
+sem pin) exige um `makefile` no CmdStan que o `prophet 1.1.6` empacota sem ele. O
+`prophet_model.bin` já vem pré-compilado, então nada precisa compilar.
+
+**Conserto (já aplicado no `requirements.txt`):** pinar `cmdstanpy==1.2.4`. Basta
+reinstalar as dependências:
 
 ```bash
-python -c "import cmdstanpy; cmdstanpy.install_cmdstan(overwrite=True)"
+pip install -r requirements.txt
 ```
 
-> Esse download vem do GitHub e pode estar bloqueado em ambientes com política de
-> rede restritiva (ex.: sandbox de CI). Rode num ambiente com acesso ao GitHub.
+> Não é preciso `install_cmdstan`, Rtools nem reinstalar o prophet — o pin resolve, é
+> reprodutível e vale no Docker/nuvem.
 
-Enquanto o Prophet estiver indisponível, o notebook roda **apenas com Holt-Winters**
+Se, mesmo assim, o Prophet estiver indisponível, o notebook roda **apenas com Holt-Winters**
 e sinaliza a limitação — nenhuma célula quebra.

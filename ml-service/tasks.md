@@ -30,7 +30,7 @@
 - `desvio_padrao_demanda` (previsto desde a v1 deste `tasks.md`, T-06) não estava no `PredictResponse` — bloqueava a Tela 6. **Implementado**: `prediction_service.py` agora expõe o `σ` da série (já calculado internamente para Ballou) no campo `desvio_padrao_demanda`.
 - **Pendência aberta para o backend** (fora do escopo deste arquivo): `PredictResponse.kt` ainda ignora `classe_abc`/`abc_proxy` (que não são mais enviados, então isso é inofensivo mas o comentário ficou desatualizado) e ainda não mapeia `desvio_padrao_demanda`. Atualizar `backend/CLAUDE.md` §4 e `PredictResponse.kt` fica para uma sessão focada no backend.
 
-**Nota sobre testes:** `test_prophet_service.py` falha localmente (11/11 testes) com `AttributeError: 'Prophet' object has no attribute 'stan_backend'` — parece problema de instalação do CmdStan neste venv, não bug de código (Holt-Winters e Stock Service passam 100%). Investigar o ambiente antes de considerar T-11/T-12 totalmente validadas em CI.
+**Nota sobre testes (atualizada 2026-07-24):** `test_prophet_service.py` **passa 13/13** após o conserto do Prophet. A causa da falha antiga (`AttributeError: 'Prophet' object has no attribute 'stan_backend'`) **não** era CmdStan ausente — era conflito de versões: o `cmdstanpy 1.3.0` (sem pin) exige `makefile` no cmdstan empacotado do `prophet 1.1.6`, que não o tem. **Resolvido** pinando `cmdstanpy==1.2.4` no `requirements.txt`. Suíte completa do ml-service: **66 testes, 0 falhas**.
 
 ---
 
@@ -145,12 +145,13 @@
   Todos os cenários cobertos, suíte passa.
   _Depende de: T-09_
 
-- [~] **T-12 — Testes: `app/tests/test_prophet_service.py`** `MVP`
-  Cenários cobertos no código, mas **11/11 testes falham neste ambiente** com
-  `AttributeError: 'Prophet' object has no attribute 'stan_backend'` — parece problema
-  de instalação do CmdStan no venv local, não bug de teste/código. Precisa reinstalar
-  o backend do Prophet (`pip install --force-reinstall prophet` ou reinstalar cmdstanpy)
-  e rodar de novo antes de marcar como `[x]`.
+- [x] **T-12 — Testes: `app/tests/test_prophet_service.py`** `MVP`
+  **13/13 passam (resolvido 2026-07-24).** A falha antiga (`AttributeError: 'Prophet' object
+  has no attribute 'stan_backend'`) **não** era CmdStan ausente nem bug de código — era conflito
+  de versões: `cmdstanpy 1.3.0` (puxado sem pin) exige `makefile` no cmdstan empacotado do
+  `prophet 1.1.6`, que vem sem ele; o `prophet_model.bin` já é pré-compilado. **Conserto:** pin
+  `cmdstanpy==1.2.4` no `requirements.txt` (NÃO reinstalar prophet — mesmo par de versões traz o
+  mesmo erro; NÃO precisa de Rtools/`install_cmdstan`).
   _Depende de: T-10_
 
 ---
@@ -243,15 +244,15 @@
 | 0 — Fundação | Dockerfile ✅, requirements ✅, `.env.example` ❌, `main.py` ✅ | T-01 → T-04 | MVP | 3/4 |
 | 1 — Schemas | `PredictRequest` e `PredictResponse` (contrato com backend) | T-05 → T-06 | MVP | 2/2 |
 | 2 — Stock Service | Fórmulas de ES, PR, ruptura (Ballou) + testes | T-07 → T-08 | MVP | 2/2 |
-| 3 — Model Services | Holt-Winters ✅ + Prophet (sem `is_promocional`) + testes (Prophet falhando no ambiente) | T-09 → T-12 | MVP | 2/4 |
+| 3 — Model Services | Holt-Winters ✅ + Prophet ✅ (sem `is_promocional`) + testes ✅ (Prophet consertado 2026-07-24) | T-09 → T-12 | MVP | 3/4 |
 | 4 — Prediction Service | Orquestração, seleção de modelo, tratamento de erros | T-13 | MVP | 1/1 |
 | 5 — Routers | `GET /health`, `POST /predict`, `main.py` final | T-14 → T-16 | MVP | 3/3 |
 | 6 — Testes integração | Fixtures + testes do router | T-17 → T-18 | MVP | 2/2 |
 | Pós-MVP | Versionamento / drift | T-19 | Pós-MVP | 0/1 |
 
-**15/19 tasks concluídas.** Pendências reais: T-03 (`.env.example`), T-10 (regressor
-`is_promocional` no Prophet, opcional), T-12 (ambiente Prophet quebrado localmente),
-T-19 (Pós-MVP, não é prioridade agora).
+**16/19 tasks concluídas.** Pendências reais: T-03 (`.env.example`), T-10 (regressor
+`is_promocional` no Prophet, opcional), T-19 (Pós-MVP, não é prioridade agora).
+T-12 (Prophet) **resolvida em 2026-07-24** — pin `cmdstanpy==1.2.4`.
 
 ---
 

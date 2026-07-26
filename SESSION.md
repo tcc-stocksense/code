@@ -21,6 +21,52 @@
 
 ---
 
+## Última Sessão — 2026-07-24 (ml-service: Prophet consertado + notebook de análise validado)
+
+> Branch: `analise-validacao-modelos` (notebook de validação empírica dos modelos, Tela 10 —
+> núcleo acadêmico do TCC). Foco da sessão: fazer o Prophet funcionar e rodar o notebook ponta a ponta.
+
+### O que foi feito
+
+- **Prophet consertado (T-12 finalmente resolvido).** Diagnosticada a causa raiz do
+  `AttributeError: 'Prophet' object has no attribute 'stan_backend'`: **não** era CmdStan ausente
+  (o `~/.cmdstan/cmdstan-2.39.0` até existe). É **conflito de versões** — o `prophet 1.1.6` empacota
+  um CmdStan enxuto em `prophet/stan_model/cmdstan-2.33.1/` **sem `makefile`**, e o `cmdstanpy 1.3.0`
+  (puxado transitivamente, sem pin) passou a **exigir** o `makefile` na validação. O
+  `prophet_model.bin` já vem pré-compilado — nada precisa compilar.
+- **Conserto: pin `cmdstanpy==1.2.4`** no `ml-service/requirements.txt` (contemporâneo do cmdstan 2.33,
+  não exige makefile). Reprodutível e válido no Docker/nuvem — **descarta** o antigo caminho de instalar
+  Rtools + `install_cmdstan`, que era desnecessário. Reinstalar o prophet **não** resolvia (mesmo par de
+  versões). A alternativa de criar um `makefile` stub foi testada e descartada (some ao recriar o venv).
+- **Validação completa:** Prophet instancia/treina/prevê; `pip check` limpo; **suíte do ml-service:
+  66 testes, 0 falhas** (13 do `test_prophet_service.py`, agora rodando de verdade — antes 11 falhavam).
+- **Notebook de análise rodado ponta a ponta** (`ml-service/analysis/analise_modelos.ipynb`), 28 células,
+  0 erros, **Prophet ativo**. Regenerou as 14 figuras e o `comparativo_modelos.csv` com os dois modelos
+  competindo. **Resultado real (dados sintéticos, seed 42): 6 vitórias Holt-Winters × 4 Prophet**, margens
+  pequenas — nenhum modelo domina, a seleção por produto se justifica (boa narrativa p/ a banca).
+- Dependências do Jupyter (`analysis/requirements-analysis.txt`) instaladas no `venv` do projeto.
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| Pin `cmdstanpy==1.2.4` em vez de manipular pasta/instalar CmdStan | Reprodutível, versionado, vai pro Docker/nuvem; resolve pra todos que instalam as deps |
+| Não reinstalar prophet nem instalar Rtools/CmdStan | O `.bin` já é pré-compilado; o problema era só a validação estrita do cmdstanpy 1.3.0 |
+| Reautorar o commit do notebook (Claude → GabrielBoos22) e regenerar figuras com Prophet | Autoria correta; as figuras commitadas antes eram só Holt-Winters (Prophet caído) e não serviam pro TCC |
+
+### Pendências que ficaram em aberto
+
+- **Notebook: dataset real** — a última seção é pulada sem `analysis/data/vendas_real.xlsx`; rodar com
+  dados reais quando disponíveis.
+- **T-54 (benchmark do motor)** e **T-53 (warm-up do Prophet)** — agora **desbloqueados** (Prophet
+  funciona); podem rodar.
+- **T-10 (ml-service)** — regressor `is_promocional` no Prophet (MVP-opcional) segue não implementado;
+  ver T-55 (risco de validade acadêmica da comparação).
+- Recriar o `venv` do zero reintroduz o bug **se** as deps não forem reinstaladas do `requirements.txt`
+  atualizado — com o pin, um `pip install -r requirements.txt` já traz a versão certa.
+
+---
+
 ## Última Sessão — 2026-07-10 (Épico 5 — Dashboard + Alertas + Curva ABC)
 
 > Branch: `feat/dashboard-alertas`, **empilhada** sobre a `feat/produto-detalhe-metricas`
@@ -575,8 +621,8 @@ ml-service/
 
 | Item | Status | Observação |
 |---|---|---|
-| Prophet: CmdStan não instalado no Windows | ❌ Bloqueado | `mingw32-make` não encontrado. Instalar Rtools: `winget install -e --id RProject.Rtools`, adicionar `C:\rtools44\mingw64\bin` ao PATH, depois `python -m cmdstanpy.install_cmdstan` |
-| Testes do `test_prophet_service.py` | ❌ 11 falhas | Dependem da resolução do CmdStan acima |
+| Prophet: `stan_backend` AttributeError (T-12) | ✅ Resolvido (2026-07-24) | **Não** era CmdStan ausente — era conflito de versões. Pin `cmdstanpy==1.2.4` no `requirements.txt` (a 1.3.0 exige `makefile` no cmdstan empacotado do prophet 1.1.6). NÃO precisa de Rtools/`install_cmdstan`; o `.bin` já é pré-compilado |
+| Testes do `test_prophet_service.py` | ✅ 13/13 passam | Após o pin do cmdstanpy; suíte completa do ml-service: 66 testes, 0 falhas |
 | `generate_report.py` | ❌ Não existe | Precisa ser criado; deve gerar PDF com gráficos de acurácia dos modelos |
 | Migrations V2, V3, V4 | ✅ Existem | Criadas em commit `3fef6bc` — V1 (schema), V2 (seed padrão), V3 (add estabelecimento_id), V4 (add índices). **Consolidadas depois em uma única `V1` + `V2` de seed** (ver commits mais recentes) |
 | ml-service executado localmente | ⚠️ Parcial | Servidor não foi levantado; testes rodaram via TestClient |

@@ -1,0 +1,21 @@
+produto_id,nome,modelo,mape,rmse,mae,vencedor
+1,Arroz 5kg,holt_winters,12.4887,2.2522,1.7583,False
+1,Arroz 5kg,prophet,12.4606,2.2451,1.7488,True
+2,Feijão Carioca 1kg,holt_winters,13.2639,1.4155,1.1231,True
+2,Feijão Carioca 1kg,prophet,13.354,1.4191,1.1279,False
+3,Leite Integral 1L,holt_winters,42.0977,9.1086,7.4113,True
+3,Leite Integral 1L,prophet,42.7739,9.1659,7.4487,False
+4,Pão Francês,holt_winters,81.251,16.0704,11.9428,True
+4,Pão Francês,prophet,84.172,16.2863,12.1403,False
+5,Banana Prata kg,holt_winters,66.6753,8.0727,6.1818,False
+5,Banana Prata kg,prophet,66.6271,8.073,6.1818,True
+6,Sal Refinado 1kg,holt_winters,9.6252,1.0853,0.5875,False
+6,Sal Refinado 1kg,prophet,9.5655,1.0844,0.5851,True
+7,Açúcar Cristal 1kg,holt_winters,8.8945,1.7412,0.9415,True
+7,Açúcar Cristal 1kg,prophet,9.0065,1.7404,0.9452,False
+8,Óleo de Soja 900ml,holt_winters,21.4335,2.1356,1.421,True
+8,Óleo de Soja 900ml,prophet,21.4615,2.1373,1.4216,False
+9,Frango Inteiro kg,holt_winters,25.3962,3.7548,2.6511,False
+9,Frango Inteiro kg,prophet,25.287,3.7482,2.6434,True
+10,Refrigerante 2L,holt_winters,28.2987,4.7083,3.3909,True
+10,Refrigerante 2L,prophet,28.3084,4.7087,3.3912,False

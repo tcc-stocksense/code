@@ -179,6 +179,7 @@ input, button, select, textarea { font-family: inherit; color: inherit; }
 .dot-success { background: var(--status-ok); }
 .dot-warning { background: var(--status-atencao); }
 .dot-danger { background: var(--status-critico); }
+.dot-neutral { background: var(--cor-texto-terc); }
 
 /* ---------- Banner ---------- */
 .banner {

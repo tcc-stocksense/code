@@ -1,4 +1,5 @@
-import { logout } from '../core/auth.js';
+import { logout, getNomeFantasia } from '../core/auth.js';
+import { mockAtivo, setMock } from '../core/config.js';
 import { iconHome, iconBox, iconBell, iconChart, iconUpload, iconBeaker, iconCog, iconLogout, iconCart } from './icons.js';
 
 const NAV_OPERACAO = [
@@ -6,7 +7,7 @@ const NAV_OPERACAO = [
   { id: 'estoque',     label: 'Estoque',              icon: iconBox,    href: 'estoque.html' },
   { id: 'alertas',     label: 'Alertas de reposição', icon: iconBell,   href: 'alertas.html' },
   { id: 'curva-abc',   label: 'Curva ABC',            icon: iconChart,  href: 'curva-abc.html' },
-  { id: 'sugestao',   label: 'Sugestão de compra',   icon: iconCart,   href: 'sugestao-compra.html' },
+  { id: 'sugestao',    label: 'Sugestão de compra',   icon: iconCart,   href: 'sugestao-compra.html', indisponivel: true },
 ];
 
 const NAV_SISTEMA = [
@@ -16,9 +17,10 @@ const NAV_SISTEMA = [
 
 function navItems(items, telaAtiva) {
   return items.map(item => `
-    <a href="${item.href}" class="nav-item ${item.id === telaAtiva ? 'active' : ''}">
+    <a href="${item.href}" class="nav-item ${item.id === telaAtiva ? 'active' : ''}"${item.indisponivel ? ' title="Sem endpoint no backend — disponível apenas em modo mock"' : ''}>
       ${item.icon()}
       ${item.label}
+      ${item.indisponivel ? '<span class="badge badge-neutral" style="margin-left:auto;font-size:10px">em breve</span>' : ''}
     </a>
   `).join('');
 }
@@ -58,17 +60,20 @@ export function renderLayout(telaAtiva) {
   const main = document.createElement('div');
   main.className = 'main';
 
-  // Topbar
+  // Topbar — o nome do estabelecimento vem do login (LoginResponse.nomeFantasia)
+  const nomeFantasia = getNomeFantasia();
+  const inicial = (nomeFantasia || 'U').trim().charAt(0).toUpperCase();
+
   const topbar = document.createElement('header');
   topbar.className = 'topbar';
   topbar.innerHTML = `
     <div class="topbar-left">
-      <strong id="topbar-nome">StockSense</strong>
+      <strong id="topbar-nome">${nomeFantasia}</strong>
       <span style="color:var(--cor-texto-terc)">·</span>
       <span id="topbar-info"></span>
     </div>
     <div class="topbar-right" style="position:relative">
-      <div class="avatar" id="topbar-avatar" style="cursor:pointer" title="Menu do usuário">U</div>
+      <div class="avatar" id="topbar-avatar" style="cursor:pointer" title="Menu do usuário">${inicial}</div>
       <div class="avatar-menu" id="avatar-menu">
         <a href="configuracoes.html" class="avatar-menu-item">
           ${iconCog(16)}
@@ -120,26 +125,27 @@ export function renderLayout(telaAtiva) {
 
 // ============================================================
 //  MOCK TOGGLE — botão flutuante para ativar/desativar dados
+//  fictícios. Fonte da verdade: core/config.js (padrão = API real).
 // ============================================================
-function renderMockToggle() {
+export function renderMockToggle() {
   if (document.getElementById('mock-toggle')) return;
 
   const btn = document.createElement('button');
   btn.id = 'mock-toggle';
   btn.type = 'button';
 
-  const ativo = localStorage.getItem('stocksense_mock') !== 'off';
-
   function atualizar() {
-    const on = localStorage.getItem('stocksense_mock') !== 'off';
-    btn.textContent = on ? '🟢 Mock ON' : '⚪ Mock OFF';
-    btn.title = on ? 'Clique para desativar dados fictícios' : 'Clique para ativar dados fictícios';
+    const on = mockAtivo();
+    btn.textContent = on ? '🟠 Mock ON' : '🟢 API real';
+    btn.title = on
+      ? 'Exibindo dados fictícios. Clique para falar com a API real.'
+      : 'Falando com a API real. Clique para usar dados fictícios (offline).';
     btn.style.cssText = `
       position:fixed; bottom:16px; right:16px; z-index:9999;
       padding:6px 14px; border-radius:20px; border:1px solid var(--cor-borda-forte);
       font-size:12px; font-weight:500; cursor:pointer;
-      background:${on ? 'var(--cor-primaria)' : '#fff'};
-      color:${on ? '#fff' : 'var(--cor-texto-sec)'};
+      background:${on ? 'var(--status-atencao)' : 'var(--cor-primaria)'};
+      color:#fff;
       box-shadow:0 2px 8px rgba(0,0,0,0.12);
       transition: all 0.2s;
     `;
@@ -148,8 +154,7 @@ function renderMockToggle() {
   atualizar();
 
   btn.addEventListener('click', () => {
-    const on = localStorage.getItem('stocksense_mock') !== 'off';
-    localStorage.setItem('stocksense_mock', on ? 'off' : 'on');
+    setMock(!mockAtivo());
     location.reload();
   });
 

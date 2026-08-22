@@ -14,3 +14,4 @@ jupyterlab==4.2.5      # ambiente do notebook
 ipykernel==6.29.5      # kernel Python para o Jupyter
 nbformat==5.10.4       # leitura/escrita do .ipynb
 openpyxl==3.1.5        # leitura do dataset real (.xlsx) da Tela 3
+reportlab==5.0.0       # geração do relatório PDF em docs/ (banca)

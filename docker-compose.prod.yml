@@ -1,0 +1,136 @@
+# StockSense — produção (EC2 t3.medium, 2 vCPU / 4 GB)
+#
+# Diferenças que importam em relação ao docker-compose.yml de desenvolvimento:
+#   1. Só o Caddy publica porta. Backend, ml-service e MySQL ficam na rede
+#      interna do Docker — a internet não os enxerga (R6).
+#   2. Nenhuma credencial tem default. A sintaxe ${VAR:?mensagem} faz o
+#      compose abortar se a variável faltar, em vez de subir com valor fraco (R8).
+#   3. Limites de memória por container, somando ~3,9 GB dos 4 GB (§6.1).
+#      O swapfile de 2 GB da instância é a rede de proteção contra o OOM killer.
+#   4. Rotação de log em todos os serviços — sem isso o EBS enche sozinho.
+#
+# Uso:  docker compose -f docker-compose.prod.yml up -d
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: stocksense-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"     # redirect para HTTPS + desafio ACME do Let's Encrypt
+      - "443:443"   # únicas portas publicadas em todo o sistema
+    environment:
+      # Domínio servido. Em produção: stocksense.duckdns.org
+      # Para testar sem TLS antes do DNS existir, use  SITE_ADDRESS=:80
+      SITE_ADDRESS: "${SITE_ADDRESS:?defina SITE_ADDRESS no .env (ex.: stocksense.duckdns.org)}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificados — precisa persistir, ou o Let's Encrypt rate-limita
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    logging: *logging
+
+  frontend:
+    image: nginx:alpine
+    container_name: stocksense-frontend
+    restart: unless-stopped
+    volumes:
+      # ./frontend/web, NÃO ./frontend — a pasta pai contém CLAUDE.md,
+      # docs/, prototype/, wiki/ e design-reference/, que iriam para a web.
+      - ./frontend/web:/usr/share/nginx/html:ro
+    # sem 'ports' — só o Caddy alcança
+    logging: *logging
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: stocksense-backend:prod
+    container_name: stocksense-backend
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://db:3306/stocksense?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: "${DB_USERNAME:?defina DB_USERNAME no .env}"
+      DB_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
+      ML_SERVICE_URL: http://ml-service:8000
+      SERVER_PORT: 8080
+      # Sem default de propósito: application.yml:37 tem um segredo versionado
+      # como fallback. Este ':?' garante que ele nunca seja usado em produção.
+      JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env (32+ bytes aleatórios)}"
+      # POI materializa o .xlsx inteiro na heap; pico ~10x o arquivo (R7)
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70"
+    mem_limit: 1g
+    depends_on:
+      db:
+        condition: service_healthy
+    # sem 'ports' — só o Caddy alcança, na rota /api/*
+    #
+    # healthcheck: pendente do item 4 da Parte 8 (adicionar
+    # spring-boot-starter-actuator). Enquanto não existir /actuator/health,
+    # um healthcheck aqui marcaria o container como unhealthy para sempre.
+    # Depois de adicionar o Actuator, descomentar:
+    #
+    # healthcheck:
+    #   test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 90s
+    logging: *logging
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    image: stocksense-ml:prod
+    container_name: stocksense-ml
+    restart: unless-stopped
+    # --workers 2 usa os 2 vCPU da t3.medium (R2). Pode sair daqui quando o
+    # item 6 da Parte 8 levar a flag para o Dockerfile.
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    mem_limit: 1800m
+    # python:3.10-slim não traz curl nem wget — o healthcheck usa o próprio Python.
+    # start_period longo por causa do cold start do Prophet/Stan (R3).
+    # Enquanto o item 5 da Parte 8 (async def -> def) não entrar, /health não
+    # responde durante um lote: daí o interval e o retries generosos (R2).
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    # sem 'ports' — POST /predict não tem autenticação nenhuma (R6)
+    logging: *logging
+
+  db:
+    image: mysql:8.0
+    container_name: stocksense-db
+    restart: unless-stopped
+    command: --innodb-buffer-pool-size=256M
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?defina DB_ROOT_PASSWORD no .env}"
+      MYSQL_DATABASE: stocksense
+      MYSQL_USER: "${DB_USERNAME:?defina DB_USERNAME no .env}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
+    volumes:
+      - db_data:/var/lib/mysql
+    mem_limit: 600m
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    # sem 'ports' — o 3307 do compose de desenvolvimento NÃO é publicado aqui
+    logging: *logging
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

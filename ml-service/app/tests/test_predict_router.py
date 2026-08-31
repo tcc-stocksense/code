@@ -6,7 +6,7 @@ o comportamento HTTP do router sem acionar os modelos de ML — mantendo
 os testes rápidos e focados na camada de roteamento.
 """
 from datetime import date
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -113,7 +113,7 @@ class TestPostPredictSucesso:
         """Payload válido com serviço mockado deve retornar 200."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             return_value=_resposta_mock(),
         ):
             response = client.post("/predict", json=payload_valido)
@@ -125,7 +125,7 @@ class TestPostPredictSucesso:
         """produto_id da resposta deve corresponder ao do request."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             return_value=_resposta_mock(produto_id=1),
         ):
             dados = client.post("/predict", json=payload_valido).json()
@@ -142,7 +142,7 @@ class TestPostPredictSucesso:
         }
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             return_value=_resposta_mock(),
         ):
             dados = client.post("/predict", json=payload_valido).json()
@@ -154,7 +154,7 @@ class TestPostPredictSucesso:
         """Lista de previsões deve conter exatamente 30 dias."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             return_value=_resposta_mock(),
         ):
             dados = client.post("/predict", json=payload_valido).json()
@@ -166,7 +166,7 @@ class TestPostPredictSucesso:
         """modelo_selecionado deve ser 'holt_winters' ou 'prophet'."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             return_value=_resposta_mock(),
         ):
             dados = client.post("/predict", json=payload_valido).json()
@@ -182,7 +182,7 @@ class TestPostPredictErros:
         """RuntimeError no serviço deve gerar HTTP 500."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             side_effect=RuntimeError("ambos os modelos falharam"),
         ):
             response = client.post("/predict", json=payload_valido)
@@ -194,7 +194,7 @@ class TestPostPredictErros:
         """Stack trace Python nunca deve aparecer na resposta ao cliente."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             side_effect=RuntimeError("falha interna"),
         ):
             response = client.post("/predict", json=payload_valido)
@@ -207,7 +207,7 @@ class TestPostPredictErros:
         """Mensagem de erro 500 deve ser genérica, sem detalhes internos."""
         with patch(
             "app.routers.predict_router.executar_previsao",
-            new_callable=AsyncMock,
+            new_callable=MagicMock,
             side_effect=RuntimeError("detalhe interno sensível"),
         ):
             body = client.post("/predict", json=payload_valido).json()

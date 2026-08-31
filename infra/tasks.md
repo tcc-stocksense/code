@@ -64,12 +64,14 @@ Auditado contra o código e o `git log`, não contra a documentação.
 |---|---|
 | `infra/infraestrutura-nuvem.md` | ✅ commit `eb147c6` |
 | `infra/terraform/*.tf` (9 arquivos) | ✅ commit `4a479d5` — **escrito e inicializado, nunca aplicado** |
-| `Caddyfile` | ⚠️ escrito, **não commitado** |
-| `docker-compose.prod.yml` | ⚠️ escrito, **não commitado** |
-| Correções da Parte 8 | ❌ **0 de 8** |
+| `Caddyfile` | ✅ commit `fabf7b3` |
+| `docker-compose.prod.yml` | ✅ commit `fabf7b3` |
+| Correções da Parte 8 | 🔶 **2 de 8** (D-13, D-15) |
 | Integração do frontend (`tasks-integracao.md`) | ❌ **0 de 11** — o app é 100% mock |
 | Recursos na AWS | ❌ **nenhum existe** — nunca houve `terraform apply` |
-| `ml-service/analysis/` (núcleo acadêmico da T10) | ⚠️ **não versionado** |
+| `ml-service/analysis/` (núcleo acadêmico da T10) | ✅ versionado na branch `analise-validacao-modelos` — **não mergeada** |
+| Benchmark do motor (T-54) | ✅ executado em 2026-08-30 — `docs/benchmark-motor.md` |
+| Pin `cmdstanpy==1.2.4` (T-12) | 🔴 **ausente na main e na branch de deploy** — ver D-46 |
 
 **Escrito ≠ executado.** O Terraform tem `terraform init` rodado (o `.terraform.lock.hcl` está
 versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito foi gasto até aqui.
@@ -85,12 +87,11 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   Compose de produção com só o Caddy publicando porta, credenciais sem default (`${VAR:?}`),
   limites de memória por container (§6.1) e rotação de log. `Caddyfile` com `SITE_ADDRESS` por env,
   rota `/api/*` → `backend:8080` e o resto → `frontend:80`.
-  **Feito, mas ainda fora do git** — ver D-02.
+  Commit `fabf7b3`.
 
-- [ ] **D-02 — Commitar os dois arquivos** `A`
-  Estão na raiz como untracked. Conferir antes que o `.gitignore` cobre `.env` — o compose lê
-  `DB_PASSWORD`, `JWT_SECRET` e `DB_ROOT_PASSWORD` de lá, e nenhum deles pode ir para o repositório
-  (`CLAUDE.md` §10).
+- [x] **D-02 — Commitar os dois arquivos** `A`
+  Commit `fabf7b3`, junto do move de `infraestrutura-nuvem.md` para `infra/`. Confirmado antes que
+  o `.gitignore:4` (`*.env`) cobre o `.env` — nenhuma credencial foi versionada.
   _Depende de: D-01_
 
 - [ ] **D-03 — `.env` de ensaio local** `A`
@@ -166,29 +167,57 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   `/actuator/health`. Depois, descomentar o healthcheck do backend no `docker-compose.prod.yml`
   (já está escrito lá, comentado, esperando esta task).
 
-- [ ] **D-13 — `async def predict` → `def predict`** `A`
-  `ml-service/app/routers/predict_router.py:15`. A rota é declarada `async`, mas o trabalho pesado
-  dentro de `executar_previsao` é bloqueante — trava o event loop, e o `GET /health` **para de
-  responder durante o lote** (R2). Com `def`, o FastAPI executa no threadpool. Depois disso, dá
-  para apertar o `interval`/`retries` do healthcheck do ml-service, hoje generosos por causa disso.
+- [x] **D-13 — `async def predict` → `def predict`** `A`
+  Feito em 2026-08-30. **A Parte 8 subestimava: não era uma linha, eram três arquivos.** A rota
+  fazia `return await executar_previsao(...)`, e `executar_previsao` era `async def` — mas sem um
+  único `await` no corpo, chamando direto o código bloqueante de Holt-Winters, Prophet e estoque.
+  Async de fachada: travava o event loop e derrubava o `GET /health` durante o lote (R2).
+  Alterados: `predict_router.py` (assinatura + `await`), `prediction_service.py:28`
+  (`async def executar_previsao` → `def`) e `test_predict_router.py` (8 mocks de `AsyncMock` para
+  `MagicMock`, já que a função deixou de ser corrotina). **66 testes passando.**
+  Ainda pendente: apertar `interval`/`retries` do healthcheck do ml-service no compose, hoje
+  generosos por causa deste problema — fazer depois da medição do D-07.
 
-- [ ] **D-14 — `--workers 2` no Dockerfile do ml-service** `A`
-  Usa os 2 vCPU da t3.medium (R2). Hoje a flag está no `command:` do
-  `docker-compose.prod.yml` — funciona, mas o lugar dela é o `ml-service/Dockerfile`. Ao mover,
-  remover o `command:` do compose para não ter a configuração em dois lugares.
+- [ ] **D-14 — `--workers 2` no Dockerfile do ml-service** `A` `aguardando medicao`
+  Hoje a flag está no `command:` do `docker-compose.prod.yml` — funciona, mas o lugar dela é o
+  `ml-service/Dockerfile`. Ao mover, remover o `command:` do compose.
+  ⚠️ **Duas ressalvas levantadas em 2026-08-30, antes de mover:**
+  (1) **Não acelera o lote como ele é hoje.** O `MotorController` itera os produtos em sequência —
+  existe uma chamada `/predict` por vez. Dois workers só ajudam com chamadas concorrentes, que não
+  existem. O ganho real é o `/health` ser servido pelo outro worker e o headroom futuro.
+  (2) **Pode não caber na memória.** Cada worker é um processo separado carregando Prophet,
+  CmdStan, pandas, statsmodels e scikit-learn — o §6.1 reserva 1,8 GB para o ml-service inteiro.
+  **Decidir o número de workers só depois do D-07.** O compose já está com 2, então o ensaio local
+  mede exatamente a configuração em dúvida.
 
-- [ ] **D-15 — `.dockerignore` do ml-service** `A`
-  Acrescentar `analysis/` e `docs/`. Hoje o `.dockerignore` cobre `venv/`, `__pycache__/` e as
-  fixtures, mas **não** os notebooks, as 14 figuras e os PDFs — que não têm função em runtime e
-  entram numa imagem que já é de 1,5–2,5 GB (R4).
-  ⚠️ `ml-service/analysis/` está **untracked no git**. É o núcleo acadêmico da T10 — versionar
-  antes de qualquer coisa, senão ele existe só na sua máquina.
+- [x] **D-15 — `.dockerignore` do ml-service** `A`
+  Feito em 2026-08-30: acrescentados `analysis/`, `docs/` e `.ipynb_checkpoints/`. Sem isso, os
+  notebooks, as 14 figuras e os PDFs entrariam numa imagem que já é de 1,5–2,5 GB (R4).
+  **Correção de uma nota anterior deste arquivo:** eu havia registrado que `ml-service/analysis/`
+  estava fora do git e "existia só nesta máquina". **Errado** — ele está versionado e no remoto, na
+  branch `analise-validacao-modelos`. O que aparecia como untracked no working tree eram só sobras
+  de `.ipynb_checkpoints/`, agora cobertas pelo `.gitignore` da raiz.
 
 - [ ] **D-16 — `V4` para a credencial seedada** `A`
   A `V2__seed_dados_padrao.sql:18` versiona o hash de `admin@stocksense.local`. Trocar via
   **migration `V4` nova** — nunca editando a `V2`, que já foi aplicada e o Flyway não reexecuta
   (`CLAUDE.md` §10). Coordenar com o `tasks-integracao.md`, que documenta `admin123` como credencial
   de dev.
+
+- [ ] **D-46 — Levar o pin `cmdstanpy==1.2.4` para a branch de deploy** `A` `BLOQUEADOR` 🔴
+  Descoberto em 2026-08-30. O pin da **T-12** existe **apenas** em
+  `analise-validacao-modelos:ml-service/requirements.txt`. Não está na `main` nem em
+  `chore/infra-terraform-aws`.
+  O `ml-service/Dockerfile` faz `pip install -r requirements.txt`: sem o pin, o pip resolve o
+  `cmdstanpy` livremente (provavelmente 1.3.0), que quebra o backend Stan do Prophet 1.1.6.
+  **A falha é silenciosa** — o motor cai em fallback para Holt-Winters e continua respondendo 200.
+  A imagem de produção rodaria sem Prophet e a comparação de modelos (T10, núcleo acadêmico do TCC)
+  seria inválida sem nenhum erro visível. É o "pin crítico" do §1.3, ausente justamente na branch
+  que vai para a nuvem.
+  O benchmark do D-41 só produziu números válidos porque o **venv local** tem o 1.2.4 instalado.
+  Resolver junto com a decisão de mergear a `analise-validacao-modelos` (5 commits à frente da
+  `main`, incluindo o notebook, os PDFs e este pin).
+  _Bloqueia: D-04, D-30, D-33 — qualquer `docker build` do ml-service, incluindo o ensaio local._
 
 ---
 
@@ -362,12 +391,15 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 
 > A infraestrutura vira capítulo. Estes números são material de defesa, não sobra de engenharia.
 
-- [ ] **D-41 — Rodar o benchmark do motor (T-54)** `A`
-  `ml-service/benchmark_motor.py` existe, está pronto e **nunca foi executado**; o
-  `docs/benchmark-motor.md` não existe. É a pendência nº 1 do §10.3, **destravável hoje**, sem
-  depender de ninguém nem da AWS. `python benchmark_motor.py --produtos 50 150 300`.
-  É o insumo direto do dimensionamento de CPU do §6.2 — a diferença entre dimensionar por estimativa
-  e por medição.
+- [x] **D-41 — Rodar o benchmark do motor (T-54)** `A`
+  Executado em 2026-08-30 na máquina de desenvolvimento. Relatório em `docs/benchmark-motor.md`.
+  **0,42–0,53 s/produto**, escala linear, 0 falhas, nenhuma chamada acima de 1,1 s, Prophet ativo em
+  500/500 chamadas. Projeção de **~2,8 min** para 312 SKUs — contra os **5 a 25 min** que o R1
+  estimava. O `read-timeout` de 30 s do Feign sai da lista de riscos.
+  Consequências: o §6.2 confirma a **t3.medium** (sem necessidade de instância maior) e o Épico 7
+  deixa de ser bloqueador — ver a conclusão do relatório.
+  ⚠️ Medido em desktop de 12 CPUs, fora do Docker. **Não é o número da t3.medium** — quem fecha
+  isso é o D-35.
 
 - [ ] **D-42 — Monitorar `CPUCreditBalance` no primeiro lote** `A`
   A t3 é burstable. Se o saldo zerar durante o lote, a instância é limitada e o recálculo se arrasta

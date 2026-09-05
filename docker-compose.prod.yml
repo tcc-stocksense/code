@@ -73,17 +73,14 @@ services:
         condition: service_healthy
     # sem 'ports' — só o Caddy alcança, na rota /api/*
     #
-    # healthcheck: pendente do item 4 da Parte 8 (adicionar
-    # spring-boot-starter-actuator). Enquanto não existir /actuator/health,
-    # um healthcheck aqui marcaria o container como unhealthy para sempre.
-    # Depois de adicionar o Actuator, descomentar:
-    #
-    # healthcheck:
-    #   test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
-    #   interval: 30s
-    #   timeout: 5s
-    #   retries: 5
-    #   start_period: 90s
+    # Actuator habilitado na D-12. wget vem do busybox da imagem alpine.
+    # start_period generoso: Flyway roda as migrations na subida.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
     logging: *logging
 
   ml-service:

@@ -22,6 +22,9 @@ class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter) {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
                 it.requestMatchers("/api/auth/login").permitAll()
+                // Healthcheck do Docker (D-12). Sem porta publicada nem rota no
+                // Caddyfile: so alcancavel de dentro da rede interna.
+                it.requestMatchers("/actuator/health").permitAll()
                 it.anyRequest().authenticated()
             }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)

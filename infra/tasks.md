@@ -71,7 +71,7 @@ Auditado contra o código e o `git log`, não contra a documentação.
 | Recursos na AWS | ❌ **nenhum existe** — nunca houve `terraform apply` |
 | `ml-service/analysis/` (núcleo acadêmico da T10) | ✅ versionado na branch `analise-validacao-modelos` — **não mergeada** |
 | Benchmark do motor (T-54) | ✅ executado em 2026-08-30 — `docs/benchmark-motor.md` |
-| Pin `cmdstanpy==1.2.4` (T-12) | 🔴 **ausente na main e na branch de deploy** — ver D-46 |
+| Pin `cmdstanpy==1.2.4` (T-12) | ✅ **na branch de deploy** desde 2026-09-05 (D-46) — ainda ausente na `main` |
 
 **Escrito ≠ executado.** O Terraform tem `terraform init` rodado (o `.terraform.lock.hcl` está
 versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito foi gasto até aqui.
@@ -211,20 +211,25 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   branch `analise-validacao-modelos`. O que aparecia como untracked no working tree eram só sobras
   de `.ipynb_checkpoints/`, agora cobertas pelo `.gitignore` da raiz.
 
-- [ ] **D-46 — Levar o pin `cmdstanpy==1.2.4` para a branch de deploy** `A` `BLOQUEADOR` 🔴
-  Descoberto em 2026-08-30. O pin da **T-12** existe **apenas** em
-  `analise-validacao-modelos:ml-service/requirements.txt`. Não está na `main` nem em
-  `chore/infra-terraform-aws`.
-  O `ml-service/Dockerfile` faz `pip install -r requirements.txt`: sem o pin, o pip resolve o
-  `cmdstanpy` livremente (provavelmente 1.3.0), que quebra o backend Stan do Prophet 1.1.6.
-  **A falha é silenciosa** — o motor cai em fallback para Holt-Winters e continua respondendo 200.
-  A imagem de produção rodaria sem Prophet e a comparação de modelos (T10, núcleo acadêmico do TCC)
-  seria inválida sem nenhum erro visível. É o "pin crítico" do §1.3, ausente justamente na branch
-  que vai para a nuvem.
-  O benchmark do D-41 só produziu números válidos porque o **venv local** tem o 1.2.4 instalado.
-  Resolver junto com a decisão de mergear a `analise-validacao-modelos` (5 commits à frente da
-  `main`, incluindo o notebook, os PDFs e este pin).
-  _Bloqueia: D-04, D-30, D-33 — qualquer `docker build` do ml-service, incluindo o ensaio local._
+- [x] **D-46 — Levar o pin `cmdstanpy==1.2.4` para a branch de deploy** `A`
+  Feito em 2026-09-05. Uma linha em `ml-service/requirements.txt`, logo abaixo do
+  `prophet==1.1.6`, idêntica à da `analise-validacao-modelos` — mesma versão, mesmo comentário.
+  **Só o pin veio; a branch continua sem merge.** A task previa resolver isto "junto com a decisão
+  de mergear a `analise-validacao-modelos`". A decisão segue aberta, mas separá-las é o certo: a
+  branch carrega notebook e PDFs que não têm por que entrar na branch de deploy (e que o
+  `.dockerignore` do D-15 já exclui da imagem). O pin é o único item de lá que a imagem de
+  produção precisa.
+  Confirmado que o venv local tem `cmdstanpy 1.2.4` instalado — o pin descreve o ambiente em que o
+  benchmark do D-41 produziu números válidos, não um palpite.
+  ⚠️ **Não validado por build.** Nenhum `docker build` do ml-service rodou com o pin no lugar. A
+  confirmação de que a imagem sobe com o Prophet de fato funcionando é o **D-04**.
+
+  Contexto original (2026-08-30): o `ml-service/Dockerfile` faz `pip install -r requirements.txt`
+  e, sem o pin, o pip resolve o `cmdstanpy` livremente (provavelmente 1.3.0), que quebra o backend
+  Stan do Prophet 1.1.6. **A falha é silenciosa** — o motor cai em fallback para Holt-Winters e
+  continua respondendo 200. A imagem de produção rodaria sem Prophet e a comparação de modelos
+  (T10, núcleo acadêmico do TCC) seria inválida sem nenhum erro visível.
+  _Destrava: D-04, D-30, D-33._
 
 > **D-16 removida em 2026-08-30.** Era "trocar a credencial seedada da `V2` por uma `V4`".
 > Descartada por duas razões. (1) Migration é o instrumento errado: ela é versionada e roda igual em

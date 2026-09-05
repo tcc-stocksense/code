@@ -43,6 +43,13 @@ foi registrada neste arquivo.
   O `SecurityConfig` era o ponto que o backlog não previa: com `anyRequest().authenticated()`,
   o healthcheck do Docker tomaria 401 para sempre e o container ficaria `unhealthy` desde a
   subida.
+- **D-46 — pin `cmdstanpy==1.2.4` na branch de deploy.** Uma linha em
+  `ml-service/requirements.txt`, abaixo do `prophet==1.1.6`, idêntica à da
+  `analise-validacao-modelos`. Sem ela o `pip install` do Dockerfile resolve o cmdstanpy livre
+  (provavelmente 1.3.0), que quebra o backend Stan do Prophet 1.1.6 **em silêncio** — fallback
+  para Holt-Winters, HTTP 200, e a comparação de modelos da T10 inválida sem erro visível.
+  Destrava D-04, D-30 e D-33. Confirmado que o venv local tem o 1.2.4 instalado: o pin descreve
+  o ambiente onde o benchmark do D-41 rodou.
 
 ### Decisões técnicas tomadas nesta sessão
 
@@ -62,22 +69,22 @@ foi registrada neste arquivo.
 - **Já no remoto** (`f54aaf2`, em `origin/chore/infra-terraform-aws`): D-13 (async de fachada
   do `/predict`), D-15 (`.dockerignore` do ml-service) e D-41 (benchmark do motor →
   `docs/benchmark-motor.md`).
-- **Commitado nesta sessão:** D-10, D-12 e a nota da D-16.
+- **Commitado nesta sessão:** D-10, D-12, D-46 e a nota da D-16.
 - **Commits locais não pushados, em outras branches** (decisão do usuário: não subir agora):
   `feat/importacao-produtos-vendas` → `03e1baf` (fixtures CSV de importação) e
   `feat/ml-service-motor-preditivo` → `066bab8` (gerador de CSV de produtos sintéticos).
 - **Pushada mas nunca mergeada:** `analise-validacao-modelos`, 5 commits à frente da `main` —
-  carrega o notebook da T10 e o pin `cmdstanpy==1.2.4` de que a D-46 precisa.
+  carrega o notebook e os PDFs da T10. O pin `cmdstanpy` dela foi copiado para esta branch na
+  D-46, então o merge deixou de ser bloqueador de deploy — virou decisão sobre material do TCC.
 
 ### Pendências que ficaram em aberto
 
 - ⚠️ **Efeito colateral do D-10, avisar no grupo:** quem roda o backend **fora do Docker**
   (IDE, `bootRun`) agora precisa exportar `JWT_SECRET`. O valor de dev só é reposto pelo
   `docker-compose.yml`.
-- 🔴 **D-46 (bloqueador):** o pin `cmdstanpy==1.2.4` existe só na `analise-validacao-modelos`.
-  Sem ele o build do ml-service resolve o cmdstanpy livre, quebra o backend Stan do Prophet
-  **em silêncio** (fallback para Holt-Winters, HTTP 200) e invalida a comparação de modelos,
-  núcleo acadêmico do TCC. Bloqueia D-04, D-30 e D-33.
+- ⚠️ **D-46 fechada, mas não validada por build.** O pin está na branch; nenhum `docker build`
+  do ml-service rodou com ele no lugar. Quem confirma que a imagem sobe com o Prophet de fato
+  funcionando é o **D-04**.
 - **Épico D0 inteiro** (D-03 → D-08) roda na máquina local, sem AWS e sem gastar crédito. O
   D-07 destrava o D-14, hoje marcado `aguardando medicao`.
 - **Três decisões travando os Épicos D3/D4:** D-17 (como o código chega na EC2 —

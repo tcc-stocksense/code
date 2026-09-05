@@ -690,6 +690,7 @@ Não são defeitos; são escolhas com justificativa, e é assim que devem ser ap
 | **Backend limitado a 1 réplica** | Consequência do estado do job em memória (R5), decisão validada em 2026-07-12 |
 | **Sem CI/CD** | Deploy manual é aceitável para uma demonstração; automatizar é evolução natural |
 | **Motor síncrono** | Épico 7 desenhado e validado, suspenso aguardando o volume real de SKUs |
+| **Credencial única, semeada por migration** | Login é por estabelecimento (ADR #4) e a `V2` versiona o hash de `admin@stocksense.local`. Trocar a senha exigiria `UPDATE` no banco — o `AuthController` só expõe `/login` e a T9 é Pós-MVP. Assumido: URL conhecida por poucos, instância desligada por padrão (§7.1), dados reconstruíveis (§7.2) |
 
 ## 10.3 Pendências que travam decisões
 

@@ -66,7 +66,7 @@ Auditado contra o código e o `git log`, não contra a documentação.
 | `infra/terraform/*.tf` (9 arquivos) | ✅ commit `4a479d5` — **escrito e inicializado, nunca aplicado** |
 | `Caddyfile` | ✅ commit `fabf7b3` |
 | `docker-compose.prod.yml` | ✅ commit `fabf7b3` |
-| Correções da Parte 8 | 🔶 **2 de 8** (D-13, D-15) |
+| Correções da Parte 8 | 🔶 **4 de 8** (D-10, D-12, D-13, D-15) · 1 descartada (credencial) |
 | Integração do frontend (`tasks-integracao.md`) | ❌ **0 de 11** — o app é 100% mock |
 | Recursos na AWS | ❌ **nenhum existe** — nunca houve `terraform apply` |
 | `ml-service/analysis/` (núcleo acadêmico da T10) | ✅ versionado na branch `analise-validacao-modelos` — **não mergeada** |
@@ -144,12 +144,16 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   ⚠️ Coordenar com a **I-02** do `tasks-integracao.md`, que pede a URL absoluta para o dev fora do
   Docker. Solução sugerida: relativo por padrão, absoluto por override explícito.
 
-- [ ] **D-10 — `JWT_SECRET` obrigatório** `A`
-  `backend/src/main/resources/application.yml:37` tem
-  `${JWT_SECRET:stocksense-dev-secret-troque-em-producao-...}`. O default versionado faz o boot
-  passar com um segredo público — qualquer um forja token (R8). Remover o default e falhar o boot
-  sem a env var. O `docker-compose.prod.yml` já exige a variável, mas a defesa tem que estar no
-  próprio backend.
+- [x] **D-10 — `JWT_SECRET` obrigatório** `A`
+  Feito em 2026-08-30. `application.yml` passa a ter `secret: ${JWT_SECRET}`, sem default: variável
+  ausente agora **quebra o boot** em vez de subir calado com o segredo versionado.
+  **Não era um arquivo só.** O `docker-compose.yml` de desenvolvimento não passava `JWT_SECRET` —
+  dependia exatamente do default removido. Recebeu o **mesmo valor de antes**, agora explícito, com
+  fallback `${JWT_SECRET:-...}`. Em dev nada muda: mesma chave, tokens existentes continuam válidos.
+  Os testes não carregam contexto Spring (não há `@SpringBootTest`), então não foram afetados.
+  Nota de proporção: o valor desta task **não é segurança** — quem tem o segredo também tem a
+  credencial seedada, que decidimos manter (ver a nota da D-16). O ganho é operacional: erro de
+  digitação no `.env` de produção falha alto em vez de silenciosamente.
 
 - [ ] **D-11 — Inverter o default do mock** `B` ⚠️
   **A expressão `localStorage.getItem('stocksense_mock') !== 'off'` aparece 6 vezes em 3 arquivos:**
@@ -162,10 +166,19 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   _Trilha `B`: só faz sentido com `tasks-integracao.md` fechado — antes disso, desligar o mock
   quebra as telas._
 
-- [ ] **D-12 — Spring Actuator** `A`
-  Adicionar `spring-boot-starter-actuator` ao `backend/build.gradle.kts`, expondo **apenas**
-  `/actuator/health`. Depois, descomentar o healthcheck do backend no `docker-compose.prod.yml`
-  (já está escrito lá, comentado, esperando esta task).
+- [x] **D-12 — Spring Actuator** `A`
+  Feito em 2026-08-30. Quatro arquivos, não dois:
+  `build.gradle.kts` (dependência), `application.yml` (`management.endpoints.web.exposure.include:
+  health` + `show-details: never`), `SecurityConfig.kt` e `docker-compose.prod.yml` (healthcheck
+  descomentado).
+  ⚠️ **O `SecurityConfig` era o pulo do gato e não estava no backlog.** Com
+  `anyRequest().authenticated()`, o `/actuator/health` exigiria JWT e o healthcheck do Docker
+  tomaria 401 **para sempre** — o container ficaria `unhealthy` desde a subida. Foi preciso
+  acrescentar `requestMatchers("/actuator/health").permitAll()`.
+  Expor o health sem autenticação é seguro aqui: `show-details: never` devolve só
+  `{"status":"UP"}`, e o `Caddyfile` não tem rota para `/actuator` — quem vier de fora cai no
+  frontend e recebe 404. O endpoint só existe dentro da rede Docker.
+  Verificado com `./gradlew build` e `./gradlew test`: ambos passando.
 
 - [x] **D-13 — `async def predict` → `def predict`** `A`
   Feito em 2026-08-30. **A Parte 8 subestimava: não era uma linha, eram três arquivos.** A rota
@@ -198,12 +211,6 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   branch `analise-validacao-modelos`. O que aparecia como untracked no working tree eram só sobras
   de `.ipynb_checkpoints/`, agora cobertas pelo `.gitignore` da raiz.
 
-- [ ] **D-16 — `V4` para a credencial seedada** `A`
-  A `V2__seed_dados_padrao.sql:18` versiona o hash de `admin@stocksense.local`. Trocar via
-  **migration `V4` nova** — nunca editando a `V2`, que já foi aplicada e o Flyway não reexecuta
-  (`CLAUDE.md` §10). Coordenar com o `tasks-integracao.md`, que documenta `admin123` como credencial
-  de dev.
-
 - [ ] **D-46 — Levar o pin `cmdstanpy==1.2.4` para a branch de deploy** `A` `BLOQUEADOR` 🔴
   Descoberto em 2026-08-30. O pin da **T-12** existe **apenas** em
   `analise-validacao-modelos:ml-service/requirements.txt`. Não está na `main` nem em
@@ -218,6 +225,16 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   Resolver junto com a decisão de mergear a `analise-validacao-modelos` (5 commits à frente da
   `main`, incluindo o notebook, os PDFs e este pin).
   _Bloqueia: D-04, D-30, D-33 — qualquer `docker build` do ml-service, incluindo o ensaio local._
+
+> **D-16 removida em 2026-08-30.** Era "trocar a credencial seedada da `V2` por uma `V4`".
+> Descartada por duas razões. (1) Migration é o instrumento errado: ela é versionada e roda igual em
+> todos os ambientes, então uma `V4` com o hash novo só moveria o segredo de arquivo — e invalidar a
+> credencial quebraria o `admin123` que o `tasks-integracao.md` usa em dev. (2) O risco prático num
+> TCC é próximo de zero: a URL é conhecida por três pessoas, a instância fica desligada por padrão
+> (§7.1) e os dados são reconstruíveis por reimportação (§7.2).
+> Vira **limitação consciente**, registrada no §10.2 do `infraestrutura-nuvem.md`. Se em algum
+> momento a senha precisar mudar, o caminho é um `UPDATE` no banco: o `AuthController` só tem
+> `/login`, e a T9 (alterar senha) é Pós-MVP — não existe outra via.
 
 ---
 
@@ -430,7 +447,6 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 | D-11 (mock off) | I-01 … I-11 completos | `frontend/docs/tasks-integracao.md` |
 | D-34 (fluxo pela UI) | I-11 (fumaça E2E no navegador) | `frontend/docs/tasks-integracao.md` |
 | D-09 (`API_BASE_URL`) | I-02 (base URL) — **decidir juntas** | `frontend/docs/tasks-integracao.md` |
-| D-16 (`V4`) | credencial de dev documentada | `frontend/docs/tasks-integracao.md` |
 | D-12 (Actuator) | `backend/build.gradle.kts` | `backend/tasks.md` |
 
 ---

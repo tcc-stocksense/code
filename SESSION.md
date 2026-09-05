@@ -9,7 +9,7 @@
 | **Repositório** | Monorepo: `backend/`, `ml-service/`, `frontend/` |
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
-| **Branches abertas** | `feat/produto-detalhe-metricas` (Épico 4, pushed, sem PR); `feat/dashboard-alertas` (Épico 5, empilhada na anterior); `test/importacao-services` (T-17 testes + doc, pushed, sem PR) |
+| **Branches abertas** | `chore/infra-terraform-aws` (deploy/infra, **atual**, sincronizada com o origin); `feat/produto-detalhe-metricas` (Épico 4, pushed, sem PR); `feat/dashboard-alertas` (Épico 5, empilhada na anterior); `test/importacao-services` (T-17 testes + doc, pushed, sem PR); `analise-validacao-modelos` (T10 + pin do cmdstanpy, pushed, **sem merge na main**) |
 
 > **Já mergeadas na `main`:** `feat/auth-login-jwt` (Épico 1, PR #4), `feat/motor-abc`
 > (Épico 3, PR #5), `feat/t26-produto-listagem-edicao-estoque` (T-26, PR #6). A `main`
@@ -21,7 +21,81 @@
 
 ---
 
-## Última Sessão — 2026-07-10 (Épico 5 — Dashboard + Alertas + Curva ABC)
+## Última Sessão — 2026-09-05 (Infra — versionamento do D1 parcial)
+
+> Branch: `chore/infra-terraform-aws`. Sessão de auditoria do backlog de deploy e commit do
+> que estava parado no working tree desde 2026-08-30. Nenhum código novo.
+
+### O que foi desenvolvido
+
+A sessão levantou **o que já estava feito mas não versionado** e fechou isso em dois commits.
+As duas tasks abaixo estavam prontas no working tree desde a sessão de 2026-08-30, que nunca
+foi registrada neste arquivo.
+
+- **D-10 — `JWT_SECRET` obrigatório.** `application.yml` passa a ter `secret: ${JWT_SECRET}`
+  sem default: variável ausente quebra o boot em vez de subir com o segredo versionado. O
+  `docker-compose.yml` de desenvolvimento passou a injetar o **mesmo valor de antes**, agora
+  explicitamente, via `${JWT_SECRET:-...}` — em dev nada muda.
+- **D-12 — Spring Actuator.** Quatro arquivos: `build.gradle.kts` (dependência),
+  `application.yml` (`management.endpoints.web.exposure.include: health` +
+  `show-details: never`), `SecurityConfig.kt` (`/actuator/health` em `permitAll`) e
+  `docker-compose.prod.yml` (healthcheck do backend descomentado).
+  O `SecurityConfig` era o ponto que o backlog não previa: com `anyRequest().authenticated()`,
+  o healthcheck do Docker tomaria 401 para sempre e o container ficaria `unhealthy` desde a
+  subida.
+
+### Decisões técnicas tomadas nesta sessão
+
+- **`SESSION.md` continua único, na raiz.** Avaliada a criação de um `infra/SESSION.md`
+  espelhando o split dos `tasks.md`. Descartado: `tasks.md` é backlog (tem dono e trilha,
+  divide bem por área), `SESSION.md` é cronologia — e a sessão atravessa áreas (esta mexeu em
+  4 arquivos de `backend/` para fechar duas tasks de `infra/`). Duas linhas do tempo criariam
+  ambiguidade sobre qual é a atual, que é o que a seção "Como Retomar Esta Sessão" existe
+  para evitar.
+- **D-16 descartada** (trocar a credencial seedada da `V2` por uma `V4`). Migration é o
+  instrumento errado — roda igual em todos os ambientes, só moveria o segredo de arquivo e
+  quebraria o `admin123` que o `tasks-integracao.md` usa em dev. Virou **limitação
+  consciente**, registrada no §10.2 do `infraestrutura-nuvem.md`.
+
+### Estado do versionamento (levantado nesta sessão)
+
+- **Já no remoto** (`f54aaf2`, em `origin/chore/infra-terraform-aws`): D-13 (async de fachada
+  do `/predict`), D-15 (`.dockerignore` do ml-service) e D-41 (benchmark do motor →
+  `docs/benchmark-motor.md`).
+- **Commitado nesta sessão:** D-10, D-12 e a nota da D-16.
+- **Commits locais não pushados, em outras branches** (decisão do usuário: não subir agora):
+  `feat/importacao-produtos-vendas` → `03e1baf` (fixtures CSV de importação) e
+  `feat/ml-service-motor-preditivo` → `066bab8` (gerador de CSV de produtos sintéticos).
+- **Pushada mas nunca mergeada:** `analise-validacao-modelos`, 5 commits à frente da `main` —
+  carrega o notebook da T10 e o pin `cmdstanpy==1.2.4` de que a D-46 precisa.
+
+### Pendências que ficaram em aberto
+
+- ⚠️ **Efeito colateral do D-10, avisar no grupo:** quem roda o backend **fora do Docker**
+  (IDE, `bootRun`) agora precisa exportar `JWT_SECRET`. O valor de dev só é reposto pelo
+  `docker-compose.yml`.
+- 🔴 **D-46 (bloqueador):** o pin `cmdstanpy==1.2.4` existe só na `analise-validacao-modelos`.
+  Sem ele o build do ml-service resolve o cmdstanpy livre, quebra o backend Stan do Prophet
+  **em silêncio** (fallback para Holt-Winters, HTTP 200) e invalida a comparação de modelos,
+  núcleo acadêmico do TCC. Bloqueia D-04, D-30 e D-33.
+- **Épico D0 inteiro** (D-03 → D-08) roda na máquina local, sem AWS e sem gastar crédito. O
+  D-07 destrava o D-14, hoje marcado `aguardando medicao`.
+- **Três decisões travando os Épicos D3/D4:** D-17 (como o código chega na EC2 —
+  `BLOQUEADOR`), D-18 (domínio) e D-19 (deployar com o front em mock ou esperar a trilha B).
+- **Trilha B em 0 de 11** (`frontend/docs/tasks-integracao.md`) — o app é 100% mock.
+- **`backend/tasks.md` desatualizado:** a T-54 (benchmark) continua `[ ]` lá, embora o D-41 do
+  `infra/tasks.md` registre a execução em 2026-08-30.
+
+### Nota sobre este arquivo
+
+A entrada anterior era de **2026-07-12**: a sessão de infra de **2026-08-30** (D-10, D-12,
+D-13, D-15 e o benchmark) nunca foi registrada aqui, e o que se sabe dela está nas notas do
+`infra/tasks.md`. Corrigidos também dois cabeçalhos órfãos — sobras de entradas antigas
+prependidas por cima do título "Última Sessão" anterior.
+
+---
+
+## Sessão — 2026-07-10 (Épico 5 — Dashboard + Alertas + Curva ABC)
 
 > Branch: `feat/dashboard-alertas`, **empilhada** sobre a `feat/produto-detalhe-metricas`
 > (decisão do usuário — o Épico 4 ainda não foi mergeado). O PR do Épico 5 só fica limpo
@@ -92,8 +166,7 @@ não há rede para o Gradle provisionar o 17 — mesma situação das sessões a
 
 ---
 
-## Sessão — 2026-07-10 (ml-service: remoção do ABC + T-05)
-## Última Sessão — 2026-07-12 (Planejamento — Motor Assíncrono)
+## Sessão — 2026-07-12 (Planejamento — Motor Assíncrono)
 
 > **Sessão de análise e documentação — nenhum código implementado.** Saída: um épico novo de
 > tarefas + um relatório técnico validado pelo orientador. Nada commitado; todas as mudanças estão
@@ -166,7 +239,6 @@ registrada na T-54 do `backend/tasks.md`.
 
 ---
 
-## Sessão — 2026-07-10
 ## Sessão — 2026-07-10 (Épico 4 — Produto: detalhe + métricas)
 
 > Branch: `feat/produto-detalhe-metricas` (criada a partir da `main`). Commitada

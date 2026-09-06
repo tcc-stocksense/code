@@ -294,14 +294,35 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 > ⚠️ **Não é código.** São três decisões que travam a execução e que nenhum documento registrou
 > ainda. Cada uma muda tasks do D3 e do D4.
 
-- [ ] **D-17 — Como o código chega na EC2** `A` `BLOQUEADOR`
-  O `user_data` do `compute.tf` instala Docker, compose e o swap — mas **não clona nada**. O repo é
-  `github.com/tcc-stocksense/code`. Duas saídas:
-  **(a) `git clone` na VM** — se o repo for privado, exige deploy key ou PAT na instância, e o build
-  roda na t3.medium, onde o §9.3 avisa que pode estourar a memória.
-  **(b) build local + push para ECR ou Docker Hub**, deixando a EC2 só com `docker compose pull`.
-  Resolve o problema de memória junto, ao custo de um registry (o ECR não está no Terraform).
-  A escolha define D-28 e D-30. **Sem ela, o deploy para.**
+- [~] **D-17 — Como o código chega na EC2** `A` `BLOQUEADOR` `aguardando confirmacao`
+  **Recomendação registrada em 2026-09-06, aguardando o seu aval.** Passo a passo completo em
+  **[`infra/docs/deploy-runbook.md`](docs/deploy-runbook.md)**, que também resume as alternativas.
+
+  O backlog tratava como uma decisão o que são **duas**: (1) onde as imagens são construídas — onde
+  mora o risco do §9.3 — e (2) como os arquivos de config e o front chegam à VM, que é inevitável
+  nas três opções por causa dos bind mounts do `Caddyfile` e do `frontend/web`.
+
+  **Recomendada: opção (c) — `docker save` → SSH → `docker load`,** que não estava no backlog.
+  Build na máquina local, imagens prontas para a instância; os arquivos por `git clone`, mantendo o
+  redeploy do front como `git pull`. **A t3.medium nunca compila nada**, então o risco do §9.3
+  deixa de existir.
+  Viabilizada por uma medição do D-04: as imagens ficaram em **273 MB + 685 MB (385 MB comprimidos,
+  medido)**, contra os 1,5–2,5 GB que o R4 projetava para o ml-service — o que tornaria a
+  transferência impraticável. O compose já suporta sem alteração: declara `image:` junto de `build:`.
+  Vantagem decisiva no contexto: **todos os comandos são disparados da máquina local** por SSH, então
+  diagnosticar falha não exige trabalhar dentro da instância.
+  Assumido: sem histórico central de imagens — rollback por tag local + o `.tar.gz` guardado.
+
+  **(a) `git clone` + build na VM** — um comando só, mas concentra na instância justamente o passo
+  que pode falhar (§9.3: Gradle estourando os 4 GB), e depurar OOM por SSH é caro.
+  **(b) registry (ECR/Docker Hub)** — tecnicamente a mais correta, com rollback central; mas o ECR
+  não está no Terraform, exige autenticação na instância e não resolve o eixo (2). Peças demais
+  para uma instância única.
+
+  ⚠️ **Pendência de fato:** não foi possível confirmar se `github.com/tcc-stocksense/code` é
+  privado (o `gh` não está instalado na máquina). Se for, o `git clone` do eixo (2) exige deploy
+  key — ou troca-se por `scp`, ao custo de perder o `git pull` no redeploy do front.
+  A escolha define D-28 e D-30.
 
 - [ ] **D-18 — Domínio** `A`
   DuckDNS grátis (`stocksense.duckdns.org`) ou `.com` próprio (~US$ 12/ano, melhor na defesa).
@@ -370,9 +391,11 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 ---
 
 ## Épico D4 — Subir a aplicação na EC2 `Trilha A`
-
 - [ ] **D-28 — Levar o código/imagens para a instância** `A`
-  Executar o que o D-17 decidiu.
+  Executar o que o D-17 decidiu. Se confirmada a opção (c): **passos 2, 3 e 5** do
+  [`docs/deploy-runbook.md`](docs/deploy-runbook.md) — empacotar (`docker save | gzip`), `git clone`
+  na VM para os arquivos de bind mount, e `docker load` via SSH.
+  _Depende de: D-17, D-27_
   _Depende de: D-17, D-27_
 
 - [ ] **D-29 — `.env` de produção na VM** `A`
@@ -384,6 +407,10 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 - [ ] **D-30 — Build, uma imagem por vez** `A`
   Se o D-17 escolheu build na VM: `build ml-service`, **depois** `build backend` — em paralelo
   estoura os 4 GB (§9.3). Se escolheu registry: `docker compose pull`.
+  📌 **Com a opção (c) recomendada, esta task some da instância:** o build acontece na máquina local
+  (passo 1 do [`docs/deploy-runbook.md`](docs/deploy-runbook.md)), onde já rodou no D-04 sem
+  restrição de memória. Na VM sobra `docker load` (D-28) e `up -d --no-build` (D-31). É o principal
+  ganho da decisão — o §9.3 deixa de ser risco de deploy.
   _Depende de: D-28_
 
 - [ ] **D-31 — `up -d` e healthchecks internos** `A`

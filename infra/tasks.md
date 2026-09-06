@@ -71,7 +71,7 @@ Auditado contra o código e o `git log`, não contra a documentação.
 | Recursos na AWS | ❌ **nenhum existe** — nunca houve `terraform apply` |
 | `ml-service/analysis/` (núcleo acadêmico da T10) | ✅ versionado na branch `analise-validacao-modelos` — **não mergeada** |
 | Benchmark do motor (T-54) | ✅ executado em 2026-08-30 — `docs/benchmark-motor.md` |
-| Pin `cmdstanpy==1.2.4` (T-12) | ✅ **na branch de deploy** desde 2026-09-05 (D-46) — ainda ausente na `main` |
+| Pin `cmdstanpy==1.2.4` (T-12) | ✅ **na branch de deploy** (D-46) e **validado na imagem** no D-04 — ainda ausente na `main` |
 
 **Escrito ≠ executado.** O Terraform tem `terraform init` rodado (o `.terraform.lock.hcl` está
 versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito foi gasto até aqui.
@@ -94,34 +94,78 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   o `.gitignore:4` (`*.env`) cobre o `.env` — nenhuma credencial foi versionada.
   _Depende de: D-01_
 
-- [ ] **D-03 — `.env` de ensaio local** `A`
-  Criar um `.env` **separado do de desenvolvimento**, com as quatro variáveis que o
-  `docker-compose.prod.yml` exige e `SITE_ADDRESS=:80` (HTTP puro — o Caddy só tenta TLS quando o
-  endereço é um nome). Senhas de ensaio, não as de produção.
+- [x] **D-03 — `.env` de ensaio local** `A`
+  Feito em 2026-09-05. Arquivo **`.env.ensaio`** (não `.env`), com as cinco variáveis que o
+  `docker-compose.prod.yml` exige via `${VAR:?}`: `DB_ROOT_PASSWORD`, `DB_USERNAME`, `DB_PASSWORD`,
+  `JWT_SECRET` (24 bytes aleatórios) e `SITE_ADDRESS=:80`. Senhas de ensaio, descartáveis.
+  Coberto pelo `.gitignore:3` (`.env.*`) — verificado com `git check-ignore`.
+  ⚠️ **O nome importa.** O compose carrega `.env` do diretório do projeto automaticamente: criar o
+  arquivo de ensaio com esse nome sobrescreveria o `.env` de desenvolvimento, que já existe e tem
+  as três credenciais de dev. Daí `.env.ensaio` + `--env-file` explícito.
 
-- [ ] **D-04 — Subir o stack de produção na máquina local** `A`
-  `docker compose -f docker-compose.prod.yml up -d`. Critério: os cinco containers em
-  `running`, `db` em `healthy`, e o build das duas imagens concluído. É também a primeira medição
-  honesta de quanto tempo o build leva.
+- [x] **D-04 — Subir o stack de produção na máquina local** `A`
+  Feito em 2026-09-05. Os cinco containers `running`; `db`, `ml-service` e `backend` `healthy`.
+  Imagens: `stocksense-backend:prod` **273 MB**, `stocksense-ml:prod` **685 MB** — bem abaixo do
+  1,5–2,5 GB que o R4 temia para o ml-service (o `.dockerignore` do D-15 ajudou). O Flyway rodou as
+  migrations na subida (query em `stocksense.produto` responde).
+  ⚠️ **O comando do backlog não pode ser usado cru.** `docker compose -f docker-compose.prod.yml
+  up -d` compartilha diretório com o compose de desenvolvimento, então herda o mesmo nome de
+  projeto (`code`) e **o mesmo volume `db_data`** — o ensaio subiria em cima do banco de dev. Pior:
+  o MySQL só aplica `MYSQL_USER`/`MYSQL_PASSWORD` na primeira inicialização, então as senhas de
+  ensaio seriam silenciosamente ignoradas e o backend falharia a autenticação por um motivo que não
+  aparece em lugar nenhum. Os `container_name` também são idênticos nos dois arquivos (nome de
+  container é global no Docker, colide até com container parado), e ambos publicam a porta 80.
+  **Comando correto:**
+  ```
+  docker compose down    # remove os containers de dev; sem -v o volume fica
+  docker compose -p stocksense-prod -f docker-compose.prod.yml --env-file .env.ensaio up -d
+  ```
+  O `-p` dá ao ensaio volumes próprios (`stocksense-prod_db_data`, `_caddy_data`, `_caddy_config`),
+  separados do `code_db_data` de desenvolvimento. Confirmado após a subida: os dois coexistem.
+  Para derrubar: `docker compose -p stocksense-prod -f docker-compose.prod.yml down`.
   _Depende de: D-03_
 
-- [ ] **D-05 — Validar o isolamento (R6)** `A`
-  Confirmar que `curl localhost:8000/health` e `mysql -h localhost -P 3306` **falham** a partir do
-  host, e que `docker compose exec backend wget -qO- http://ml-service:8000/health` **funciona**.
-  Se o ml-service responder pelo host, o `ports` vazou e a instância subiria com um motor de CPU
-  aberto para a internet.
+- [x] **D-05 — Validar o isolamento (R6)** `A`
+  Feito em 2026-09-05. `curl localhost:8000/health` e a porta 8080 **recusam** conexão do host, e
+  `docker exec backend wget -qO- http://ml-service:8000/health` responde
+  `{"status":"ok","service":"ml-service","version":"1.0.0"}`. `docker port stocksense-db` volta
+  vazio: nenhum dos três serviços internos publica porta.
+  ⚠️ **Falso positivo a não repetir:** a 3306 **está** aberta no host desta máquina, mas quem
+  escuta é um **MySQL nativo do Windows** (`mysqld`, PID 6648), não o container. Testar a 3306 com
+  `mysql -h localhost` como o backlog sugeria daria "conectou" e passaria a impressão de vazamento.
+  O teste que vale é `docker port <container>` — na EC2, onde não há MySQL nativo, os dois
+  coincidem.
   _Depende de: D-04_
 
-- [ ] **D-06 — Validar o roteamento do Caddy** `A`
-  `http://localhost/` devolve o `index.html`; `http://localhost/api/auth/login` chega no backend
-  (401/404 conta como sucesso — o que importa é ter chegado). Confirma o desenho de mesma origem
-  do §3.4, que é o que elimina o CORS.
+- [x] **D-06 — Validar o roteamento do Caddy** `A`
+  Feito em 2026-09-05. `GET http://localhost/` → **200**, `text/html`, `<title>StockSense</title>`.
+  `POST http://localhost/api/auth/login` → **404**, e a resposta prova que veio do backend, não do
+  nginx: `Content-Type: application/problem+json` (o RFC 7807 da T-04), corpo
+  `{"detail":"E-mail ou senha inválidos.",...}`, headers do Spring Security e `Via: 1.1 Caddy`.
+  Confirma o desenho de mesma origem do §3.4 — sem CORS.
+  📌 **Observação para a trilha B:** credencial inválida devolve **404**, não 401. Funciona, mas o
+  front precisa tratar 404 no login como "credencial inválida" e não como "rota não existe" — vale
+  conferir contra a I-03 do `tasks-integracao.md`.
   _Depende de: D-04_
 
-- [ ] **D-07 — Medir memória contra o orçamento do §6.1** `A`
-  `docker stats` com o stack ocioso e, se possível, durante um `POST /api/motor/recalcular`. O
-  orçamento fecha em ~3,9 GB de 4 GB; sua máquina tem mais folga que a t3.medium, então o número
-  útil é o **pico por container**, não o total.
+- [~] **D-07 — Medir memória contra o orçamento do §6.1** `A` `parcial: falta sob carga`
+  Medido em 2026-09-05, **stack ocioso** (`docker stats --no-stream`):
+
+  | Container | Uso | Limite | % |
+  |---|---|---|---|
+  | `db` | 454,5 MiB | 600 MiB | **75,8%** |
+  | `ml-service` | 282,1 MiB | 1,758 GiB | 15,7% |
+  | `backend` | 276,2 MiB | 1 GiB | 27,0% |
+  | `frontend` | 11,3 MiB | — | — |
+  | `caddy` | 10,8 MiB | — | — |
+
+  **Total ocioso ~1,01 GiB** dos 3,9 GB orçados — folga confortável parada.
+  🔶 **O `db` é o apertado:** 75,8% do limite **sem nenhuma carga**, com
+  `--innodb-buffer-pool-size=256M`. Sob importação e lote, é o primeiro candidato ao OOM killer.
+  Considerar subir o `mem_limit` de 600m (há folga no orçamento) ou baixar o buffer pool.
+  ⚠️ **Falta a medição sob carga**, que é a que a task chama de número útil. O banco de ensaio tem
+  **0 produtos** — medir o pico exige importar planilhas e rodar `POST /api/motor/recalcular`
+  antes. Fica para uma sessão com dados, ou para o **D-43** na instância.
   _Depende de: D-04_
 
 - [ ] **D-08 — Avaliar: Caddy servindo o estático, sem o container nginx** `A` `opcional`
@@ -221,8 +265,10 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   produção precisa.
   Confirmado que o venv local tem `cmdstanpy 1.2.4` instalado — o pin descreve o ambiente em que o
   benchmark do D-41 produziu números válidos, não um palpite.
-  ⚠️ **Não validado por build.** Nenhum `docker build` do ml-service rodou com o pin no lugar. A
-  confirmação de que a imagem sobe com o Prophet de fato funcionando é o **D-04**.
+  ✅ **Validado no D-04 (2026-09-05).** Dentro da imagem `stocksense-ml:prod`: `pip show cmdstanpy`
+  → **1.2.4**, e um `Prophet().fit()` com 60 pontos treinou e previu 67 usando
+  `CmdStanPyBackend` — sem fallback silencioso. A comparação de modelos da T10 é válida na imagem
+  que vai para a nuvem.
 
   Contexto original (2026-08-30): o `ml-service/Dockerfile` faz `pip install -r requirements.txt`
   e, sem o pin, o pip resolve o `cmdstanpy` livremente (provavelmente 1.3.0), que quebra o backend

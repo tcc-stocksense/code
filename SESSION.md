@@ -21,10 +21,11 @@
 
 ---
 
-## Última Sessão — 2026-09-05 (Infra — versionamento do D1 parcial)
+## Última Sessão — 2026-09-05 (Infra — versionamento do D1 + Épico D0)
 
-> Branch: `chore/infra-terraform-aws`. Sessão de auditoria do backlog de deploy e commit do
-> que estava parado no working tree desde 2026-08-30. Nenhum código novo.
+> Branch: `chore/infra-terraform-aws`. Duas metades: auditoria do backlog de deploy com commit do
+> que estava parado no working tree desde 2026-08-30, e depois o **Épico D0 inteiro** — o stack de
+> produção rodando na máquina local. Nenhuma feature nova; nenhum recurso na AWS.
 
 ### O que foi desenvolvido
 
@@ -43,6 +44,13 @@ foi registrada neste arquivo.
   O `SecurityConfig` era o ponto que o backlog não previa: com `anyRequest().authenticated()`,
   o healthcheck do Docker tomaria 401 para sempre e o container ficaria `unhealthy` desde a
   subida.
+- **Épico D0 — ensaio local do stack de produção (D-03 → D-07).** Os cinco containers de
+  `docker-compose.prod.yml` subiram na máquina local, com `db`, `ml-service` e `backend`
+  `healthy`. Imagens: backend **273 MB**, ml-service **685 MB** (o R4 temia 1,5–2,5 GB para o
+  ml-service). Flyway rodou as migrations na subida. Isolamento (R6) confirmado: nenhum dos três
+  serviços internos publica porta, e o backend alcança o ml-service pela rede do Docker.
+  Roteamento do Caddy confirmado, com a prova de que o `/api/*` chega no backend e não no nginx.
+  Memória ociosa total ~1,01 GiB dos 3,9 GB orçados. Detalhes por task em `infra/tasks.md`.
 - **D-46 — pin `cmdstanpy==1.2.4` na branch de deploy.** Uma linha em
   `ml-service/requirements.txt`, abaixo do `prophet==1.1.6`, idêntica à da
   `analise-validacao-modelos`. Sem ela o `pip install` do Dockerfile resolve o cmdstanpy livre
@@ -82,11 +90,18 @@ foi registrada neste arquivo.
 - ⚠️ **Efeito colateral do D-10, avisar no grupo:** quem roda o backend **fora do Docker**
   (IDE, `bootRun`) agora precisa exportar `JWT_SECRET`. O valor de dev só é reposto pelo
   `docker-compose.yml`.
-- ⚠️ **D-46 fechada, mas não validada por build.** O pin está na branch; nenhum `docker build`
-  do ml-service rodou com ele no lugar. Quem confirma que a imagem sobe com o Prophet de fato
-  funcionando é o **D-04**.
-- **Épico D0 inteiro** (D-03 → D-08) roda na máquina local, sem AWS e sem gastar crédito. O
-  D-07 destrava o D-14, hoje marcado `aguardando medicao`.
+- 🔶 **D-07 incompleto: falta a medição sob carga.** O ocioso está medido, mas o número que a task
+  chama de útil é o **pico** durante um lote — e o banco de ensaio tem 0 produtos. Exige importar
+  planilhas e rodar o motor antes. O `db` já está em **75,8% do seu `mem_limit` de 600 MiB parado**,
+  então é ele o candidato a OOM sob carga, não o ml-service.
+- **D-08 (opcional) não avaliado** — trocar o container nginx pelo `file_server` do Caddy, ~50 MB.
+  O D-06 já deu a base para testar.
+- 📌 **Para a trilha B:** credencial inválida devolve **404**, não 401 (visto no D-06). O front
+  precisa tratar 404 no login como "credencial inválida" — conferir contra a I-03.
+- **D-14 continua `aguardando medicao`.** O ocioso do D-07 não resolve: o ml-service marcou
+  282 MiB parado, mas o Prophet carrega sob demanda — o que decide se dois workers cabem nos
+  1,8 GB é o pico, que é justamente o que falta medir. O `ps` não existe na imagem
+  `python:3.10-slim`, então nem a contagem de processos saiu por ali.
 - **Três decisões travando os Épicos D3/D4:** D-17 (como o código chega na EC2 —
   `BLOQUEADOR`), D-18 (domínio) e D-19 (deployar com o front em mock ou esperar a trilha B).
 - **Trilha B em 0 de 11** (`frontend/docs/tasks-integracao.md`) — o app é 100% mock.

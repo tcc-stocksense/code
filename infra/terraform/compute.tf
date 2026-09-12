@@ -38,7 +38,8 @@ resource "aws_instance" "app" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.web.id]
   key_name               = aws_key_pair.main.key_name
-  iam_instance_profile   = aws_iam_instance_profile.ec2.name
+  # Profile pré-existente do Learner Lab (var). "" = sem profile, e o stack sobe igual.
+  iam_instance_profile = var.instance_profile_name != "" ? var.instance_profile_name : null
 
   root_block_device {
     volume_type           = "gp3"

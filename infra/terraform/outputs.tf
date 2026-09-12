@@ -21,11 +21,16 @@ output "instance_id" {
 output "proximos_passos" {
   value = <<-EOT
 
-    1. DuckDNS: aponte stocksense.duckdns.org para ${aws_eip.app.public_ip}
-    2. Aguarde ~3 min o bootstrap (Docker + swap) terminar
-    3. ssh -i stocksense-key.pem ubuntu@${aws_eip.app.public_ip}
-    4. Confirme: ls /var/log/stocksense-bootstrap-done && free -h
-    5. Siga o §9.2 em diante: git clone, build, .env, docker compose up
+    1. Aguarde ~3 min o bootstrap (Docker + swap) terminar
+    2. ssh -i stocksense-key.pem ubuntu@${aws_eip.app.public_ip}
+    3. Confirme: ls /var/log/stocksense-bootstrap-done && free -h
+    4. Da sua máquina: infra/scripts/03-enviar.sh e depois 04-subir.sh
+    5. Abra http://${aws_eip.app.public_ip} — SITE_ADDRESS=:80, HTTP puro
+
+    HTTPS não sai deste apply: o Let's Encrypt não emite certificado para
+    endereço IP (§5). Quando quiser o cadeado, aponte um nome (DuckDNS) para
+    ${aws_eip.app.public_ip}, troque SITE_ADDRESS no .env da VM e reinicie
+    o Caddy — não precisa recriar nada aqui.
 
   EOT
 }

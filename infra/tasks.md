@@ -56,25 +56,45 @@ Descobrir na véspera da defesa custa a defesa.
 
 ---
 
-## Estado atual (auditado em 2026-08-30)
+## Estado atual (auditado em 2026-09-12)
 
-Auditado contra o código e o `git log`, não contra a documentação.
+Auditado contra o código e o `git log`, não contra a documentação. A auditoria anterior
+(2026-08-30) errava em quatro pontos, corrigidos abaixo — a trilha B tinha fechado e este
+arquivo não sabia.
 
 | Item | Estado |
 |---|---|
 | `infra/infraestrutura-nuvem.md` | ✅ commit `eb147c6` |
-| `infra/terraform/*.tf` (9 arquivos) | ✅ commit `4a479d5` — **escrito e inicializado, nunca aplicado** |
+| `infra/terraform/*.tf` | ✅ commit `4a479d5`, **adaptado ao Learner Lab** em 2026-09-12 — `terraform validate` passa, **nunca aplicado** |
 | `Caddyfile` | ✅ commit `fabf7b3` |
 | `docker-compose.prod.yml` | ✅ commit `fabf7b3` |
-| Correções da Parte 8 | 🔶 **4 de 8** (D-10, D-12, D-13, D-15) · 1 descartada (credencial) |
-| Integração do frontend (`tasks-integracao.md`) | ❌ **0 de 11** — o app é 100% mock |
+| Scripts de deploy (`infra/scripts/`) | ✅ **novos** — 01 a 05 + `backup.sh`, ver [`scripts/README.md`](./scripts/README.md) |
+| Correções da Parte 8 | ✅ **6 de 8** (D-09, D-10, D-11, D-12, D-13, D-15) · D-14 aguarda medição · 1 descartada (D-16) |
+| Integração do frontend (`tasks-integracao.md`) | ✅ **10 de 11** — mergeada na `main` (PR #10). Falta só a I-11 (fumaça no navegador) |
 | Recursos na AWS | ❌ **nenhum existe** — nunca houve `terraform apply` |
 | `ml-service/analysis/` (núcleo acadêmico da T10) | ✅ versionado na branch `analise-validacao-modelos` — **não mergeada** |
 | Benchmark do motor (T-54) | ✅ executado em 2026-08-30 — `docs/benchmark-motor.md` |
-| Pin `cmdstanpy==1.2.4` (T-12) | ✅ **na branch de deploy** (D-46) e **validado na imagem** no D-04 — ainda ausente na `main` |
+| Pin `cmdstanpy==1.2.4` (T-12) | ✅ na branch de deploy (D-46), validado na imagem no D-04 — ainda ausente na `main` |
 
 **Escrito ≠ executado.** O Terraform tem `terraform init` rodado (o `.terraform.lock.hcl` está
-versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito foi gasto até aqui.
+versionado) e `validate` passando, mas nunca passou por `plan` nem `apply`. Nenhum dólar de
+crédito foi gasto até aqui.
+
+### Restrições do AWS Academy Learner Lab (confirmado em 2026-09-12)
+
+A conta é **Learner Lab**, não uma conta AWS comum — o que o §7 deste projeto assumia. Quatro
+consequências que mudam tasks:
+
+| Restrição | Efeito |
+|---|---|
+| `iam:CreateRole` negado | O `backup.tf` **não cria mais role/policy/instance profile**. Usa a `LabRole` pronta do lab, por `var.instance_profile_name`. Perde-se o privilégio mínimo de `s3:PutObject` — limitação de ambiente, registrar no §10.2 |
+| `budgets:*` negado | **D-23 não aplicável.** O controle de gasto passa a ser o painel do próprio lab |
+| Credenciais temporárias | Expiram em ~3–4h e exigem `AWS_SESSION_TOKEN`. Recolar em `infra/lab-credentials.env` a cada sessão |
+| Sessão do lab encerra | O lab **para as instâncias** ao fim da sessão. O Elastic IP e o EBS persistem; os containers voltam pelo `restart: unless-stopped`. "No ar 24/7" não existe neste ambiente |
+
+⚠️ **A confirmar no primeiro apply:** se a `t3.medium` está entre os tipos permitidos. Alguns
+labs limitam o tamanho da instância, e cair para `t3.small` (2 GB) **não cabe** no orçamento de
+memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) deixa de ser opcional.
 
 ---
 
@@ -177,12 +197,25 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 
 ---
 
-## Épico D1 — Correções de código pré-deploy `Trilha A` (exceto D-11)
+## Épico D1 — Correções de código pré-deploy `Trilha A`
 
 > Os 8 itens da Parte 8, um por task. Referências reconferidas contra o código em 2026-08-30 —
 > **nenhuma foi feita ainda.**
 
-- [ ] **D-09 — `API_BASE_URL` relativo** `A`
+- [x] **D-09 — `API_BASE_URL` relativo** `A`
+  **Feito em 2026-09-12 — e não do jeito que esta task previa.** A solução sugerida aqui
+  ("relativo por padrão, absoluto por override") resolve o sintoma mantendo a causa: dev e
+  produção com topologias de origem diferentes, obrigando o front a saber onde está.
+  O que foi feito: **o nginx de desenvolvimento ganhou o proxy que o Caddy já tinha**
+  ([`frontend/nginx-dev.conf`](../../frontend/nginx-dev.conf), montado no
+  `docker-compose.yml`). Com os dois ambientes na mesma origem, `API_BASE_URL` é `'/api'`
+  puro, sem detecção de ambiente — e o bean de CORS que veio da integração passa a ser
+  redundante (inofensivo) também em dev.
+  Dois defaults do nginx que quebrariam o que o Caddy não quebra, e foram corrigidos no
+  conf: `client_max_body_size` (1m default → 413 no upload da T3, que o backend aceita até
+  5MB) e `proxy_read_timeout` (60s default → cortaria o lote do motor no meio; R1).
+  Escape hatch para quem serve o front fora do Docker: `localStorage` →
+  `stocksense_api_base`, documentado no próprio `config.js`.
   `frontend/web/js/core/config.js:1`: `'http://localhost:8080/api'` → `'/api'`. Front e API na mesma
   origem via Caddy; elimina o `localhost` e a necessidade de CORS.
   ⚠️ Coordenar com a **I-02** do `tasks-integracao.md`, que pede a URL absoluta para o dev fora do
@@ -199,7 +232,15 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   credencial seedada, que decidimos manter (ver a nota da D-16). O ganho é operacional: erro de
   digitação no `.env` de produção falha alto em vez de silenciosamente.
 
-- [ ] **D-11 — Inverter o default do mock** `B` ⚠️
+- [x] **D-11 — Inverter o default do mock** `B`
+  ✅ **Já estava feito quando esta task foi reavaliada (2026-09-12).** O commit de
+  integração `3b5f60d` consolidou as 6 ocorrências em **uma única função** em
+  `core/config.js`: `mockAtivo()` devolve `localStorage.getItem('stocksense_mock') === 'on'`.
+  Não existe mais nenhum `!== 'off'` solto — `layout.js`, `apiClient.js` e
+  `sugestao-compra.page.js` todos importam de `config.js`, então o botão flutuante e o
+  comportamento real não podem dessincronizar, que era o risco apontado abaixo.
+  Conferido também que a T8 (Pós-MVP, sem endpoint no backend) com mock desligado mostra
+  um *empty state* honesto em vez de erro de console — o critério do D-34 se mantém.
   **A expressão `localStorage.getItem('stocksense_mock') !== 'off'` aparece 6 vezes em 3 arquivos:**
   `js/core/apiClient.js:8`, `js/components/layout.js:131,134,151`, `js/pages/login.page.js:45,50`.
   A Parte 8 aponta só a primeira — mudar só ela dessincroniza o botão flutuante do comportamento
@@ -294,7 +335,14 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 > ⚠️ **Não é código.** São três decisões que travam a execução e que nenhum documento registrou
 > ainda. Cada uma muda tasks do D3 e do D4.
 
-- [~] **D-17 — Como o código chega na EC2** `A` `BLOQUEADOR` `aguardando confirmacao`
+- [x] **D-17 — Como o código chega na EC2** `A` `opção (c)`
+  ✅ **Decidido em 2026-09-12: opção (c).** Build local, `docker save` → SSH →
+  `docker load`; arquivos de bind mount por `git clone`. Implementado em
+  [`01-empacotar-imagens.sh`](../scripts/01-empacotar-imagens.sh) e
+  [`03-enviar.sh`](../scripts/03-enviar.sh).
+  **A pendência de fato caiu:** `github.com/tcc-stocksense/code` é **público** (verificado
+  por `api.github.com/repos/...` → HTTP 200 sem autenticação). O `git clone` do eixo (2)
+  não precisa de deploy key, e o redeploy do front segue sendo `git pull`.
   **Recomendação registrada em 2026-09-06, aguardando o seu aval.** Passo a passo completo em
   **[`infra/docs/deploy-runbook.md`](docs/deploy-runbook.md)**, que também resume as alternativas.
 
@@ -324,11 +372,27 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   key — ou troca-se por `scp`, ao custo de perder o `git pull` no redeploy do front.
   A escolha define D-28 e D-30.
 
-- [ ] **D-18 — Domínio** `A`
+- [~] **D-18 — Domínio** `A` `pós-primeiro-deploy`
+  🔁 **Reordenado em 2026-09-12: sai do caminho crítico do primeiro deploy.** Sobe-se em
+  **HTTP puro no IP** (`SITE_ADDRESS=:80`, o modo do `Caddyfile:18`), e o domínio vira um
+  passo posterior de 5 minutos. Motivo: o Let's Encrypt **não emite certificado para
+  endereço IP** (§5), então juntar TLS à primeira subida traz dois riscos que nada têm a
+  ver com a infra funcionar — propagação de DNS e o rate limit de 5 falhas/hora do ACME,
+  que trava a emissão por uma hora se o DNS não estava pronto.
+  Com o stack comprovadamente no ar, `04-subir.sh stocksense.duckdns.org` troca o
+  `SITE_ADDRESS` e reinicia o Caddy. **Decisão pendente apenas de quando**, não de qual:
+  DuckDNS grátis para validar, `.com` próprio se quiser na defesa.
+  ⚠️ **Antes da defesa isto precisa existir.** Sem HTTPS o JWT trafega em claro (a lacuna
+  que o §1.7 aponta), o navegador mostra "Não seguro" e o D-45 pede "cadeado do HTTPS"
+  nas capturas. HTTP no IP é estado de trânsito, não de entrega.
   DuckDNS grátis (`stocksense.duckdns.org`) ou `.com` próprio (~US$ 12/ano, melhor na defesa).
   Precisa estar **resolvendo para o Elastic IP antes** do primeiro `up` com TLS — ver D-32.
 
-- [ ] **D-19 — Deployar com o front em mock, ou esperar a trilha B?** `A`
+- [x] **D-19 — Deployar com o front em mock, ou esperar a trilha B?** `A`
+  ✅ **Resolvido por fato consumado em 2026-09-12: a trilha B fechou antes.** A pergunta
+  pressupunha front em mock; a integração foi mergeada na `main` (PR #10) com **10 das 11
+  tasks** do `tasks-integracao.md` concluídas — falta só a I-11, que é o próprio teste de
+  fumaça no navegador. Deploya-se com o front **integrado**, e o Épico D5 roda uma vez.
   A recomendação deste arquivo é **deployar antes**: valida infra cedo e o redeploy do front é um
   `git pull` (bind mount, sem rebuild). Registrar a decisão aqui de qualquer forma — ela define se
   o Épico D5 roda uma vez ou duas.
@@ -346,6 +410,10 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   Commit `4a479d5`. **`terraform init` rodado; `plan` e `apply`, nunca.**
 
 - [ ] **D-21 — `terraform.tfvars`** `A`
+  📌 **Automatizado em 2026-09-12** no [`02-provisionar.sh`](../scripts/02-provisionar.sh):
+  ele resolve o `dev_ip` por `curl checkip.amazonaws.com` a cada execução (o IP
+  residencial muda) e preserva o resto do arquivo. Acrescenta `instance_profile_name`,
+  que passou a existir por causa do Learner Lab. Ainda `[ ]` porque só roda amanhã.
   Copiar do `.example` e preencher `dev_ip` com `curl -s https://checkip.amazonaws.com` + `/32`.
   A `validation` do `variables.tf` rejeita CIDR malformado. O arquivo é gitignorado.
   ⚠️ IP residencial muda. Se o SSH parar de conectar depois de um tempo, é isto — reaplicar com o
@@ -357,7 +425,12 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
   8080/8000/3306.
   _Depende de: D-21_
 
-- [ ] **D-23 — Alarme de orçamento** `A`
+- [x] **D-23 — Alarme de orçamento** `A` `não aplicável no Learner Lab`
+  ⛔ **Não aplicável no AWS Academy Learner Lab (decidido em 2026-09-12).** A política
+  do lab nega `budgets:*`: incluir o recurso garantiria apply falho. O controle de gasto
+  passa a ser o do próprio lab — ele mostra o crédito consumido e encerra a sessão,
+  parando as instâncias. Registrar como limitação do ambiente no §10.2, não como lacuna
+  do projeto. Se a conta mudar para uma AWS normal, reabrir esta task.
   **Recurso que falta no Terraform.** São US$ 100 de crédito e nada avisa se a instância ficar
   ligada esquecida. Adicionar `aws_budgets_budget` com notificação por e-mail em ~50% e ~80%.
   Escrever antes do `apply` para entrar na mesma execução.
@@ -454,7 +527,15 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 
 ## Épico D6 — Operação `Trilha A`
 
-- [ ] **D-36 — `infra/scripts/backup.sh` versionado** `A`
+- [x] **D-36 — `infra/scripts/backup.sh` versionado** `A`
+  **Feito em 2026-09-12.** Arquivo em [`infra/scripts/backup.sh`](../scripts/backup.sh).
+  Lê o nome do bucket de `/etc/stocksense-backup.conf` (tem sufixo aleatório, vem do
+  output `bucket_backup` do D-24) e a senha do root do `.env` da instância. Acrescentei
+  sobre o bloco do §9.7: `--single-transaction` (dump consistente sem travar escrita) e
+  **verificação de dump vazio** — sem ela, uma falha de autenticação no MySQL produziria
+  um `.gz` de poucos bytes que o `aws s3 cp` subiria como se fosse backup bom. Também
+  confere o objeto no S3 com `s3 ls` antes de sair com 0, para o cron reportar falha.
+  ⚠️ O `s3://stocksense-backup/` do §9.7 está errado: o bucket tem sufixo aleatório.
   Hoje o script existe **só como bloco de código no §9.7**. Virar arquivo de verdade, recebendo o
   nome do bucket por variável de ambiente (ele tem sufixo aleatório — output do D-24) e a senha do
   root por `.env`. `mysqldump` → `gzip` → `aws s3 cp`. A instance profile autentica: **nenhuma
@@ -522,9 +603,9 @@ versionado), mas nunca passou por `plan` nem `apply`. Nenhum dólar de crédito 
 
 | Este arquivo | Depende de | Onde |
 |---|---|---|
-| D-11 (mock off) | I-01 … I-11 completos | `frontend/docs/tasks-integracao.md` |
-| D-34 (fluxo pela UI) | I-11 (fumaça E2E no navegador) | `frontend/docs/tasks-integracao.md` |
-| D-09 (`API_BASE_URL`) | I-02 (base URL) — **decidir juntas** | `frontend/docs/tasks-integracao.md` |
+| ~~D-11 (mock off)~~ | ✅ resolvida — 10/11 das I-xx concluídas e mergeadas (PR #10) | `frontend/docs/tasks-integracao.md` |
+| D-34 (fluxo pela UI) | I-11 (fumaça E2E no navegador) — **única I-xx aberta** | `frontend/docs/tasks-integracao.md` |
+| ~~D-09 (`API_BASE_URL`)~~ | ✅ resolvida sem conflito com a I-02: o proxy no nginx de dev deixa `/api` válido nos dois ambientes | `frontend/nginx-dev.conf` |
 | D-12 (Actuator) | `backend/build.gradle.kts` | `backend/tasks.md` |
 
 ---

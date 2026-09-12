@@ -1,5 +1,6 @@
-# S3 + IAM — destino do mysqldump diário (§9.7).
-# A instance profile autentica a chamada: nenhuma access key no disco da EC2.
+# S3 — destino do mysqldump diário (§9.7).
+# A instance profile do lab autentica a chamada: nenhuma access key no disco da EC2.
+# A role NÃO é criada aqui (ver o bloco no fim do arquivo).
 
 # Nome de bucket é global na AWS inteira; o sufixo evita colisão.
 resource "random_id" "bucket" {
@@ -45,35 +46,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
   }
 }
 
-resource "aws_iam_role" "ec2" {
-  name = "stocksense-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "ec2.amazonaws.com" }
-    }]
-  })
-}
-
-# Permissão mínima: gravar objetos, e só neste bucket.
-resource "aws_iam_role_policy" "backup_write" {
-  name = "stocksense-s3-backup-write"
-  role = aws_iam_role.ec2.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["s3:PutObject"]
-      Resource = "${aws_s3_bucket.backup.arn}/*"
-    }]
-  })
-}
-
-resource "aws_iam_instance_profile" "ec2" {
-  name = "stocksense-ec2-profile"
-  role = aws_iam_role.ec2.name
-}
+# ----------------------------------------------------------------------------
+# IAM — NÃO criado aqui. Restrição do AWS Academy Learner Lab.
+#
+# A versão anterior deste arquivo criava `aws_iam_role` + `aws_iam_role_policy`
+# + `aws_iam_instance_profile`, com permissão mínima de `s3:PutObject` só neste
+# bucket. No Learner Lab isso falha no apply: a política do lab nega
+# iam:CreateRole. O lab fornece uma role pronta (`LabRole`) e a instance
+# profile correspondente, que é o que a EC2 passa a usar.
+#
+# O que se perde: o privilégio mínimo. A LabRole tem permissões amplas, então a
+# EC2 pode mais que gravar dumps. É limitação do ambiente, não escolha de
+# projeto — registrar no §10.2 do infraestrutura-nuvem.md junto das outras.
+# O que se mantém: nenhuma access key em disco. A autenticação continua vindo
+# da instance profile, que é o ponto do §9.7.
+#
+# O nome sai em `var.instance_profile_name` porque varia entre versões do lab.
+# Confirmar antes do apply em: console AWS → IAM → Roles → LabRole → aba
+# "Instance profile ARNs". Se o nome estiver errado, o apply falha em
+# `aws_instance` com "InvalidParameterValue: IAM Instance Profile not found".
+# ----------------------------------------------------------------------------

@@ -47,3 +47,21 @@ variable "backup_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "instance_profile_name" {
+  description = <<-EOT
+    Nome da instance profile que a EC2 assume, usada pelo backup do §9.7 para
+    gravar no S3 sem access key em disco.
+
+    No AWS Academy Learner Lab a role não pode ser criada (iam:CreateRole é
+    negado) — usa-se a que o lab já fornece, normalmente "LabInstanceProfile".
+    Confirmar em: console AWS → IAM → Roles → LabRole → "Instance profile ARNs".
+
+    Deixar como string vazia ("") sobe a instância SEM profile: o stack funciona
+    e só o backup para S3 fica indisponível, podendo ser anexado depois sem
+    recriar a instância. É o escape hatch para não travar o deploy por causa de
+    um nome errado.
+  EOT
+  type        = string
+  default     = "LabInstanceProfile"
+}

@@ -1,0 +1,588 @@
+{
+  "prophet_ok": true,
+  "seed": 42,
+  "descritiva": [
+    {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "variabilidade": 0.15,
+      "media_diaria": 12.4,
+      "desvio": 5.46,
+      "cv": 0.47,
+      "pct_zeros": 6.0,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 2,
+      "nome": "Feijão Carioca 1kg",
+      "variabilidade": 0.15,
+      "media_diaria": 8.27,
+      "desvio": 3.86,
+      "cv": 0.51,
+      "pct_zeros": 8.5,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 3,
+      "nome": "Leite Integral 1L",
+      "variabilidade": 0.35,
+      "media_diaria": 21.52,
+      "desvio": 11.62,
+      "cv": 0.58,
+      "pct_zeros": 7.7,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 4,
+      "nome": "Pão Francês",
+      "variabilidade": 0.4,
+      "media_diaria": 30.58,
+      "desvio": 18.24,
+      "cv": 0.64,
+      "pct_zeros": 6.8,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "variabilidade": 0.45,
+      "media_diaria": 16.53,
+      "desvio": 10.57,
+      "cv": 0.68,
+      "pct_zeros": 6.3,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 6,
+      "nome": "Sal Refinado 1kg",
+      "variabilidade": 0.05,
+      "media_diaria": 5.21,
+      "desvio": 2.29,
+      "cv": 0.48,
+      "pct_zeros": 7.7,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 7,
+      "nome": "Açúcar Cristal 1kg",
+      "variabilidade": 0.05,
+      "media_diaria": 7.27,
+      "desvio": 3.21,
+      "cv": 0.48,
+      "pct_zeros": 7.4,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 8,
+      "nome": "Óleo de Soja 900ml",
+      "variabilidade": 0.2,
+      "media_diaria": 6.09,
+      "desvio": 2.89,
+      "cv": 0.51,
+      "pct_zeros": 6.8,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 9,
+      "nome": "Frango Inteiro kg",
+      "variabilidade": 0.3,
+      "media_diaria": 10.44,
+      "desvio": 5.45,
+      "cv": 0.56,
+      "pct_zeros": 7.4,
+      "n_dias": 365
+    },
+    {
+      "produto_id": 10,
+      "nome": "Refrigerante 2L",
+      "variabilidade": 0.25,
+      "media_diaria": 14.49,
+      "desvio": 7.11,
+      "cv": 0.53,
+      "pct_zeros": 6.8,
+      "n_dias": 365
+    }
+  ],
+  "params_hw": [
+    {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "alpha": 0.0,
+      "beta": 0.0,
+      "gamma": 0.0,
+      "nivel_inicial": 10.136,
+      "tendencia_inicial": 0.00708,
+      "sazonais_iniciais": [
+        -0.254,
+        -1.762,
+        -0.697,
+        0.724,
+        5.075,
+        6.878,
+        -8.713
+      ]
+    },
+    {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "alpha": 0.0,
+      "beta": 0.0,
+      "gamma": 0.0001,
+      "nivel_inicial": 15.19,
+      "tendencia_inicial": 0.00028,
+      "sazonais_iniciais": [
+        -2.423,
+        -1.209,
+        -3.423,
+        0.767,
+        10.124,
+        9.695,
+        -11.867
+      ]
+    }
+  ],
+  "walkforward": {
+    "1": {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "n_treino": 292,
+      "n_validacao": 73,
+      "treino_ini": "2024-01-01",
+      "treino_fim": "2024-10-18",
+      "valid_ini": "2024-10-19",
+      "valid_fim": "2024-12-30",
+      "hw": {
+        "mape": 12.4887,
+        "rmse": 2.2522,
+        "mae": 1.7583
+      },
+      "prophet": {
+        "mape": 12.4606,
+        "rmse": 2.2451,
+        "mae": 1.7488
+      }
+    },
+    "5": {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "n_treino": 292,
+      "n_validacao": 73,
+      "treino_ini": "2024-01-01",
+      "treino_fim": "2024-10-18",
+      "valid_ini": "2024-10-19",
+      "valid_fim": "2024-12-30",
+      "hw": {
+        "mape": 66.6753,
+        "rmse": 8.0727,
+        "mae": 6.1818
+      },
+      "prophet": {
+        "mape": 66.6271,
+        "rmse": 8.073,
+        "mae": 6.1818
+      }
+    }
+  },
+  "backtesting": {
+    "1": {
+      "holt_winters": [
+        {
+          "origem": "2024-10-22",
+          "mape": 11.839,
+          "rmse": 1.8164,
+          "mae": 1.4855
+        },
+        {
+          "origem": "2024-11-05",
+          "mape": 12.4226,
+          "rmse": 2.8208,
+          "mae": 2.2967
+        },
+        {
+          "origem": "2024-11-19",
+          "mape": 11.3453,
+          "rmse": 1.496,
+          "mae": 1.2896
+        },
+        {
+          "origem": "2024-12-03",
+          "mape": 15.6548,
+          "rmse": 2.3596,
+          "mae": 1.8628
+        },
+        {
+          "origem": "2024-12-17",
+          "mape": 10.5033,
+          "rmse": 2.1089,
+          "mae": 1.5922
+        }
+      ],
+      "prophet": [
+        {
+          "origem": "2024-10-22",
+          "mape": 11.8483,
+          "rmse": 1.8033,
+          "mae": 1.4795
+        },
+        {
+          "origem": "2024-11-05",
+          "mape": 12.4832,
+          "rmse": 2.8262,
+          "mae": 2.3028
+        },
+        {
+          "origem": "2024-11-19",
+          "mape": 11.3429,
+          "rmse": 1.4951,
+          "mae": 1.2916
+        },
+        {
+          "origem": "2024-12-03",
+          "mape": 15.5182,
+          "rmse": 2.3615,
+          "mae": 1.8511
+        },
+        {
+          "origem": "2024-12-17",
+          "mape": 10.4214,
+          "rmse": 2.0999,
+          "mae": 1.585
+        }
+      ]
+    },
+    "5": {
+      "holt_winters": [
+        {
+          "origem": "2024-10-22",
+          "mape": 34.135,
+          "rmse": 6.3049,
+          "mae": 5.1933
+        },
+        {
+          "origem": "2024-11-05",
+          "mape": 50.9536,
+          "rmse": 7.8968,
+          "mae": 6.5588
+        },
+        {
+          "origem": "2024-11-19",
+          "mape": 188.4245,
+          "rmse": 11.6365,
+          "mae": 8.8273
+        },
+        {
+          "origem": "2024-12-03",
+          "mape": 31.9082,
+          "rmse": 6.5933,
+          "mae": 5.5175
+        },
+        {
+          "origem": "2024-12-17",
+          "mape": 30.2279,
+          "rmse": 7.6776,
+          "mae": 5.6054
+        }
+      ],
+      "prophet": [
+        {
+          "origem": "2024-10-22",
+          "mape": 34.3025,
+          "rmse": 6.37,
+          "mae": 5.2242
+        },
+        {
+          "origem": "2024-11-05",
+          "mape": 50.7711,
+          "rmse": 7.8703,
+          "mae": 6.5581
+        },
+        {
+          "origem": "2024-11-19",
+          "mape": 185.0188,
+          "rmse": 11.5978,
+          "mae": 8.7537
+        },
+        {
+          "origem": "2024-12-03",
+          "mape": 31.8215,
+          "rmse": 6.6237,
+          "mae": 5.5466
+        },
+        {
+          "origem": "2024-12-17",
+          "mape": 30.2129,
+          "rmse": 7.674,
+          "mae": 5.6154
+        }
+      ]
+    }
+  },
+  "kpis": [
+    {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "vencedor": "prophet",
+      "demanda_media": 13.092,
+      "desvio": 5.459,
+      "z": 1.6449,
+      "lead_time": 3,
+      "variab_lt": 1.0,
+      "estoque_seguranca": 26.56,
+      "ponto_reposicao": 65.84,
+      "estoque_atual": 15,
+      "dias_ate_ruptura": 1.15
+    },
+    {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "vencedor": "prophet",
+      "demanda_media": 15.267,
+      "desvio": 10.573,
+      "z": 1.6449,
+      "lead_time": 3,
+      "variab_lt": 1.0,
+      "estoque_seguranca": 39.22,
+      "ponto_reposicao": 85.02,
+      "estoque_atual": 200,
+      "dias_ate_ruptura": 13.1
+    }
+  ],
+  "comparativo": [
+    {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "modelo": "holt_winters",
+      "mape": 12.4887,
+      "rmse": 2.2522,
+      "mae": 1.7583,
+      "vencedor": false
+    },
+    {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "modelo": "prophet",
+      "mape": 12.4606,
+      "rmse": 2.2451,
+      "mae": 1.7488,
+      "vencedor": true
+    },
+    {
+      "produto_id": 2,
+      "nome": "Feijão Carioca 1kg",
+      "modelo": "holt_winters",
+      "mape": 13.2639,
+      "rmse": 1.4155,
+      "mae": 1.1231,
+      "vencedor": true
+    },
+    {
+      "produto_id": 2,
+      "nome": "Feijão Carioca 1kg",
+      "modelo": "prophet",
+      "mape": 13.354,
+      "rmse": 1.4191,
+      "mae": 1.1279,
+      "vencedor": false
+    },
+    {
+      "produto_id": 3,
+      "nome": "Leite Integral 1L",
+      "modelo": "holt_winters",
+      "mape": 42.0977,
+      "rmse": 9.1086,
+      "mae": 7.4113,
+      "vencedor": true
+    },
+    {
+      "produto_id": 3,
+      "nome": "Leite Integral 1L",
+      "modelo": "prophet",
+      "mape": 42.7739,
+      "rmse": 9.1659,
+      "mae": 7.4487,
+      "vencedor": false
+    },
+    {
+      "produto_id": 4,
+      "nome": "Pão Francês",
+      "modelo": "holt_winters",
+      "mape": 81.251,
+      "rmse": 16.0704,
+      "mae": 11.9428,
+      "vencedor": true
+    },
+    {
+      "produto_id": 4,
+      "nome": "Pão Francês",
+      "modelo": "prophet",
+      "mape": 84.172,
+      "rmse": 16.2863,
+      "mae": 12.1403,
+      "vencedor": false
+    },
+    {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "modelo": "holt_winters",
+      "mape": 66.6753,
+      "rmse": 8.0727,
+      "mae": 6.1818,
+      "vencedor": false
+    },
+    {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "modelo": "prophet",
+      "mape": 66.6271,
+      "rmse": 8.073,
+      "mae": 6.1818,
+      "vencedor": true
+    },
+    {
+      "produto_id": 6,
+      "nome": "Sal Refinado 1kg",
+      "modelo": "holt_winters",
+      "mape": 9.6252,
+      "rmse": 1.0853,
+      "mae": 0.5875,
+      "vencedor": false
+    },
+    {
+      "produto_id": 6,
+      "nome": "Sal Refinado 1kg",
+      "modelo": "prophet",
+      "mape": 9.5655,
+      "rmse": 1.0844,
+      "mae": 0.5851,
+      "vencedor": true
+    },
+    {
+      "produto_id": 7,
+      "nome": "Açúcar Cristal 1kg",
+      "modelo": "holt_winters",
+      "mape": 8.8945,
+      "rmse": 1.7412,
+      "mae": 0.9415,
+      "vencedor": true
+    },
+    {
+      "produto_id": 7,
+      "nome": "Açúcar Cristal 1kg",
+      "modelo": "prophet",
+      "mape": 9.0065,
+      "rmse": 1.7404,
+      "mae": 0.9452,
+      "vencedor": false
+    },
+    {
+      "produto_id": 8,
+      "nome": "Óleo de Soja 900ml",
+      "modelo": "holt_winters",
+      "mape": 21.4335,
+      "rmse": 2.1356,
+      "mae": 1.421,
+      "vencedor": true
+    },
+    {
+      "produto_id": 8,
+      "nome": "Óleo de Soja 900ml",
+      "modelo": "prophet",
+      "mape": 21.4615,
+      "rmse": 2.1373,
+      "mae": 1.4216,
+      "vencedor": false
+    },
+    {
+      "produto_id": 9,
+      "nome": "Frango Inteiro kg",
+      "modelo": "holt_winters",
+      "mape": 25.3962,
+      "rmse": 3.7548,
+      "mae": 2.6511,
+      "vencedor": false
+    },
+    {
+      "produto_id": 9,
+      "nome": "Frango Inteiro kg",
+      "modelo": "prophet",
+      "mape": 25.287,
+      "rmse": 3.7482,
+      "mae": 2.6434,
+      "vencedor": true
+    },
+    {
+      "produto_id": 10,
+      "nome": "Refrigerante 2L",
+      "modelo": "holt_winters",
+      "mape": 28.2987,
+      "rmse": 4.7083,
+      "mae": 3.3909,
+      "vencedor": true
+    },
+    {
+      "produto_id": 10,
+      "nome": "Refrigerante 2L",
+      "modelo": "prophet",
+      "mape": 28.3084,
+      "rmse": 4.7087,
+      "mae": 3.3912,
+      "vencedor": false
+    }
+  ],
+  "vitorias": {
+    "holt_winters": 6,
+    "prophet": 4
+  },
+  "margens": [
+    {
+      "produto_id": 1,
+      "nome": "Arroz 5kg",
+      "margem_pp": 0.0281
+    },
+    {
+      "produto_id": 2,
+      "nome": "Feijão Carioca 1kg",
+      "margem_pp": 0.0901
+    },
+    {
+      "produto_id": 3,
+      "nome": "Leite Integral 1L",
+      "margem_pp": 0.6762
+    },
+    {
+      "produto_id": 4,
+      "nome": "Pão Francês",
+      "margem_pp": 2.921
+    },
+    {
+      "produto_id": 5,
+      "nome": "Banana Prata kg",
+      "margem_pp": 0.0482
+    },
+    {
+      "produto_id": 6,
+      "nome": "Sal Refinado 1kg",
+      "margem_pp": 0.0597
+    },
+    {
+      "produto_id": 7,
+      "nome": "Açúcar Cristal 1kg",
+      "margem_pp": 0.112
+    },
+    {
+      "produto_id": 8,
+      "nome": "Óleo de Soja 900ml",
+      "margem_pp": 0.028
+    },
+    {
+      "produto_id": 9,
+      "nome": "Frango Inteiro kg",
+      "margem_pp": 0.1092
+    },
+    {
+      "produto_id": 10,
+      "nome": "Refrigerante 2L",
+      "margem_pp": 0.0097
+    }
+  ]
+}

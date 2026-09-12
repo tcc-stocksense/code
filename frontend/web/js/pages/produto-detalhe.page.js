@@ -5,9 +5,8 @@ import { kpiCard } from '../components/kpiCard.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
-import { openModal } from '../components/modal.js';
 import { skeletonKpiGrid, skeletonChart } from '../components/skeleton.js';
-import { numero } from '../core/format.js';
+import { numero, dataBR } from '../core/format.js';
 import { iconArrowLeft, iconTrend, iconPencil, iconCheck, iconX } from '../components/icons.js';
 
 requireAuth();
@@ -46,12 +45,27 @@ async function carregarDetalhe() {
     const headerLeft = document.createElement('div');
     headerLeft.innerHTML = `
       <h1 class="page-title">${p.nome}</h1>
-      <p class="page-subtitle">${p.categoria || ''} · classe ${p.classe || ''}</p>
+      <p class="page-subtitle">${p.categoria || 'sem categoria'}${p.classe ? ` · classe ${p.classe}` : ''}</p>
     `;
     header.appendChild(headerLeft);
-    let headerBadge = statusBadge(p.diasRuptura);
+    let headerBadge = statusBadge(p.semaforo);
     header.appendChild(headerBadge);
     page.appendChild(header);
+
+    // Banner quando o motor ainda não rodou para este produto
+    if (p.semCalculo || p.semPrevisao) {
+      const banner = document.createElement('div');
+      banner.className = 'banner banner-warning';
+      banner.style.marginBottom = '20px';
+      banner.innerHTML = `
+        <div class="banner-body">
+          <strong>Sem previsão para este produto.</strong>
+          <small>O motor preditivo ainda não gerou estatísticas de demanda — importe vendas com histórico suficiente e execute o recálculo.</small>
+        </div>
+        <a href="importar.html" class="btn btn-secondary btn-sm">Ir para Importar</a>
+      `;
+      page.appendChild(banner);
+    }
 
     // Grid: conteúdo principal + side panel
     const grid = document.createElement('div');
@@ -61,14 +75,14 @@ async function carregarDetalhe() {
     const mainCol = document.createElement('div');
     mainCol.className = 'stack';
 
-    // Gráfico
-    if (p.grafico) {
+    // Gráfico — o backend devolve apenas a série prevista (até 30 pontos)
+    if (p.previsoes.length > 0) {
       const chartCard = document.createElement('div');
       chartCard.className = 'card';
       chartCard.innerHTML = `
         <div class="row-between" style="margin-bottom:6px">
-          <h3>Demanda diária</h3>
-          <span class="text-meta">últimos 90 dias + projeção 30 dias</span>
+          <h3>Demanda prevista</h3>
+          <span class="text-meta">${p.previsoes.length} dias · modelo selecionado pelo motor</span>
         </div>
         <div style="height:260px"><canvas id="chart-demanda"></canvas></div>
       `;
@@ -84,50 +98,52 @@ async function carregarDetalhe() {
     kpiGrid.appendChild(kpiCard({
       titulo: 'Demanda média/dia',
       valor: p.demandaMedia != null ? numero(p.demandaMedia, 1) : '—',
-      sub: `${p.unidade || 'un'}/dia`,
+      sub: `${p.unidade}/dia`,
     }));
 
     kpiGrid.appendChild(kpiCard({
       titulo: 'Variabilidade',
       valor: p.desvioPadrao != null ? `±${numero(p.desvioPadrao, 1)}` : '—',
-      sub: p.cv != null ? `desvio-padrão · CV ${numero(p.cv * 100, 0)}%` : '',
+      sub: p.cv != null ? `desvio-padrão · CV ${numero(p.cv * 100, 0)}%` : 'desvio-padrão da demanda',
     }));
 
-    const tendLabel = p.tendencia || 'estável';
-    const tendCor = p.tendencia === 'crescente' ? 'var(--status-ok)' : p.tendencia === 'decrescente' ? 'var(--status-critico)' : null;
+    const tendLabel = p.tendencia || '—';
+    const tendCor = p.tendencia === 'crescente' ? 'var(--status-ok)'
+      : p.tendencia === 'decrescente' ? 'var(--status-critico)' : null;
     const trendIcon = p.tendencia === 'decrescente'
       ? `<span style="display:inline-flex;transform:rotate(180deg)">${iconTrend(16)}</span>`
       : p.tendencia === 'crescente' ? iconTrend(16) : '';
     kpiGrid.appendChild(kpiCard({
       titulo: 'Tendência',
       valor: `${trendIcon} ${tendLabel}`,
-      sub: p.tendenciaDelta != null ? `${p.tendenciaDelta > 0 ? '+' : ''}${numero(p.tendenciaDelta * 100, 1)}% nas últimas 2 semanas` : '',
+      sub: p.tendenciaPercentual != null
+        ? `${p.tendenciaPercentual > 0 ? '+' : ''}${numero(p.tendenciaPercentual, 1)}% (primeiros vs. últimos 14 dias)`
+        : 'sem cálculo',
       cor: tendCor,
     }));
 
     mainCol.appendChild(kpiGrid);
 
-    // Vendas por semana (se disponível)
-    if (p.vendasSemana && p.vendasSemana.length > 0) {
-      const semanasCard = document.createElement('div');
-      semanasCard.className = 'card';
-      semanasCard.innerHTML = `<h3 style="margin-bottom:14px">Vendas por semana</h3>`;
+    // Tabela da série prevista
+    if (p.previsoes.length > 0) {
+      const serieCard = document.createElement('div');
+      serieCard.className = 'card';
+      serieCard.innerHTML = `<h3 style="margin-bottom:14px">Série prevista</h3>`;
       const table = document.createElement('table');
       table.className = 'table';
       table.innerHTML = `
-        <thead><tr><th>Semana</th><th>Total vendido</th><th>Média/dia</th></tr></thead>
+        <thead><tr><th>Data</th><th>Quantidade prevista</th></tr></thead>
         <tbody>
-          ${p.vendasSemana.map(s => `
+          ${p.previsoes.map(pt => `
             <tr>
-              <td>${s.label}</td>
-              <td class="tabular">${s.total} ${p.unidade || 'un'}</td>
-              <td class="tabular text-secondary">${numero(s.media, 1)} ${p.unidade || 'un'}/dia</td>
+              <td>${dataBR(pt.data)}</td>
+              <td class="tabular">${pt.quantidade != null ? numero(pt.quantidade, 2) : '—'} ${p.unidade}</td>
             </tr>
           `).join('')}
         </tbody>
       `;
-      semanasCard.appendChild(table);
-      mainCol.appendChild(semanasCard);
+      serieCard.appendChild(table);
+      mainCol.appendChild(serieCard);
     }
 
     grid.appendChild(mainCol);
@@ -139,7 +155,7 @@ async function carregarDetalhe() {
     const sideCard = document.createElement('div');
     sideCard.className = 'card';
 
-    // Estoque atual (editável, com tag "ajustado manualmente" + desfazer)
+    // Estoque atual (editável)
     const estoqueBlock = document.createElement('div');
     estoqueBlock.style.marginBottom = '16px';
     const estoqueOriginal = p.estoque;
@@ -150,7 +166,7 @@ async function carregarDetalhe() {
         <div class="label">Estoque atual</div>
         <div style="display:flex; align-items:center; gap:8px; margin-top:8px">
           <span style="font-size:32px; font-weight:500; font-variant-numeric:tabular-nums; line-height:1.1">
-            ${p.estoque} <span style="font-size:16px; color:var(--cor-texto-sec); font-weight:400">${p.unidade || 'un'}</span>
+            ${p.estoque} <span style="font-size:16px; color:var(--cor-texto-sec); font-weight:400">${p.unidade}</span>
           </span>
           <button type="button" class="btn btn-tertiary btn-sm" id="btn-edit-estoque" title="Editar estoque" style="padding:4px">${iconPencil(14)}</button>
         </div>
@@ -163,17 +179,7 @@ async function carregarDetalhe() {
       if (foiAjustado) {
         estoqueBlock.querySelector('#btn-desfazer-estoque').addEventListener('click', async (e) => {
           e.preventDefault();
-          try {
-            const resp = await apiPatch(`/produtos/${produtoId}/estoque`, { estoque: estoqueOriginal });
-            p.estoque = resp.estoque ?? estoqueOriginal;
-            aplicarIntel(resp);
-            foiAjustado = false;
-            toast.sucesso('Estoque revertido ao valor original');
-            renderEstoqueDisplay();
-            refreshIntel();
-          } catch (err) {
-            toast.erro(err.detail || 'Erro ao reverter estoque');
-          }
+          await salvarEstoque(estoqueOriginal, 'Estoque revertido ao valor original');
         });
       }
     }
@@ -192,59 +198,66 @@ async function carregarDetalhe() {
       input.select();
       input.addEventListener('input', (e) => { val = Math.max(0, Math.round(+e.target.value) || 0); });
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') salvar();
+        if (e.key === 'Enter') salvarEstoque(val);
         if (e.key === 'Escape') renderEstoqueDisplay();
       });
       estoqueBlock.querySelector('#btn-cancel-estoque').addEventListener('click', renderEstoqueDisplay);
-      estoqueBlock.querySelector('#btn-save-estoque').addEventListener('click', salvar);
+      estoqueBlock.querySelector('#btn-save-estoque').addEventListener('click', () => salvarEstoque(val));
+    }
 
-      async function salvar() {
-        try {
-          const resp = await apiPatch(`/produtos/${produtoId}/estoque`, { estoque: val });
-          p.estoque = resp.estoque ?? val;
-          aplicarIntel(resp);
-          foiAjustado = (p.estoque !== estoqueOriginal);
-          toast.sucesso(`Estoque atualizado para ${p.estoque}`);
-          renderEstoqueDisplay();
-          refreshIntel();
-        } catch (err) {
-          toast.erro(err.detail || 'Erro ao atualizar estoque');
-        }
+    /** PATCH /api/produtos/{id}/estoque → body { estoqueAtual } (traduzido no apiClient). */
+    async function salvarEstoque(valor, mensagem) {
+      try {
+        const resp = await apiPatch(`/produtos/${produtoId}/estoque`, { estoqueAtual: valor });
+        p.estoque = resp.estoque ?? valor;
+        p.pontoReposicao = resp.pontoReposicao ?? p.pontoReposicao;
+        p.estoqueSeguranca = resp.estoqueSeguranca ?? p.estoqueSeguranca;
+        p.semaforo = resp.semaforo;
+        p.qtdSugerida = p.pontoReposicao != null
+          ? Math.max(0, Math.ceil(p.pontoReposicao + (p.estoqueSeguranca ?? 0) - p.estoque))
+          : null;
+        foiAjustado = (p.estoque !== estoqueOriginal);
+        toast.sucesso(mensagem || `Estoque atualizado para ${p.estoque}`);
+        renderEstoqueDisplay();
+        renderStats();
+        const novo = statusBadge(p.semaforo);
+        headerBadge.replaceWith(novo);
+        headerBadge = novo;
+      } catch (err) {
+        toast.erro(err.detail || 'Erro ao atualizar estoque');
+        renderEstoqueDisplay();
       }
     }
 
     renderEstoqueDisplay();
     sideCard.appendChild(estoqueBlock);
 
-    // Stats — derivados pela inteligência de reposição; reagem a mudanças de estoque
+    // Stats de reposição — todos vêm do motor; null = ainda não calculado
     const statsWrap = document.createElement('div');
     sideCard.appendChild(statsWrap);
 
-    function precisaPedir() {
-      if (p.precisaPedir != null) return p.precisaPedir;
-      if (p.pontoReposicao != null) return p.estoque <= p.pontoReposicao;
-      return p.diasRuptura <= 7;
-    }
-
     function renderStats() {
-      const un = p.unidade || 'un';
-      const pedir = precisaPedir();
+      const un = p.unidade;
+      const precisaPedir = p.pontoReposicao != null ? p.estoque <= p.pontoReposicao : null;
       const diasTxt = p.diasRuptura == null ? '—'
-        : p.diasRuptura === 0 ? 'zerado'
-        : `${p.diasRuptura} ${p.diasRuptura === 1 ? 'dia' : 'dias'}`;
+        : p.diasRuptura <= 0 ? 'zerado'
+        : `${numero(p.diasRuptura, 1)} dias`;
 
       const stats = [
-        { label: 'Você precisa pedir?', value: pedir ? 'Sim' : 'Não', color: pedir ? 'var(--status-critico)' : 'var(--status-ok)' },
+        {
+          label: 'Você precisa pedir?',
+          value: precisaPedir == null ? '—' : (precisaPedir ? 'Sim' : 'Não'),
+          color: precisaPedir == null ? null : (precisaPedir ? 'var(--status-critico)' : 'var(--status-ok)'),
+        },
       ];
-      if (pedir && p.qtdSugerida > 0) {
+      if (precisaPedir && p.qtdSugerida) {
         stats.push({ label: 'Quanto pedir (sugerido)', value: `${p.qtdSugerida} ${un}`, color: 'var(--cor-primaria)' });
       }
       stats.push(
-        { label: 'Ponto de reposição', value: `${p.pontoReposicao ?? '—'} ${un}` },
-        { label: 'Estoque de segurança', value: `${p.estoqueSeguranca ?? '—'} ${un}` },
+        { label: 'Ponto de reposição', value: p.pontoReposicao != null ? `${numero(p.pontoReposicao, 1)} ${un}` : '—' },
+        { label: 'Estoque de segurança', value: p.estoqueSeguranca != null ? `${numero(p.estoqueSeguranca, 1)} ${un}` : '—' },
         { label: 'Dias até ruptura', value: diasTxt },
-        { label: 'Lead time fornecedor', value: `${p.leadTime ?? '—'} dias` },
-        { label: 'Nível de serviço alvo', value: `${p.nivelServico ?? 95}%` },
+        { label: 'Último cálculo', value: p.dataUltimoCalculo ? dataBR(String(p.dataUltimoCalculo).slice(0, 10)) : '—' },
       );
 
       statsWrap.innerHTML = stats.map(s =>
@@ -252,114 +265,45 @@ async function carregarDetalhe() {
       ).join('');
     }
 
-    // Recalcula painel + badge do header após o estoque mudar
-    function refreshIntel() {
-      renderStats();
-      const novo = statusBadge(p.diasRuptura);
-      headerBadge.replaceWith(novo);
-      headerBadge = novo;
-    }
-
-    // Propaga os campos derivados devolvidos pelo backend/mock ao editar o estoque
-    function aplicarIntel(resp) {
-      if (resp.diasRuptura != null) p.diasRuptura = resp.diasRuptura;
-      if (resp.pontoReposicao != null) p.pontoReposicao = resp.pontoReposicao;
-      if (resp.estoqueSeguranca != null) p.estoqueSeguranca = resp.estoqueSeguranca;
-      if (resp.precisaPedir != null) p.precisaPedir = resp.precisaPedir;
-      if (resp.qtdSugerida != null) p.qtdSugerida = resp.qtdSugerida;
-    }
-
     renderStats();
 
-    // Botões
+    // Botões.
+    // "Editar parâmetros" fica desabilitado: PATCH /api/produtos/{id}/parametros
+    // ainda não existe no backend (pendência P-01 do backlog de integração).
     const btns = document.createElement('div');
     btns.className = 'stack-tight';
     btns.style.marginTop = '16px';
     btns.innerHTML = `
       <button class="btn btn-primary btn-block" id="btn-marcar-pedido">Marcar para pedido</button>
-      <button class="btn btn-secondary btn-block" id="btn-editar-params">Editar parâmetros</button>
+      <button class="btn btn-secondary btn-block" id="btn-editar-params" disabled
+        title="Indisponível: o backend ainda não expõe endpoint para editar lead time e nível de serviço.">
+        Editar parâmetros
+      </button>
+      <span class="text-meta" style="text-align:center; display:block">Lead time e nível de serviço ainda não são editáveis.</span>
     `;
     sideCard.appendChild(btns);
 
     side.appendChild(sideCard);
-
-    // Card fornecedor
-    if (p.fornecedor) {
-      const fornCard = document.createElement('div');
-      fornCard.className = 'card';
-      fornCard.style.cssText = 'margin-top:16px; padding:14px;';
-      fornCard.innerHTML = `
-        <div class="label" style="margin-bottom:8px">Fornecedor</div>
-        <div style="font-weight:500">${p.fornecedor}</div>
-        ${p.precoMedio != null ? `<div class="text-meta">Preço médio: R$ ${numero(p.precoMedio, 2)}/${p.unidade || 'un'}</div>` : ''}
-      `;
-      side.appendChild(fornCard);
-    }
-
     grid.appendChild(side);
     page.appendChild(grid);
 
-    // Renderizar gráfico
-    if (p.grafico) {
+    // Renderizar gráfico da série prevista
+    if (p.previsoes.length > 0) {
       linha(document.getElementById('chart-demanda'), {
-        labels: p.grafico.labels,
-        historico: p.grafico.historico,
-        projecao: p.grafico.projecao || [],
-        labelHist: 'Histórico',
-        labelProj: 'Projeção',
+        labels: p.previsoes.map(pt => dataBR(pt.data)),
+        historico: p.previsoes.map(pt => pt.quantidade ?? 0),
+        labelHist: 'Demanda prevista',
       });
     }
 
-    // Marcar para pedido toggle
+    // Marcar para pedido (estado local — não há endpoint de pedidos)
     const btnPedido = document.getElementById('btn-marcar-pedido');
+    btnPedido.title = 'Marcação local — não é gravada no servidor';
     let marcado = false;
     btnPedido.addEventListener('click', () => {
       marcado = !marcado;
       btnPedido.className = `btn ${marcado ? 'btn-tertiary' : 'btn-primary'} btn-block`;
       btnPedido.innerHTML = marcado ? `${iconCheck(14)} Pedido marcado` : 'Marcar para pedido';
-    });
-
-    // Modal editar parâmetros (read-only se sem endpoint)
-    document.getElementById('btn-editar-params').addEventListener('click', () => {
-      const form = document.createElement('div');
-      form.className = 'stack';
-      form.style.gap = '14px';
-      form.innerHTML = `
-        <div class="field">
-          <label class="field-label">Lead time do fornecedor (dias)</label>
-          <input type="number" class="input" id="param-lt" value="${p.leadTime || 0}">
-        </div>
-        <div class="field">
-          <label class="field-label">Nível de serviço alvo (%)</label>
-          <input type="number" class="input" id="param-ns" value="${p.nivelServico || 95}" min="50" max="99">
-          <span class="text-meta">Probabilidade de não faltar o produto dentro do lead time.</span>
-        </div>
-      `;
-
-      let salvando = false;
-      openModal({
-        titulo: `Editar parâmetros — ${p.nome}`,
-        conteudo: form,
-        labelConfirm: 'Salvar parâmetros',
-        onConfirm: async (fechar) => {
-          if (salvando) return;
-          salvando = true;
-          const lt = Math.max(0, Math.round(+document.getElementById('param-lt').value) || 0);
-          const ns = Math.min(99, Math.max(50, Math.round(+document.getElementById('param-ns').value) || 95));
-          try {
-            const resp = await apiPatch(`/produtos/${produtoId}/parametros`, { leadTime: lt, nivelServico: ns });
-            if (resp.leadTime != null) p.leadTime = resp.leadTime;
-            if (resp.nivelServico != null) p.nivelServico = resp.nivelServico;
-            aplicarIntel(resp);
-            refreshIntel();
-            toast.sucesso('Parâmetros atualizados — reposição recalculada');
-            fechar();
-          } catch (err) {
-            salvando = false;
-            toast.erro(err.detail || 'Erro ao salvar parâmetros');
-          }
-        },
-      });
     });
 
   } catch (err) {

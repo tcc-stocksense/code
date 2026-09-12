@@ -12,7 +12,11 @@ const page = renderLayout('comparativo');
 
 let chartInstance = null;
 let metricaAtual = 'mape';
-let dadosCache = null;
+
+/** Chaves do ml-service: "holt_winters" e "prophet". */
+const HW = 'holt_winters';
+const PROPHET = 'prophet';
+const ROTULO = { [HW]: 'Holt-Winters', [PROPHET]: 'Prophet' };
 
 page.innerHTML = `
   <div style="background:var(--info-bg); border-left:3px solid var(--info); padding:10px 16px; font-size:13px; color:var(--info); margin-bottom:20px;">
@@ -21,7 +25,7 @@ page.innerHTML = `
   <div class="page-header">
     <div>
       <h1 class="page-title">Comparativo de modelos preditivos</h1>
-      <p class="page-subtitle">Holt-Winters vs Prophet · métricas agregadas e por produto</p>
+      <p class="page-subtitle">Holt-Winters vs Prophet · métricas por produto, agregadas nesta tela</p>
     </div>
   </div>
   <div id="comp-content"></div>
@@ -32,21 +36,95 @@ content.appendChild(skeletonKpiGrid(3));
 content.appendChild(skeletonChart());
 content.appendChild(skeletonTable(8, 8));
 
+/**
+ * Executa `tarefas` com no máximo `limite` requisições simultâneas.
+ * Não existe endpoint agregado de métricas: a visão geral é montada aqui a
+ * partir de GET /api/produtos/{id}/metricas, um produto por vez.
+ */
+async function comLimite(itens, limite, tarefa) {
+  const resultados = new Array(itens.length);
+  let proximo = 0;
+
+  async function worker() {
+    while (proximo < itens.length) {
+      const indice = proximo++;
+      resultados[indice] = await tarefa(itens[indice], indice);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
+  return resultados;
+}
+
+/** Converte a lista de MetricaResponse de um produto em uma linha da tabela. */
+function montarLinha(produto, metricas) {
+  if (!metricas || metricas.length === 0) return null;
+
+  const porModelo = {};
+  metricas.forEach(m => { porModelo[m.modelo] = m; });
+
+  const hw = porModelo[HW];
+  const prophet = porModelo[PROPHET];
+  const vencedor = metricas.find(m => m.selecionado);
+
+  return {
+    id: produto.id,
+    nome: produto.nome,
+    mapeHW: hw?.mape ?? null,
+    mapeProphet: prophet?.mape ?? null,
+    rmseHW: hw?.rmse ?? null,
+    rmseProphet: prophet?.rmse ?? null,
+    maeHW: hw?.mae ?? null,
+    maeProphet: prophet?.mae ?? null,
+    selecionado: vencedor ? (ROTULO[vencedor.modelo] || vencedor.modelo) : null,
+    executadoEm: vencedor?.executadoEm ?? metricas[0]?.executadoEm ?? null,
+  };
+}
+
+/** Média simples ignorando nulos. */
+function media(valores) {
+  const validos = valores.filter(v => v != null);
+  if (validos.length === 0) return null;
+  return validos.reduce((a, v) => a + v, 0) / validos.length;
+}
+
 async function carregarComparativo() {
   try {
-    const dados = await apiGet('/produtos/metricas');
-    dadosCache = dados;
+    const produtos = await apiGet('/produtos');
 
-    if (!dados || (!dados.agregado && (!dados.porProduto || dados.porProduto.length === 0))) {
+    if (!produtos || produtos.length === 0) {
       content.innerHTML = '';
       content.appendChild(emptyState({
-        titulo: 'Nenhuma métrica disponível',
-        msg: 'Rode o motor de previsão para gerar métricas de comparação.',
+        titulo: 'Nenhum produto importado',
+        msg: 'Importe produtos e vendas antes de comparar os modelos.',
+        acao: { label: 'Importar dados', href: 'importar.html' },
       }));
       return;
     }
 
-    renderConteudo(dados);
+    const brutos = await comLimite(produtos, 4, async (produto) => {
+      try {
+        const metricas = await apiGet(`/produtos/${produto.id}/metricas`);
+        return montarLinha(produto, metricas);
+      } catch {
+        // Um produto sem métricas não invalida o painel inteiro.
+        return null;
+      }
+    });
+
+    const linhas = brutos.filter(Boolean);
+
+    if (linhas.length === 0) {
+      content.innerHTML = '';
+      content.appendChild(emptyState({
+        titulo: 'Nenhuma métrica disponível',
+        msg: 'O motor preditivo ainda não foi executado. Rode o recálculo na tela de importação.',
+        acao: { label: 'Ir para Importar', href: 'importar.html' },
+      }));
+      return;
+    }
+
+    renderConteudo(linhas, produtos.length);
 
   } catch (err) {
     content.innerHTML = '';
@@ -54,100 +132,120 @@ async function carregarComparativo() {
   }
 }
 
-function renderConteudo(dados) {
+function renderConteudo(linhas, totalProdutos) {
   content.innerHTML = '';
-  const ag = dados.agregado || {};
 
-  // KPIs agregados
+  const cobertura = document.createElement('p');
+  cobertura.className = 'text-meta';
+  cobertura.style.marginBottom = '16px';
+  cobertura.textContent = `${linhas.length} de ${totalProdutos} produtos têm métricas calculadas.`;
+  content.appendChild(cobertura);
+
+  // KPIs agregados — média das métricas por produto
+  const ag = {
+    mapeHW: media(linhas.map(l => l.mapeHW)),
+    mapeProphet: media(linhas.map(l => l.mapeProphet)),
+    rmseHW: media(linhas.map(l => l.rmseHW)),
+    rmseProphet: media(linhas.map(l => l.rmseProphet)),
+    maeHW: media(linhas.map(l => l.maeHW)),
+    maeProphet: media(linhas.map(l => l.maeProphet)),
+  };
+
   const kpiGrid = document.createElement('div');
   kpiGrid.className = 'kpi-grid';
   kpiGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
-
-  kpiGrid.appendChild(metricCard('MAPE', ag.mapeHW, ag.mapeProphet, '%', true));
-  kpiGrid.appendChild(metricCard('RMSE', ag.rmseHW, ag.rmseProphet, '', true));
-  kpiGrid.appendChild(metricCard('MAE', ag.maeHW, ag.maeProphet, '', true));
-
+  kpiGrid.appendChild(metricCard('MAPE', ag.mapeHW, ag.mapeProphet, '%'));
+  kpiGrid.appendChild(metricCard('RMSE', ag.rmseHW, ag.rmseProphet, ''));
+  kpiGrid.appendChild(metricCard('MAE', ag.maeHW, ag.maeProphet, ''));
   content.appendChild(kpiGrid);
 
-  // Gráfico de barras
-  if (dados.porProduto && dados.porProduto.length > 0) {
-    const chartCard = document.createElement('div');
-    chartCard.className = 'card';
-    chartCard.style.marginBottom = '20px';
-    chartCard.innerHTML = `
-      <div class="row-between" style="margin-bottom:12px">
-        <h3>Comparação por produto</h3>
-        <select class="select" id="select-metrica" style="width:160px">
-          <option value="mape">MAPE</option>
-          <option value="rmse">RMSE</option>
-          <option value="mae">MAE</option>
-        </select>
-      </div>
-      <div style="height:320px"><canvas id="chart-comparativo"></canvas></div>
-    `;
-    content.appendChild(chartCard);
-
-    document.getElementById('select-metrica').value = metricaAtual;
-    document.getElementById('select-metrica').addEventListener('change', (e) => {
-      metricaAtual = e.target.value;
-      renderGrafico(dados.porProduto);
-    });
-
-    renderGrafico(dados.porProduto);
-
-    // Log de execuções
-    if (dados.execucoes && dados.execucoes.length > 0) {
-      const logCard = document.createElement('div');
-      logCard.className = 'card';
-      logCard.style.cssText = 'padding:0; margin-bottom:20px;';
-      logCard.innerHTML = `
-        <div style="padding:16px 20px; border-bottom:1px solid var(--cor-borda)">
-          <h3>Log de execuções</h3>
+  // Quantos produtos cada modelo venceu
+  const vitorias = linhas.reduce((acc, l) => {
+    if (l.selecionado) acc[l.selecionado] = (acc[l.selecionado] || 0) + 1;
+    return acc;
+  }, {});
+  const placar = document.createElement('div');
+  placar.className = 'card';
+  placar.style.marginBottom = '20px';
+  placar.innerHTML = `
+    <div class="label" style="margin-bottom:10px">Modelo selecionado pelo motor</div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap">
+      ${Object.values(ROTULO).map(nome => `
+        <div>
+          <div class="tabular" style="font-size:24px; font-weight:500">${vitorias[nome] || 0}</div>
+          <div class="text-meta">${nome}</div>
         </div>
-        <pre style="padding:16px 20px; margin:0; font-size:13px; white-space:pre-wrap; font-family:monospace; line-height:1.6; max-height:260px; overflow:auto">${dados.execucoes.map(e => `[${e.data}] ${e.mensagem}`).join('\n')}</pre>
-      `;
-      content.appendChild(logCard);
-    }
+      `).join('')}
+    </div>
+  `;
+  content.appendChild(placar);
 
-    // Tabela detalhada
-    const tableCard = document.createElement('div');
-    tableCard.className = 'card';
-    tableCard.style.cssText = 'padding:0; overflow:auto; margin-bottom:20px;';
-    tableCard.innerHTML = `
-      <div style="padding:16px 20px; border-bottom:1px solid var(--cor-borda)">
-        <h3>Métricas detalhadas por produto</h3>
-      </div>
-      <table class="table">
-        <thead><tr>
-          <th>Produto</th>
-          <th>MAPE H-W</th><th>MAPE Prophet</th>
-          <th>RMSE H-W</th><th>RMSE Prophet</th>
-          <th>MAE H-W</th><th>MAE Prophet</th>
-          <th>Recomendado</th>
-        </tr></thead>
-        <tbody>
-          ${dados.porProduto.map(m => {
-            const rec = m.recomendado || (m.mapeProphet < m.mapeHW ? 'Prophet' : 'Holt-Winters');
-            const badgeCls = rec === 'Prophet' ? 'badge-info' : 'badge-primary';
-            return `<tr>
-              <td>${m.nome}</td>
-              <td class="tabular">${numero(m.mapeHW, 2)}%</td>
-              <td class="tabular">${numero(m.mapeProphet, 2)}%</td>
-              <td class="tabular">${numero(m.rmseHW, 2)}</td>
-              <td class="tabular">${numero(m.rmseProphet, 2)}</td>
-              <td class="tabular">${numero(m.maeHW, 2)}</td>
-              <td class="tabular">${numero(m.maeProphet, 2)}</td>
-              <td><span class="badge ${badgeCls}">${rec}</span></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    `;
-    content.appendChild(tableCard);
-  }
+  // Gráfico de barras
+  const chartCard = document.createElement('div');
+  chartCard.className = 'card';
+  chartCard.style.marginBottom = '20px';
+  chartCard.innerHTML = `
+    <div class="row-between" style="margin-bottom:12px">
+      <h3>Comparação por produto</h3>
+      <select class="select" id="select-metrica" style="width:160px">
+        <option value="mape">MAPE</option>
+        <option value="rmse">RMSE</option>
+        <option value="mae">MAE</option>
+      </select>
+    </div>
+    <div style="height:320px"><canvas id="chart-comparativo"></canvas></div>
+  `;
+  content.appendChild(chartCard);
+
+  document.getElementById('select-metrica').value = metricaAtual;
+  document.getElementById('select-metrica').addEventListener('change', (e) => {
+    metricaAtual = e.target.value;
+    renderGrafico(linhas);
+  });
+
+  renderGrafico(linhas);
+
+  // Tabela detalhada
+  const tableCard = document.createElement('div');
+  tableCard.className = 'card';
+  tableCard.style.cssText = 'padding:0; overflow:auto; margin-bottom:20px;';
+  tableCard.innerHTML = `
+    <div style="padding:16px 20px; border-bottom:1px solid var(--cor-borda)">
+      <h3>Métricas detalhadas por produto</h3>
+    </div>
+    <table class="table">
+      <thead><tr>
+        <th>Produto</th>
+        <th>MAPE H-W</th><th>MAPE Prophet</th>
+        <th>RMSE H-W</th><th>RMSE Prophet</th>
+        <th>MAE H-W</th><th>MAE Prophet</th>
+        <th>Selecionado</th>
+      </tr></thead>
+      <tbody>
+        ${linhas.map(l => {
+          const badgeCls = l.selecionado === 'Prophet' ? 'badge-info' : 'badge-primary';
+          return `<tr>
+            <td>${l.nome}</td>
+            <td class="tabular">${fmt(l.mapeHW, '%')}</td>
+            <td class="tabular">${fmt(l.mapeProphet, '%')}</td>
+            <td class="tabular">${fmt(l.rmseHW)}</td>
+            <td class="tabular">${fmt(l.rmseProphet)}</td>
+            <td class="tabular">${fmt(l.maeHW)}</td>
+            <td class="tabular">${fmt(l.maeProphet)}</td>
+            <td>${l.selecionado ? `<span class="badge ${badgeCls}">${l.selecionado}</span>` : '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+  content.appendChild(tableCard);
 }
 
-function renderGrafico(porProduto) {
+function fmt(valor, unidade = '') {
+  return valor == null ? '—' : numero(valor, 2) + unidade;
+}
+
+function renderGrafico(linhas) {
   const canvas = document.getElementById('chart-comparativo');
   if (!canvas) return;
 
@@ -157,36 +255,37 @@ function renderGrafico(porProduto) {
   const keyPro = metricaAtual + 'Prophet';
 
   chartInstance = barras(canvas, {
-    labels: porProduto.map(m => m.nome.split(' ').slice(0, 2).join(' ')),
+    labels: linhas.map(l => l.nome.split(' ').slice(0, 2).join(' ')),
     series: [
-      { label: 'Holt-Winters', data: porProduto.map(m => m[keyHW] || 0), cor: '#1F4A30' },
-      { label: 'Prophet', data: porProduto.map(m => m[keyPro] || 0), cor: '#2E5A78' },
+      { label: 'Holt-Winters', data: linhas.map(l => l[keyHW] ?? 0), cor: '#1F4A30' },
+      { label: 'Prophet', data: linhas.map(l => l[keyPro] ?? 0), cor: '#2E5A78' },
     ],
   });
 }
 
-function metricCard(label, hw, pro, unit, lowerBetter) {
+function metricCard(label, hw, pro, unidade) {
   const card = document.createElement('div');
   card.className = 'card';
 
-  const hwVal = hw != null ? numero(hw, 2) + unit : '—';
-  const proVal = pro != null ? numero(pro, 2) + unit : '—';
-  const winnerHW = hw != null && pro != null && (lowerBetter ? hw < pro : hw > pro);
-  const diff = hw != null && pro != null ? numero(Math.abs(hw - pro), 2) + unit : '—';
+  const hwVal = fmt(hw, unidade);
+  const proVal = fmt(pro, unidade);
+  const temAmbos = hw != null && pro != null;
+  const vencedorHW = temAmbos && hw < pro;   // todas as três métricas: menor é melhor
+  const diff = temAmbos ? numero(Math.abs(hw - pro), 2) + unidade : '—';
 
   card.innerHTML = `
-    <div class="label" style="margin-bottom:14px">${label} agregado</div>
+    <div class="label" style="margin-bottom:14px">${label} médio</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
       <div>
-        <div class="text-meta" style="margin-bottom:4px">Holt-Winters ${winnerHW ? '<span class="badge badge-primary" style="margin-left:4px">melhor</span>' : ''}</div>
+        <div class="text-meta" style="margin-bottom:4px">Holt-Winters ${temAmbos && vencedorHW ? '<span class="badge badge-primary" style="margin-left:4px">melhor</span>' : ''}</div>
         <div class="tabular" style="font-size:24px; font-weight:500">${hwVal}</div>
       </div>
       <div>
-        <div class="text-meta" style="margin-bottom:4px">Prophet ${!winnerHW && hw != null ? '<span class="badge badge-info" style="margin-left:4px">melhor</span>' : ''}</div>
+        <div class="text-meta" style="margin-bottom:4px">Prophet ${temAmbos && !vencedorHW ? '<span class="badge badge-info" style="margin-left:4px">melhor</span>' : ''}</div>
         <div class="tabular" style="font-size:24px; font-weight:500">${proVal}</div>
       </div>
     </div>
-    <div class="text-meta" style="margin-top:10px">Diferença: ${diff} ${lowerBetter ? '(quanto menor, melhor)' : ''}</div>
+    <div class="text-meta" style="margin-top:10px">Diferença: ${diff} (quanto menor, melhor)</div>
   `;
 
   return card;

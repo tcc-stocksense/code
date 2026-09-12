@@ -83,7 +83,8 @@ for rota in /dashboard /alertas /curva-abc /produtos; do
 done
 
 PROD="$(curl -s "$API/produtos" "${AUTH[@]}")"
-ID="$(grep -o '"id":[0-9]*' <<<"$PROD" | head -1 | sed 's/.*://')"
+# O DTO expõe 'produtoId', não 'id' — conferido contra a resposta real.
+ID="$(grep -o '"produtoId":[0-9]*' <<<"$PROD" | head -1 | sed 's/.*://')"
 if [ -n "$ID" ]; then
   for rota in "/produtos/$ID/detalhe" "/produtos/$ID/metricas"; do
     CODIGO="$(curl -s -o /dev/null -w '%{http_code}' "$API$rota" "${AUTH[@]}")"

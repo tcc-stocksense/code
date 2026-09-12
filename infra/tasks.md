@@ -169,6 +169,32 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   _Depende de: D-04_
 
 - [~] **D-07 — Medir memória contra o orçamento do §6.1** `A` `parcial: falta sob carga`
+  📊 **Segunda medição em 2026-09-12**, stack de produção local com as imagens novas,
+  durante importação + lote do motor (amostragem a cada 3s via
+  [`medir-memoria.sh`](../scripts/medir-memoria.sh), 30 amostras):
+
+  | Container | Pico | Média | Limite | % do limite |
+  |---|---|---|---|---|
+  | `db` | 407,5 MiB | 407,2 | 600 MiB | **67,9%** |
+  | `backend` | 337,6 MiB | 295,2 | 1 GiB | 33,0% |
+  | `ml-service` | 269,8 MiB | 262,8 | 1,758 GiB | 15,0% |
+  | `frontend` | 10,5 MiB | 10,4 | — | — |
+  | `caddy` | 11,5 MiB | 10,8 | — | — |
+
+  **Pico somado: 1,01 GiB** dos 3,9 GB orçados. O `db` segue o mais apertado, mas em 67,9%
+  contra os 75,8% da primeira medição.
+  ⚠️ **Isto ainda NÃO é a medição sob carga que a task pede, e a task continua `[~]`.** O
+  catálogo sintético tem **10 produtos** (`PRODUTOS_META` no `generate_synthetic_data.py` é
+  fixo), então o lote terminou em 4 s e o pico ficou igual ao ocioso. Carga real exige um
+  catálogo de ~312 SKUs — trabalho no gerador do ml-service, não na infra. Quem fecha de
+  verdade é o **D-43**, na instância, com dados do estabelecimento.
+
+  ✅ **Mas rendeu um número novo e útil:** **0,40 s/produto** (4 s / 10 produtos) medido
+  **dentro do container de produção**, numa VM Docker de 3,95 GB — praticamente o teto da
+  t3.medium. O D-41 mediu 0,42–0,53 s/produto **fora do Docker**, em desktop de 12 CPUs, e
+  avisava explicitamente que não era o número da t3.medium. Agora há evidência de que o
+  contêiner não degrada o tempo por produto, o que reforça a projeção de ~2,8 min para 312
+  SKUs em vez dos 5–25 min do R1.
   Medido em 2026-09-05, **stack ocioso** (`docker stats --no-stream`):
 
   | Container | Uso | Limite | % |

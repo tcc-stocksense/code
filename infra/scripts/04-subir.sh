@@ -64,13 +64,13 @@ ssh "${SSH_OPTS[@]}" "$ALVO" DESTINO="$DESTINO" bash -s <<'REMOTO'
 set -uo pipefail
 cd "$DESTINO"
 for i in $(seq 1 40); do
-  PENDENTES="$(docker compose -f docker-compose.prod.yml ps --format '{{.Name}} {{.Status}}' \
+  PENDENTES="$(docker compose -f docker-compose.prod.yml --env-file .env ps --format '{{.Name}} {{.Status}}' \
               | grep -E 'starting|unhealthy' || true)"
   [ -z "$PENDENTES" ] && break
   sleep 15
 done
 echo
-docker compose -f docker-compose.prod.yml ps --format '    {{.Name}}\t{{.Status}}'
+docker compose -f docker-compose.prod.yml --env-file .env ps --format '    {{.Name}}\t{{.Status}}'
 echo
 echo "    Healthchecks por dentro (§9.6):"
 docker exec stocksense-backend wget -qO- http://localhost:8080/actuator/health && echo "  <- backend"

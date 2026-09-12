@@ -1,5 +1,6 @@
 import { requireAuth } from '../core/auth.js';
 import { apiGet } from '../core/apiClient.js';
+import { mockAtivo } from '../core/config.js';
 import { renderLayout } from '../components/layout.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
@@ -27,6 +28,18 @@ content.appendChild(skeletonTable(8, 5));
 const estado = {};
 
 async function carregarSugestao() {
+  // GET /api/sugestao-compra nao existe no backend. Enquanto o endpoint nao for
+  // criado, esta tela so funciona em modo mock - e diz isso, em vez de exibir
+  // dados ficticios como se fossem reais.
+  if (!mockAtivo()) {
+    content.innerHTML = '';
+    content.appendChild(emptyState({
+      titulo: 'Relat\u00f3rio de compra ainda n\u00e3o dispon\u00edvel',
+      msg: 'O backend ainda n\u00e3o exp\u00f5e o endpoint de sugest\u00e3o de compra. Enquanto isso, a tela de Alertas mostra o que precisa ser pedido e quanto.',
+      acao: { label: 'Ir para Alertas', href: 'alertas.html' },
+    }));
+    return;
+  }
   try {
     const dados = await apiGet('/sugestao-compra');
 

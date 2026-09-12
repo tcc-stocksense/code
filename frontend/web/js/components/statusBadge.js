@@ -1,43 +1,49 @@
 /**
- * Retorna o status semáforo baseado em dias até ruptura.
- * @param {number} diasRuptura
- * @returns {'critico'|'atencao'|'ok'}
+ * Semáforo de reposição.
+ *
+ * A régua oficial (contrato da API) é relativa ao ponto de reposição calculado
+ * pelo motor — não a cortes fixos de dias. Quando o motor ainda não rodou, o
+ * semáforo é `null` e a tela mostra o estado "sem cálculo" em vez de fingir OK.
  */
-export function statusClass(diasRuptura) {
-  if (diasRuptura < 3) return 'critico';
-  if (diasRuptura <= 7) return 'atencao';
-  return 'ok';
+
+const MAPA = {
+  critico: { css: 'badge-danger', dot: 'dot-danger', label: 'crítico' },
+  atencao: { css: 'badge-warning', dot: 'dot-warning', label: 'atenção' },
+  ok: { css: 'badge-success', dot: 'dot-success', label: 'ok' },
+  indefinido: { css: 'badge-neutral', dot: 'dot-neutral', label: 'sem cálculo' },
+};
+
+function cfgDe(semaforo) {
+  return MAPA[semaforo] || MAPA.indefinido;
 }
 
 /**
- * Cria um badge de semáforo (dot + label).
- * @param {number} diasRuptura
+ * Badge de semáforo (dot + label).
+ * @param {'critico'|'atencao'|'ok'|null} semaforo
  * @returns {HTMLElement}
  */
-export function statusBadge(diasRuptura) {
-  const status = statusClass(diasRuptura);
-  const map = {
-    critico: { css: 'badge-danger', dot: 'dot-danger', label: 'cr\u00edtico' },
-    atencao: { css: 'badge-warning', dot: 'dot-warning', label: 'aten\u00e7\u00e3o' },
-    ok:      { css: 'badge-success', dot: 'dot-success', label: 'ok' },
-  };
-  const cfg = map[status];
-
+export function statusBadge(semaforo) {
+  const cfg = cfgDe(semaforo);
   const el = document.createElement('span');
   el.className = `badge ${cfg.css}`;
   el.innerHTML = `<span class="dot ${cfg.dot}"></span>${cfg.label}`;
+  if (!semaforo) el.title = 'O motor preditivo ainda não calculou o ponto de reposição deste produto.';
   return el;
 }
 
 /**
- * Cria apenas o dot colorido.
- * @param {number} diasRuptura
+ * Apenas o dot colorido.
+ * @param {'critico'|'atencao'|'ok'|null} semaforo
  * @returns {HTMLElement}
  */
-export function statusDot(diasRuptura) {
-  const status = statusClass(diasRuptura);
-  const dotMap = { critico: 'dot-danger', atencao: 'dot-warning', ok: 'dot-success' };
+export function statusDot(semaforo) {
+  const cfg = cfgDe(semaforo);
   const el = document.createElement('span');
-  el.className = `dot ${dotMap[status]}`;
+  el.className = `dot ${cfg.dot}`;
   return el;
+}
+
+/** Rótulo curto para uso em texto. */
+export function statusLabel(semaforo) {
+  return cfgDe(semaforo).label;
 }

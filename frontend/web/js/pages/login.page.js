@@ -1,4 +1,5 @@
 import { login, getToken } from '../core/auth.js';
+import { renderMockToggle } from '../components/layout.js';
 import { toast } from '../components/toast.js';
 
 // Já logado → dashboard
@@ -20,38 +21,25 @@ app.innerHTML = `
         <div class="stack" style="gap:14px">
           <div class="field">
             <label class="field-label" for="email">Email</label>
-            <input class="input" id="email" type="email" required placeholder="seu@email.com" value="gestor@stocksense.com">
+            <input class="input" id="email" type="email" required placeholder="seu@email.com" value="admin@stocksense.local">
           </div>
           <div class="field">
             <label class="field-label" for="senha">Senha</label>
-            <input class="input" id="senha" type="password" required placeholder="••••••••" value="123456">
+            <input class="input" id="senha" type="password" required placeholder="••••••••" value="admin123">
           </div>
           <button type="submit" class="btn btn-primary btn-block" id="btn-login" style="margin-top:4px">Entrar</button>
           <a href="#" style="text-align:center; font-size:13px; color:var(--cor-texto-sec)" onclick="event.preventDefault()">Esqueci minha senha</a>
         </div>
       </form>
       <div style="text-align:center; margin-top:20px; font-size:12px; color:var(--cor-texto-terc)">
-        v0.4 protótipo
+        v0.5 · integrado à API
       </div>
     </div>
   </div>
 `;
 
-// Toggle de mock (mesmo da layout, mas para a tela de login)
-(function mockToggle() {
-  const btn = document.createElement('button');
-  btn.id = 'mock-toggle';
-  btn.type = 'button';
-  const on = localStorage.getItem('stocksense_mock') !== 'off';
-  btn.textContent = on ? '🟢 Mock ON' : '⚪ Mock OFF';
-  btn.title = on ? 'Clique para desativar dados fictícios' : 'Clique para ativar dados fictícios';
-  btn.style.cssText = `position:fixed;bottom:16px;right:16px;z-index:9999;padding:6px 14px;border-radius:20px;border:1px solid var(--cor-borda-forte);font-size:12px;font-weight:500;cursor:pointer;background:${on?'var(--cor-primaria)':'#fff'};color:${on?'#fff':'var(--cor-texto-sec)'};box-shadow:0 2px 8px rgba(0,0,0,0.12)`;
-  btn.addEventListener('click', () => {
-    localStorage.setItem('stocksense_mock', on ? 'off' : 'on');
-    location.reload();
-  });
-  document.body.appendChild(btn);
-})();
+// Mesmo toggle da área logada — uma única implementação.
+renderMockToggle();
 
 const form = document.getElementById('login-form');
 const btnLogin = document.getElementById('btn-login');
@@ -68,7 +56,8 @@ form.addEventListener('submit', async (e) => {
     await login(email, senha);
     window.location.replace('dashboard.html');
   } catch (err) {
-    toast.erro(err.detail || 'Credenciais inválidas');
+    // O backend devolve 404 para credencial inválida (não distingue email de senha).
+    toast.erro(err.status === 404 ? 'Credenciais inválidas' : (err.detail || 'Não foi possível entrar'));
     btnLogin.disabled = false;
     btnLogin.textContent = 'Entrar';
   }

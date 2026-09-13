@@ -13,7 +13,7 @@ lado do cliente, reconciliando as telas com o contrato que o backend já publica
 | | Antes | Depois |
 |---|---|---|
 | Endpoints do backend ligados | 9 de 11 | **11 de 11** |
-| Telas servindo mock sem avisar | 4 | **0** |
+| Telas servindo mock sem avisar | 4 | **0** (Configurações foi a última, corrigida em 13/09 — ver B-04) |
 | Fallback silencioso para dados fictícios | sim | **não** |
 
 ---

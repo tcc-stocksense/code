@@ -71,16 +71,32 @@ function getFiltrados() {
     if (filtros.busca && !p.nome.toLowerCase().includes(filtros.busca)) return false;
     if (filtros.categoria !== 'todas' && p.categoria !== filtros.categoria) return false;
     if (filtros.classe !== 'todas' && p.classe !== filtros.classe) return false;
-    if (filtros.status === 'sem-calculo') return p.semaforo == null;
+    // Mesmo critério do banner (`semCalculo`), para os dois não discordarem (M-02).
+    if (filtros.status === 'sem-calculo') return p.semCalculo;
     if (filtros.status !== 'todos' && p.semaforo !== filtros.status) return false;
     return true;
   }).sort((a, b) => peso(a) - peso(b) || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function classeBadge(classe) {
-  if (!classe) return '<span class="text-meta">—</span>';
+  const el = document.createElement('span');
+  if (!classe) {
+    el.className = 'text-meta';
+    el.textContent = '—';
+    return el;
+  }
   const map = { A: 'badge-primary', B: 'badge-warning', C: 'badge-neutral' };
-  return `<span class="badge ${map[classe] || 'badge-neutral'}">${classe}</span>`;
+  el.className = `badge ${map[classe] || 'badge-neutral'}`;
+  el.textContent = classe;
+  return el;
+}
+
+/** `<td>` com texto puro — nunca interpreta HTML vindo da planilha importada. */
+function tdTexto(texto, className) {
+  const td = document.createElement('td');
+  if (className) td.className = className;
+  td.textContent = texto;
+  return td;
 }
 
 function renderAvisoMotor() {
@@ -129,6 +145,9 @@ function renderTabela() {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px 20px;color:var(--cor-texto-sec)">Nenhum produto encontrado.</td></tr>';
   }
 
+  // B-01: a linha é montada só com createElement/appendChild. Um único
+  // `tr.innerHTML +=` re-parseia a linha inteira e mata todos os listeners já
+  // registrados nos filhos — era o que deixava o lápis de editar estoque morto.
   filtrados.forEach(p => {
     const tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
@@ -140,8 +159,15 @@ function renderTabela() {
     tr.appendChild(tdStatus);
 
     // Nome
-    tr.innerHTML += `<td><div style="font-weight:500">${p.nome}</div></td>`;
-    tr.innerHTML += `<td class="text-small text-secondary">${p.categoria || '—'}</td>`;
+    const tdNome = document.createElement('td');
+    const nomeWrap = document.createElement('div');
+    nomeWrap.style.fontWeight = '500';
+    nomeWrap.textContent = p.nome;
+    tdNome.appendChild(nomeWrap);
+    tr.appendChild(tdNome);
+
+    // Categoria
+    tr.appendChild(tdTexto(p.categoria || '—', 'text-small text-secondary'));
 
     // Estoque editável
     const tdEstoque = document.createElement('td');
@@ -150,16 +176,32 @@ function renderTabela() {
     tr.appendChild(tdEstoque);
 
     // Ponto de reposição
-    const prTxt = p.pontoReposicao != null
-      ? `${numero(p.pontoReposicao, 1)} ${p.unidade}`
-      : '<span class="text-meta">sem cálculo</span>';
-    tr.innerHTML += `<td class="tabular">${prTxt}</td>`;
+    if (p.pontoReposicao != null) {
+      tr.appendChild(tdTexto(`${numero(p.pontoReposicao, 1)} ${p.unidade}`, 'tabular'));
+    } else {
+      const tdPr = document.createElement('td');
+      tdPr.className = 'tabular';
+      const vazio = document.createElement('span');
+      vazio.className = 'text-meta';
+      vazio.textContent = 'sem cálculo';
+      tdPr.appendChild(vazio);
+      tr.appendChild(tdPr);
+    }
 
     // ABC
-    tr.innerHTML += `<td>${classeBadge(p.classe)}</td>`;
+    const tdClasse = document.createElement('td');
+    tdClasse.appendChild(classeBadge(p.classe));
+    tr.appendChild(tdClasse);
 
     // Ação
-    tr.innerHTML += `<td><a href="produto-detalhe.html?id=${p.id}" class="btn btn-tertiary btn-sm" onclick="event.stopPropagation()">Detalhe</a></td>`;
+    const tdAcao = document.createElement('td');
+    const link = document.createElement('a');
+    link.href = `produto-detalhe.html?id=${p.id}`;
+    link.className = 'btn btn-tertiary btn-sm';
+    link.textContent = 'Detalhe';
+    link.addEventListener('click', (e) => e.stopPropagation());
+    tdAcao.appendChild(link);
+    tr.appendChild(tdAcao);
 
     tbody.appendChild(tr);
   });
@@ -176,7 +218,11 @@ function renderEstoqueCell(td, produto) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'estoque-cell';
-  btn.innerHTML = `<span class="tabular">${produto.estoque} ${produto.unidade || 'un'}</span>${iconPencil(13)}`;
+  const rotulo = document.createElement('span');
+  rotulo.className = 'tabular';
+  rotulo.textContent = `${produto.estoque} ${produto.unidade || 'un'}`;
+  btn.appendChild(rotulo);
+  btn.insertAdjacentHTML('beforeend', iconPencil(13));
   btn.title = 'Clique para editar o estoque';
   btn.addEventListener('click', () => renderEstoqueEdit(td, produto));
   td.appendChild(btn);

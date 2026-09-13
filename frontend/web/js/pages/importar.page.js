@@ -3,6 +3,7 @@ import { apiUpload, apiPost } from '../core/apiClient.js';
 import { renderLayout } from '../components/layout.js';
 import { uploadBlock } from '../components/uploadBlock.js';
 import { toast } from '../components/toast.js';
+import { esc } from '../core/format.js';
 
 requireAuth();
 const page = renderLayout('importar');
@@ -138,7 +139,8 @@ async function enviarArquivo(pl, file, bloco) {
     if (observacoes.length > 0) {
       const nota = document.createElement('ul');
       nota.style.cssText = 'margin:8px 0 0; padding-left:20px; font-size:13px; color:var(--cor-texto-sec); list-style:disc';
-      nota.innerHTML = observacoes.map(o => `<li>${o}</li>`).join('');
+      // As mensagens ecoam valores crus da planilha — escapar antes de injetar.
+      nota.innerHTML = observacoes.map(o => `<li>${esc(o)}</li>`).join('');
       bloco.el.appendChild(nota);
     }
   } catch (err) {

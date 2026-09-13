@@ -5,7 +5,7 @@ import { barras } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonKpiGrid, skeletonChart, skeletonTable } from '../components/skeleton.js';
-import { numero } from '../core/format.js';
+import { numero, esc } from '../core/format.js';
 
 requireAuth();
 const page = renderLayout('comparativo');
@@ -225,7 +225,7 @@ function renderConteudo(linhas, totalProdutos) {
         ${linhas.map(l => {
           const badgeCls = l.selecionado === 'Prophet' ? 'badge-info' : 'badge-primary';
           return `<tr>
-            <td>${l.nome}</td>
+            <td>${esc(l.nome)}</td>
             <td class="tabular">${fmt(l.mapeHW, '%')}</td>
             <td class="tabular">${fmt(l.mapeProphet, '%')}</td>
             <td class="tabular">${fmt(l.rmseHW)}</td>

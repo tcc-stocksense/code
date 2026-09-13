@@ -498,10 +498,22 @@ demonstrações (§7.1, que também economiza crédito) ou trocar a senha por `U
   Impacto: baixo hoje — a AWS aplica bloqueio de acesso público e SSE-S3 por padrão em
   buckets novos desde 2023. O que se perde de fato é o **lifecycle de 30 dias**, então
   dumps antigos não expiram sozinhos. Bloqueia o D-37 até ser resolvido.
-  ⚠️ **Consequência operacional:** enquanto esses recursos estiverem na configuração,
-  qualquer `terraform apply` futuro volta a falhar no mesmo ponto. Resolver antes do
-  próximo apply — removê-los do `.tf` e configurar o bucket pelo console, ou aceitar os
-  padrões e documentar no §10.2.
+  ✅ **RESOLVIDO em 2026-09-13 — e o diagnóstico acima estava incompleto.** Não eram os três
+  recursos filhos: o problema é o próprio **`aws_s3_bucket`**. O provider chama
+  `GetObjectLockConfiguration` ao **ler** o recurso, no create e em todo refresh posterior —
+  então a partir do apply que abortou, até `terraform plan` passou a falhar, porque o
+  refresh do bucket já existente batia na mesma API negada. Confirmado rodando o plan.
+  Não há contorno: o provider não expõe flag para pular essa leitura, e o erro é de
+  autorização, não de configuração.
+  **Solução:** o S3 saiu do Terraform por completo. O `backup.tf` ficou só com a explicação,
+  `aws_s3_bucket.backup` e `random_id.bucket` foram removidos do state com
+  `terraform state rm` (o bucket segue existindo na AWS, sem gerência), e o output
+  `bucket_backup` deixou de existir. Quem cria o bucket agora é o `backup.sh`, na primeira
+  execução, com nome derivado do id da conta — determinístico e sem depender de state.
+  `terraform plan` volta a rodar limpo, sem alteração de infraestrutura.
+  Perde-se o **lifecycle de 30 dias**; bloqueio público e SSE-S3 continuam valendo por
+  padrão da AWS. Registrar no §10.2.
+  ⚠️ Ficou órfão o bucket `stocksense-backup-6a9ff8eb`, vazio e fora do Terraform.
   Guardar os outputs: `ip_publico`, `instance_id`, `bucket_backup`, `comando_ssh`. O
   `bucket_backup` tem sufixo aleatório (`random_id`) — o script do D-36 precisa desse nome.
   _Depende de: D-22, D-23_
@@ -692,10 +704,10 @@ demonstrações (§7.1, que também economiza crédito) ou trocar a senha por `U
   access key no disco.**
   _Depende de: D-24_
 
-- [ ] **D-37 — Agendar o backup** `A` `BLOQUEADA pela SCP do lab`
-  ⛔ **Bloqueada desde 2026-09-13 pela SCP do lab.** O bucket existe, mas sem o
-  `lifecycle_configuration` (ver D-24), então dumps antigos não expirariam. Resolver a
-  pendência do D-24 antes desta.
+- [ ] **D-37 — Agendar o backup** `A` `destravada`
+  ✅ **Destravada em 2026-09-13.** O S3 saiu do Terraform e o `backup.sh` passou a criar o
+  bucket sozinho (ver D-24). Segue sem `lifecycle`, então dumps antigos não expiram — limpar
+  à mão de tempos em tempos, ou aceitar o acúmulo num projeto de TCC.
   Instalar em `/etc/cron.daily/`. Confirmar que o objeto aparece no S3 no dia seguinte.
   _Depende de: D-36, D-31_
 

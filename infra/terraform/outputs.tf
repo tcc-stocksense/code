@@ -8,10 +8,9 @@ output "comando_ssh" {
   value       = "ssh -i stocksense-key.pem ubuntu@${aws_eip.app.public_ip}"
 }
 
-output "bucket_backup" {
-  description = "Nome do bucket S3 — usar no script de backup do §9.7."
-  value       = aws_s3_bucket.backup.id
-}
+# O bucket de backup saiu do Terraform — ver o comentário em backup.tf. Quem o
+# cria é o infra/scripts/backup.sh, na primeira execução, com nome derivado do
+# id da conta. Não há output a expor aqui.
 
 output "instance_id" {
   description = "Para ligar/desligar e economizar crédito (§9.8)."

@@ -1,68 +1,40 @@
-# S3 — destino do mysqldump diário (§9.7).
-# A instance profile do lab autentica a chamada: nenhuma access key no disco da EC2.
-# A role NÃO é criada aqui (ver o bloco no fim do arquivo).
-
-# Nome de bucket é global na AWS inteira; o sufixo evita colisão.
-resource "random_id" "bucket" {
-  byte_length = 4
-}
-
-resource "aws_s3_bucket" "backup" {
-  bucket = "stocksense-backup-${random_id.bucket.hex}"
-
-  tags = { Name = "stocksense-backup" }
-}
-
-resource "aws_s3_bucket_public_access_block" "backup" {
-  bucket                  = aws_s3_bucket.backup.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "backup" {
-  bucket = aws_s3_bucket.backup.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "backup" {
-  bucket = aws_s3_bucket.backup.id
-
-  rule {
-    id     = "expira-dumps-antigos"
-    status = "Enabled"
-
-    filter {}
-
-    expiration {
-      days = var.backup_retention_days
-    }
-  }
-}
-
 # ----------------------------------------------------------------------------
-# IAM — NÃO criado aqui. Restrição do AWS Academy Learner Lab.
+# Backup (§9.7) — o S3 NÃO é gerenciado por Terraform. Restrição do ambiente.
 #
-# A versão anterior deste arquivo criava `aws_iam_role` + `aws_iam_role_policy`
-# + `aws_iam_instance_profile`, com permissão mínima de `s3:PutObject` só neste
-# bucket. No Learner Lab isso falha no apply: a política do lab nega
-# iam:CreateRole. O lab fornece uma role pronta (`LabRole`) e a instance
-# profile correspondente, que é o que a EC2 passa a usar.
+# POR QUE ESTE ARQUIVO ESTÁ VAZIO DE RECURSOS
 #
-# O que se perde: o privilégio mínimo. A LabRole tem permissões amplas, então a
-# EC2 pode mais que gravar dumps. É limitação do ambiente, não escolha de
-# projeto — registrar no §10.2 do infraestrutura-nuvem.md junto das outras.
-# O que se mantém: nenhuma access key em disco. A autenticação continua vindo
-# da instance profile, que é o ponto do §9.7.
+# A versão anterior criava o bucket, o bloqueio de acesso público, a criptografia
+# e o lifecycle de 30 dias, mais uma role IAM com permissão mínima de
+# `s3:PutObject`. Nada disso sobrevive ao AWS Academy Learner Lab:
 #
-# O nome sai em `var.instance_profile_name` porque varia entre versões do lab.
-# Confirmar antes do apply em: console AWS → IAM → Roles → LabRole → aba
-# "Instance profile ARNs". Se o nome estiver errado, o apply falha em
-# `aws_instance` com "InvalidParameterValue: IAM Instance Profile not found".
+#   1. `iam:CreateRole` é negado → usa-se a `LabRole` pronta do lab, referenciada
+#      em `var.instance_profile_name` e aplicada em compute.tf.
+#
+#   2. `s3:GetBucketObjectLockConfiguration` é negado por uma service control
+#      policy da organização (p-gi77lu0b). O provider AWS chama essa API ao LER
+#      qualquer `aws_s3_bucket` — no create e em todo refresh posterior. Efeito
+#      medido em 2026-09-13: o apply criou o bucket e abortou logo depois, e a
+#      partir dali até `terraform plan` passou a falhar, porque o refresh do
+#      recurso existente bate na mesma API.
+#
+#      Não há como contornar: não existe flag no provider para pular essa
+#      leitura, e o erro é de autorização, não de configuração.
+#
+# COMO O BUCKET PASSA A EXISTIR
+#
+# O `infra/scripts/backup.sh` o cria na primeira execução, se não existir, usando
+# o AWS CLI da instância autenticado pela instance profile. O nome é derivado do
+# id da conta (`stocksense-backup-<account-id>`): globalmente único, determinístico
+# e sem precisar de estado.
+#
+# O QUE SE PERDE
+#
+# Privilégio mínimo (a LabRole é ampla) e o lifecycle que expiraria dumps com
+# mais de 30 dias — eles se acumulam até alguém apagar. Bloqueio de acesso
+# público e criptografia SSE-S3 continuam valendo: a AWS os aplica por padrão em
+# buckets novos desde 2023. Registrar as duas perdas no §10.2 como limitações do
+# ambiente, não como escolha de projeto.
+#
+# Se um dia a conta deixar de ser Learner Lab, o histórico deste arquivo tem a
+# versão completa — `git log -- infra/terraform/backup.tf`.
 # ----------------------------------------------------------------------------

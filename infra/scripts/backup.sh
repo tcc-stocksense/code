@@ -8,10 +8,14 @@
 # Instalação (D-37):
 #     sudo cp /home/ubuntu/stocksense/infra/scripts/backup.sh /etc/cron.daily/stocksense-backup
 #     sudo chmod +x /etc/cron.daily/stocksense-backup
-#     sudo tee /etc/stocksense-backup.conf <<<'BUCKET=stocksense-backup-xxxxxxxx'
 #
-# O nome do bucket tem sufixo aleatório (random_id no backup.tf) — sai no output
-# 'bucket_backup' do terraform e é lido daqui via /etc/stocksense-backup.conf.
+# O bucket NÃO precisa ser configurado: o script deriva o nome do id da conta
+# (stocksense-backup-<account-id>) e o cria na primeira execução. Para usar outro
+# nome, crie /etc/stocksense-backup.conf com 'BUCKET=meu-bucket'.
+#
+# Isso mudou em 2026-09-13: o bucket saía do Terraform, mas a SCP do Learner Lab
+# nega s3:GetBucketObjectLockConfiguration, que o provider chama ao ler qualquer
+# aws_s3_bucket — o que fazia até o `terraform plan` falhar. Ver backup.tf.
 #
 # Em cron não existe PATH decente nem variáveis de ambiente da sua sessão: tudo
 # o que o script precisa ele resolve por caminho absoluto ou lê do disco.
@@ -26,7 +30,29 @@ AWS="$(command -v aws || echo /usr/local/bin/aws)"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 [ -f "$CONF" ] && . "$CONF"
-: "${BUCKET:?defina BUCKET em $CONF (output bucket_backup do terraform)}"
+
+# O bucket NÃO vem mais do Terraform: a SCP do Learner Lab nega
+# s3:GetBucketObjectLockConfiguration, que o provider AWS chama ao ler qualquer
+# aws_s3_bucket — o que fazia até o `terraform plan` falhar. Ver backup.tf.
+#
+# Nome derivado do id da conta quando não informado: globalmente único (ids de
+# conta são únicos), determinístico e sem depender de estado — sobrevive a um
+# destroy/recriar da infraestrutura.
+if [ -z "${BUCKET:-}" ]; then
+  CONTA="$("$AWS" sts get-caller-identity --query Account --output text)"
+  [ -n "$CONTA" ] || { log "ERRO: nao consegui descobrir o id da conta"; exit 1; }
+  BUCKET="stocksense-backup-$CONTA"
+  log "BUCKET nao definido em $CONF; usando $BUCKET"
+fi
+
+# Cria na primeira execução. head-bucket devolve != 0 quando não existe.
+if ! "$AWS" s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
+  log "Bucket $BUCKET nao existe — criando"
+  # us-east-1 é a única região que NÃO aceita LocationConstraint no create.
+  "$AWS" s3api create-bucket --bucket "$BUCKET" >/dev/null
+  log "Bucket criado. Bloqueio de acesso publico e SSE-S3 vem por padrao da AWS."
+  log "AVISO: sem lifecycle — dumps antigos se acumulam ate serem apagados a mao."
+fi
 
 # A senha do root vive só no .env da instância, com chmod 600.
 [ -f "$RAIZ/.env" ] || { log "ERRO: $RAIZ/.env não existe"; exit 1; }

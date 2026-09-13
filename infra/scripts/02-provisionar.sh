@@ -147,7 +147,8 @@ echo "==> Gravando os outputs em infra/scripts/.outputs.env"
   echo "# Gerado por 02-provisionar.sh em $(date '+%Y-%m-%d %H:%M:%S')"
   echo "IP_PUBLICO=$(terraform output -raw ip_publico)"
   echo "INSTANCE_ID=$(terraform output -raw instance_id)"
-  echo "BUCKET_BACKUP=$(terraform output -raw bucket_backup)"
+  # O bucket saiu do Terraform (SCP do lab — ver backup.tf). Quem o cria e o
+  # nomeia e o backup.sh, a partir do id da conta.
   echo "PEM=$TF/stocksense-key.pem"
 } > "$SAIDA"
 cat "$SAIDA"

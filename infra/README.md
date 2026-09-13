@@ -80,25 +80,35 @@ Cinco restrições, todas descobertas na prática:
 |---|---|
 | `iam:CreateRole` negado | O Terraform **não cria role**; usa a `LabRole` pronta, via `var.instance_profile_name = "LabInstanceProfile"`. Perde-se o privilégio mínimo de `s3:PutObject` |
 | `budgets:*` negado | Sem alarme de orçamento (D-23). O controle de gasto é o painel do lab |
-| `s3:GetBucketObjectLockConfiguration` negado por SCP | ⛔ **Bloqueador ativo.** Ver abaixo |
+| `s3:GetBucketObjectLockConfiguration` negado por SCP | Tirou o S3 do Terraform. Ver abaixo |
 | Credenciais temporárias | Expiram em ~3–4 h e exigem `AWS_SESSION_TOKEN`. Recolar a cada sessão |
 | Sessão do lab encerra | O lab **para a instância**. Disco e IP persistem; os containers voltam sozinhos |
 
 ✅ **`t3.medium` é permitida** — era a maior incógnita, confirmada no apply.
 
-### ⛔ Bloqueador: o S3 quebra qualquer apply futuro
+### O S3 saiu do Terraform — resolvido em 2026-09-13
 
-O provider da AWS lê a configuração de *object lock* logo após criar um bucket, e a SCP da
-organização do lab nega essa leitura. O apply **cria o bucket e aborta em seguida**, sem
-aplicar bloqueio de acesso público, criptografia e **lifecycle**.
+O provider da AWS chama `GetObjectLockConfiguration` ao **ler** qualquer `aws_s3_bucket` —
+no create e em todo refresh posterior. A SCP da organização do lab nega essa chamada.
 
-Efeito prático: os dados estão seguros (a AWS aplica bloqueio público e SSE-S3 por padrão
-desde 2023), mas **dumps antigos não expiram sozinhos**, e **todo `terraform apply` daqui
-em diante falha no mesmo ponto** enquanto esses três recursos estiverem na configuração.
+O apply de 2026-09-13 criou o bucket e abortou em seguida; a partir dali **até o
+`terraform plan` passou a falhar**, porque o refresh do recurso já existente batia na mesma
+API. Não havia como contornar: o provider não tem flag para pular essa leitura, e o erro é
+de autorização, não de configuração.
 
-**Resolver antes de qualquer novo apply:** remover `aws_s3_bucket_public_access_block`,
-`aws_s3_bucket_server_side_encryption_configuration` e `aws_s3_bucket_lifecycle_configuration`
-de `terraform/backup.tf`, e configurar o bucket pelo console se o lifecycle for necessário.
+**Solução adotada:** o S3 saiu do Terraform por completo (`backup.tf` ficou só com a
+explicação) e os recursos foram removidos do state com `terraform state rm` — o bucket
+continua existindo na AWS, apenas sem gerência do Terraform. Quem cria o bucket agora é o
+`infra/scripts/backup.sh`, na primeira execução, com nome derivado do id da conta
+(`stocksense-backup-<account-id>`): globalmente único, determinístico e sem depender de
+estado, então sobrevive a um destroy/recriar.
+
+**O que se perde:** o *lifecycle* de 30 dias — dumps antigos se acumulam até alguém
+apagar. Bloqueio de acesso público e criptografia SSE-S3 continuam valendo, porque a AWS os
+aplica por padrão em buckets novos desde 2023.
+
+> ⚠️ Ficou órfão na AWS o bucket `stocksense-backup-6a9ff8eb`, criado pelo apply que
+> abortou. Está vazio e fora do Terraform; pode ser apagado pelo console.
 
 ---
 

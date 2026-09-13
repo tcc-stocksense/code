@@ -16,6 +16,21 @@ export function dataBR(iso) {
   return `${dia}/${mes}/${ano}`;
 }
 
+/**
+ * Escapa texto que vai para `innerHTML`. Usar sempre que o conteúdo vier de
+ * dado importado (nome de produto, categoria, mensagem de erro da planilha):
+ * o .xlsx é entrada não confiável, mesmo vindo do próprio lojista.
+ */
+export function esc(valor) {
+  if (valor == null) return '';
+  return String(valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function numero(valor, casas = 0) {
   return new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: casas,

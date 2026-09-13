@@ -6,7 +6,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { skeletonKpiGrid, skeletonChart } from '../components/skeleton.js';
-import { numero, dataBR } from '../core/format.js';
+import { numero, dataBR, esc } from '../core/format.js';
 import { iconArrowLeft, iconTrend, iconPencil, iconCheck, iconX } from '../components/icons.js';
 
 requireAuth();
@@ -44,8 +44,8 @@ async function carregarDetalhe() {
     header.style.cssText = 'margin-bottom:24px; flex-wrap:wrap; gap:12px;';
     const headerLeft = document.createElement('div');
     headerLeft.innerHTML = `
-      <h1 class="page-title">${p.nome}</h1>
-      <p class="page-subtitle">${p.categoria || 'sem categoria'}${p.classe ? ` · classe ${p.classe}` : ''}</p>
+      <h1 class="page-title">${esc(p.nome)}</h1>
+      <p class="page-subtitle">${esc(p.categoria || 'sem categoria')}${p.classe ? ` · classe ${esc(p.classe)}` : ''}</p>
     `;
     header.appendChild(headerLeft);
     let headerBadge = statusBadge(p.semaforo);

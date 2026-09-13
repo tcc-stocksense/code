@@ -30,7 +30,10 @@ function num(valor) {
 export function semaforoPorPR(estoque, pontoReposicao) {
   const pr = num(pontoReposicao);
   const est = num(estoque);
-  if (pr == null || est == null || pr <= 0) return null;
+  // `null` significa apenas "o motor ainda não calculou". PR = 0 é um resultado
+  // legítimo (demanda média zero) e não pode cair no mesmo balde — com PR = 0 o
+  // produto fica verde enquanto tiver qualquer estoque.
+  if (pr == null || est == null) return null;
   if (est <= pr) return 'critico';
   if (est <= pr * 1.5) return 'atencao';
   return 'ok';

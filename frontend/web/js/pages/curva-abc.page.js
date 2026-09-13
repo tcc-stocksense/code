@@ -5,7 +5,7 @@ import { pareto } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonKpiGrid, skeletonChart, skeletonTable } from '../components/skeleton.js';
-import { moedaBR, numero } from '../core/format.js';
+import { moedaBR, numero, esc } from '../core/format.js';
 
 requireAuth();
 const page = renderLayout('curva-abc');
@@ -137,7 +137,7 @@ async function carregarABC() {
         : usaProxy ? numero(i.faturamento, 0) : moedaBR(i.faturamento);
       return `<tr>
         <td><span class="badge ${badgeClass}">${i.classe}</span></td>
-        <td>${i.nome}</td>
+        <td>${esc(i.nome)}</td>
         <td class="tabular">${valor}</td>
         <td class="tabular text-secondary">${numero(i.percentualDoTotal, 1)}%</td>
         <td class="tabular text-secondary">${numero(i.percentualAcumulado, 1)}%</td>

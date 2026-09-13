@@ -171,6 +171,16 @@ def main() -> int:
                    help="Diretório de saída. Padrão: app/tests/fixtures/massa-sintetica/")
     p.add_argument("--semente", type=int, default=SEMENTE_PADRAO,
                    help="Semente aleatória — mesma semente, mesmo catálogo.")
+    # Sobrescritas aplicadas ao PRIMEIRO produto. Servem para montar um SKU
+    # reconhecível numa demonstração, em vez do nome sorteado, que combina base
+    # e variante e às vezes produz coisas como "Arroz fardo".
+    p.add_argument("--nome", type=str, default=None,
+                   help="Nome do primeiro produto. Sobrescreve o sorteio.")
+    p.add_argument("--categoria", type=str, default=None,
+                   choices=sorted(CATEGORIAS), metavar="CATEGORIA",
+                   help=f"Categoria do primeiro produto. Uma de: {', '.join(sorted(CATEGORIAS))}")
+    p.add_argument("--estoque", type=int, default=None,
+                   help="Estoque atual do primeiro produto. Baixo o põe em Alertas.")
     args = p.parse_args()
 
     if args.dias < 90:
@@ -189,7 +199,25 @@ def main() -> int:
 
     # Reaproveita o pipeline do módulo original: colunas e janela de datas
     # continuam definidas num lugar só.
-    g.PRODUTOS_META = gerar_meta(args.produtos, args.primeiro_id, args.semente)
+    meta = gerar_meta(args.produtos, args.primeiro_id, args.semente)
+
+    if args.categoria:
+        # Trocar a categoria sem ressortear demanda e preço deixaria o SKU com
+        # números de outra faixa. Regenera o primeiro item já na categoria certa.
+        cfg = CATEGORIAS[args.categoria]
+        rng = np.random.default_rng(args.semente)
+        meta[0]["categoria"] = args.categoria
+        meta[0]["unidade_medida"] = cfg["unidade"]
+        meta[0]["demanda_base"] = round(float(rng.uniform(*cfg["demanda"])), 1)
+        meta[0]["variabilidade"] = round(float(rng.uniform(*cfg["variabilidade"])), 2)
+        meta[0]["preco_venda"] = round(float(rng.uniform(*cfg["preco"])), 2)
+        meta[0]["estoque_atual"] = max(1, int(meta[0]["demanda_base"] * 8))
+    if args.nome:
+        meta[0]["nome"] = args.nome
+    if args.estoque is not None:
+        meta[0]["estoque_atual"] = max(1, args.estoque)
+
+    g.PRODUTOS_META = meta
 
     g.exportar_planilha_produtos(destino=caminho_produtos)
     g.exportar_planilha_vendas(dias=args.dias, destino=caminho_vendas)

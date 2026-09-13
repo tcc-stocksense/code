@@ -623,7 +623,31 @@ demonstrações (§7.1, que também economiza crédito) ou trocar a senha por `U
   dashboard, alertas, curva ABC e métricas. **Valida a trilha A inteira sem depender do frontend.**
   _Depende de: D-32_
 
-- [ ] **D-34 — Fluxo completo pela interface** `A+B`
+- [~] **D-34 — Fluxo completo pela interface** `A+B` `T3 validada; faltam as demais telas`
+  🔶 **Parcialmente validado em 2026-09-13 — a T3 passou pelo navegador, em produção.**
+  O lojista subiu `produtos.xlsx` e `vendas.xlsx` pela tela de Importação e clicou em
+  processar. Funcionou ponta a ponta: upload multipart atravessando o Caddy, parsing do
+  xlsx pelo POI, validação, persistência e disparo do motor.
+
+  Produto importado pela interface: **id 12, "Achocolatado em Pó 400g"** (170 linhas de
+  vendas, 180 dias). O motor calculou demanda de 12,67 un/dia, ponto de reposição 63,31 e
+  **1,58 dias até ruptura** — contra os ~1,6 projetados a partir da massa gerada, ou seja,
+  o motor recuperou a demanda que o gerador injetou.
+
+  Três coisas que este teste provou e que a fumaça por API (D-33) não provava:
+  1. **Acentuação sobrevive** ao caminho navegador → multipart → POI → MySQL → JSON
+     ("Achocolatado em Pó", "Pão Francês" corretos na resposta).
+  2. **A ABC é relativa e recalculada no backend** (ADR #3): o produto novo entrou em
+     **1º lugar** por faturamento (R$ 62.953,13) e tirou a liderança do Arroz 5kg
+     (R$ 61.452,60), reordenando a curva inteira.
+  3. **A importação é incremental** — produtos fazem upsert por `produto_id` e vendas são
+     acrescentadas. Dá para crescer o catálogo sem reimportar tudo.
+     ⚠️ Corolário: reimportar o MESMO arquivo de vendas **duplica** as linhas, porque não
+     há deduplicação. Produtos são seguros de reimportar; vendas não.
+
+  **O que falta para fechar:** percorrer as demais telas (T2, T4, T5, T6, T7, T10) com o
+  console aberto, e exercitar os estados `null` — que exigem banco com dados e **sem** o
+  motor rodado, situação que não existe mais em produção.
   O mesmo roteiro pelo navegador, com o mock desligado por padrão (D-11). Critério: sem erro no
   console, e os dados batendo com os do D-33.
   Testar **também antes de rodar o motor**, para exercitar os estados `null` — o

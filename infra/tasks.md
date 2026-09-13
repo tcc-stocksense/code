@@ -690,6 +690,25 @@ demonstrações (§7.1, que também economiza crédito) ou trocar a senha por `U
 ## Épico D6 — Operação `Trilha A`
 
 - [x] **D-36 — `infra/scripts/backup.sh` versionado** `A`
+  ✅ **Executado na instância em 2026-09-13** — até aqui o script estava versionado mas
+  nunca rodado. Primeira execução real:
+
+  ```
+  BUCKET nao definido; usando stocksense-backup-249866726898
+  Bucket nao existe — criando
+  Gerando o dump de 'stocksense'
+  Dump: 29406 bytes
+  Enviando para s3://stocksense-backup-249866726898/2026-09-13.sql.gz
+  2026-09-13 20:28:31      29406 2026-09-13.sql.gz
+  Backup concluído
+  ```
+
+  Valida as três partes: o nome derivado do id da conta, a criação do bucket na primeira
+  execução (depois de o S3 sair do Terraform) e o upload autenticado pela instance profile
+  — **nenhuma access key em disco**, que era o ponto do §9.7.
+  📌 **Melhoria pendente:** o `mysqldump -p"$SENHA"` deixa a senha visível no `ps` da
+  instância, e o próprio MySQL avisa. Risco baixo numa máquina de usuário único, mas o certo
+  é `--defaults-extra-file` ou `MYSQL_PWD`.
   **Feito em 2026-09-12.** Arquivo em [`infra/scripts/backup.sh`](../scripts/backup.sh).
   Lê o nome do bucket de `/etc/stocksense-backup.conf` (tem sufixo aleatório, vem do
   output `bucket_backup` do D-24) e a senha do root do `.env` da instância. Acrescentei

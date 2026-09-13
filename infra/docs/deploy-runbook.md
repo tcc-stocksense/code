@@ -8,10 +8,19 @@
 > comandos marcados `[local]` rodam na sua máquina; os marcados `[via ssh]` rodam na VM mas são
 > disparados da sua máquina — você não precisa trabalhar dentro da instância.
 >
-> **Estado em 2026-09-06:** nada disto foi executado ainda. Não existe recurso na AWS
-> (`terraform apply` nunca rodou). O ensaio local equivalente — Épico D0 — está feito e validado.
+> **Estado em 2026-09-13: executado com sucesso.** O sistema está no ar em
+> http://107.20.236.251. Os passos abaixo foram validados na prática e depois automatizados
+> em [`infra/scripts/`](../scripts/README.md) — **prefira os scripts**; este documento
+> continua valendo como referência do que cada um faz por dentro, e para diagnóstico quando
+> algum passo falhar.
 >
-> Referências: `infra/tasks.md` (backlog, D-17 a D-32), `infra/infraestrutura-nuvem.md`
+> Divergências entre o que está aqui e o que foi executado de fato:
+> - O passo 6 subiu com `SITE_ADDRESS=:80` (HTTP puro no IP), não com domínio — decisão D-18.
+> - O `.env` do passo 4 é gerado pelo `04-subir.sh` na própria instância, com `openssl rand`.
+> - O tarball do passo 2 saiu com **350 MB**, não os ~385 MB estimados.
+>
+> Referências: [`infra/README.md`](../README.md) (ponto de entrada e restrições do Learner
+> Lab), `infra/tasks.md` (backlog, D-17 a D-32), `infra/infraestrutura-nuvem.md`
 > (arquitetura, riscos, orçamento).
 
 ---

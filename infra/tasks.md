@@ -704,7 +704,25 @@ demonstrações (§7.1, que também economiza crédito) ou trocar a senha por `U
   contagem de linhas de `produto` e `venda`.
   _Depende de: D-37_
 
-- [ ] **D-39 — Runbook de ligar/desligar** `A`
+- [x] **D-39 — Runbook de ligar/desligar** `A`
+  ✅ **Feito em 2026-09-13.** Runbook em [`infra/docs/ligar-desligar.md`](docs/ligar-desligar.md),
+  com os ids reais e a tabela de custo.
+  **Verificado na prática, que era o ponto da task** — ciclo completo medido com comparação
+  do estado antes e depois:
+
+  | Etapa | Tempo |
+  |---|---|
+  | `stop` → `stopped` | 32 s |
+  | indisponibilidade confirmada | conexão recusada ✓ |
+  | `start` → `running` | 11 s |
+  | SSH respondendo | 11 s depois |
+  | containers no ar | **automático, sem nenhum comando** |
+  | HTTP 200 pela borda | imediato |
+
+  **Indisponibilidade total: pouco menos de 1 minuto.** Os 12 produtos voltaram com os
+  mesmos ids, o mesmo líder da ABC (Achocolatado, R$ 62.953,13) e mesmos estoque e classe
+  produto a produto — comparação campo a campo, não só de contagem. O Elastic IP não mudou.
+  É a demonstração empírica do §7.2, e vira material de defesa.
   Documentar o §9.8 com o `instance_id` real: o que para de ser cobrado (CPU/RAM) e o que continua
   (~US$ 6/mês de EBS + IPv4). Confirmar na prática que os containers voltam sozinhos pelo
   `restart: unless-stopped` e que **o banco não perde dados** — é a demonstração do §7.2.

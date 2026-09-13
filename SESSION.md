@@ -9,6 +9,7 @@
 | **Repositório** | Monorepo: `backend/`, `ml-service/`, `frontend/` |
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
+| **Produção** | **http://107.20.236.251** — EC2 `i-01fb1975491b85fb1` (t3.medium, us-east-1), no ar desde 2026-09-13. Conta **AWS Academy Learner Lab**. Ponto de entrada: [`infra/README.md`](infra/README.md) |
 | **Branches abertas** | `chore/infra-terraform-aws` (deploy/infra, **atual**, sincronizada com o origin); `feat/produto-detalhe-metricas` (Épico 4, pushed, sem PR); `feat/dashboard-alertas` (Épico 5, empilhada na anterior); `test/importacao-services` (T-17 testes + doc, pushed, sem PR); `analise-validacao-modelos` (T10 + pin do cmdstanpy, pushed, **sem merge na main**) |
 
 > **Já mergeadas na `main`:** `feat/auth-login-jwt` (Épico 1, PR #4), `feat/motor-abc`
@@ -21,7 +22,118 @@
 
 ---
 
-## Última Sessão — 2026-09-05 (Infra — versionamento do D1 + Épico D0)
+## Última Sessão — 2026-09-12/13 (Infra — deploy em produção na AWS)
+
+> Branch: `chore/infra-terraform-aws`. Duas sessões emendadas. A primeira preparou tudo sem
+> gastar um dólar: merge da `main`, auditoria do backlog, decisões do Épico D2 fechadas,
+> Terraform adaptado ao Learner Lab e os scripts de deploy escritos. A segunda executou —
+> **o StockSense está no ar em http://107.20.236.251**.
+>
+> Ponto de entrada da infra, para a próxima sessão: **[`infra/README.md`](infra/README.md)**.
+
+### O que foi desenvolvido
+
+**Dia 1 — preparação (nada na AWS).**
+
+- **Merge da `main` na branch de infra.** Dois arquivos se cruzavam (`SecurityConfig.kt` e
+  `docker-compose.yml`), em regiões diferentes — merge automático, `compileKotlin` passando.
+  A branch trouxe a integração do frontend, que estava em 10 de 11 tasks e este backlog não
+  sabia.
+- **Auditoria das 47 tasks contra o código.** A tabela de estado era de 2026-08-30 e errava
+  em quatro pontos: a trilha B tinha fechado, o D-11 já estava feito, o repositório é
+  público (o que derrubou a ressalva do D-17) e o front já tratava o 404 do login.
+- **D-09 resolvido pela topologia, não por detecção de ambiente.** O nginx de desenvolvimento
+  ganhou o proxy de `/api` que o Caddy já tinha (`frontend/nginx-dev.conf`), então
+  `API_BASE_URL` virou `/api` puro nos dois ambientes. De passagem, dois defaults do nginx
+  que o Caddy não tem: `client_max_body_size` (1 MB daria 413 no upload da T3) e
+  `proxy_read_timeout` (60 s cortaria o lote do motor).
+- **Sete scripts de deploy** em `infra/scripts/`, com README mapeando task → script.
+- **Ensaio local completo** do stack de produção, com a segunda medição do D-07 e as
+  métricas da T10 validadas na imagem.
+
+**Dia 2 — execução.**
+
+- **Infra provisionada** — 15 dos 16 recursos: VPC, subnet, gateway, route table, security
+  group, EC2 t3.medium, Elastic IP, bucket S3.
+- **Deploy pela opção (c) do D-17:** 350 MB de imagens construídas localmente e carregadas
+  na instância. **A t3.medium não compilou nada**, que era o ponto da decisão.
+- **Cinco containers saudáveis**, com o R6 provado na nuvem: `docker port` vazio para banco,
+  backend e ml-service. Só o Caddy publica porta.
+- **Fumaça completa passando** (D-33): login, importação de 1.690 linhas de vendas, motor
+  sem falhas, seis rotas em 200.
+- **Importação pela interface** (D-34 parcial): o lojista subiu as planilhas pela tela T3 em
+  produção e funcionou ponta a ponta.
+- **Ciclo parar/religar verificado** (D-39) e **gerador de catálogo de N produtos**
+  (`ml-service/app/tests/generate_catalogo.py`).
+
+### Decisões técnicas tomadas nesta sessão
+
+- **D-17 — opção (c):** build local, `docker save` → SSH → `docker load`. A pendência de
+  fato caiu: o repositório é público, então o `git clone` não precisa de deploy key.
+- **D-18 reordenada:** a primeira subida é **HTTP puro no IP** (`SITE_ADDRESS=:80`). O
+  Let's Encrypt não emite certificado para endereço IP, e juntar TLS à primeira subida
+  traria propagação de DNS e o rate limit do ACME para o caminho crítico sem necessidade.
+  **Continua obrigatória antes da defesa.**
+- **D-23 não aplicável:** `budgets:*` é negado no Learner Lab.
+- **D-19 resolvida por fato consumado:** a trilha B fechou antes, então deploya-se com o
+  front integrado.
+
+### O que o Learner Lab impõe (cinco restrições)
+
+A conta **não é uma conta AWS comum** — o §7 do `infraestrutura-nuvem.md` assumia que era.
+`iam:CreateRole` e `budgets:*` negados; credenciais temporárias que expiram em ~3–4 h e
+exigem `AWS_SESSION_TOKEN`; a sessão do lab para a instância ao encerrar; e uma **service
+control policy que nega `s3:GetBucketObjectLockConfiguration`**.
+
+✅ **`t3.medium` é permitida** — era a maior incógnita do D-24, e o plano B do D-08
+(eliminar o container nginx para caber numa t3.small) não precisou ser acionado.
+
+### Números que viraram evidência para o TCC
+
+- **T10 válida na nuvem:** Prophet MAPE **14,18%** (selecionado) × Holt-Winters **55,74%**.
+  O pin do `cmdstanpy==1.2.4` atravessou o `docker save`/`load` intacto — não é o fallback
+  silencioso que invalidaria o núcleo acadêmico.
+- **D-35 — 0,50 s/produto na t3.medium**, dentro da faixa de 0,42–0,53 medida no desktop
+  (D-41). Projeção de **~2,6 min para 312 SKUs**, contra os 5 a 25 min que o R1 estimava.
+- **D-43 — 1,6 GiB de 3,7 GiB** usados na instância, com o swap praticamente intocado
+  (76 KiB de 2 GiB). O `db` é o container mais apertado, em 70% do seu limite.
+- **D-39 — menos de 1 minuto de indisponibilidade** no ciclo parar/religar, com os
+  containers voltando sozinhos e os dados batendo campo a campo.
+- **ADR #3 confirmado empiricamente:** ao importar um produto novo pela interface, ele
+  assumiu o 1º lugar na Curva ABC e reordenou a curva inteira — a classificação é relativa
+  e roda no backend.
+
+### Armadilhas encontradas (e corrigidas)
+
+- **CRLF quebraria os scripts.** Não havia `.gitattributes` e `core.autocrlf=true`
+  converteria os `.sh` no checkout — `bash` morre com `$'\r'`, inclusive dentro dos
+  heredocs que os scripts mandam por SSH. Os `.sh` agora são fixos em LF.
+- **O bit de execução não ia para o index** (o Windows não o rastreia), então os scripts
+  clonados na VM não seriam executáveis.
+- **A importação de vendas não deduplica.** Reimportar o mesmo arquivo duplica as linhas e
+  dobra a demanda calculada. Produtos são seguros, porque fazem upsert por `produto_id`.
+- **`docker compose` precisa de `--env-file` até para `ps`**, porque o compose de produção
+  usa `${VAR:?}` e aborta na interpolação.
+
+### Pendências que ficaram em aberto
+
+- ⛔ **A SCP do S3 quebra qualquer `terraform apply` futuro.** O bucket foi criado, mas
+  bloqueio público, criptografia e **lifecycle** ficaram de fora, e o apply aborta sempre no
+  mesmo ponto. **Resolver antes de destruir/recriar.** Bloqueia o D-37.
+- **HTTPS e domínio** (D-18/D-26/D-32) — hoje o JWT trafega em claro.
+- **D-34 parcial:** a T3 passou pelo navegador; faltam as demais telas com o console aberto.
+  Os estados `null` não são mais testáveis em produção, porque o motor já rodou.
+- **Medições de carga** (D-07, D-35, D-43) seguem parciais: com 12 produtos não há carga
+  real. O `generate_catalogo.py` produz o catálogo de 312 SKUs que falta.
+- **Credencial semeada exposta:** `admin@stocksense.local` / `admin123` está num repositório
+  público e o sistema está na internet. A premissa do D-16 ("URL conhecida por três
+  pessoas") deixou de valer.
+- **D-14 destravado mas não feito:** a medição mostrou que 2 workers cabem. Mexe no
+  Dockerfile do ml-service, o que invalidaria o tarball de 350 MB já construído — fazer
+  depois do deploy.
+
+---
+## Sessão — 2026-09-05 (Infra — versionamento do D1 + Épico D0)
 
 > Branch: `chore/infra-terraform-aws`. Duas metades: auditoria do backlog de deploy com commit do
 > que estava parado no working tree desde 2026-08-30, e depois o **Épico D0 inteiro** — o stack de

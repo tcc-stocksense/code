@@ -146,6 +146,30 @@ async function carregarDetalhe() {
       mainCol.appendChild(serieCard);
     }
 
+    // Vendas por semana — o ProdutoDetalheResponse ainda não traz essa série;
+    // a tabela reaparece sozinha quando o campo existir.
+    if (p.vendasSemana && p.vendasSemana.length > 0) {
+      const semanasCard = document.createElement('div');
+      semanasCard.className = 'card';
+      semanasCard.innerHTML = `<h3 style="margin-bottom:14px">Vendas por semana</h3>`;
+      const tabelaSemanas = document.createElement('table');
+      tabelaSemanas.className = 'table';
+      tabelaSemanas.innerHTML = `
+        <thead><tr><th>Semana</th><th>Total vendido</th><th>Média/dia</th></tr></thead>
+        <tbody>
+          ${p.vendasSemana.map(s => `
+            <tr>
+              <td>${s.label}</td>
+              <td class="tabular">${s.total} ${p.unidade}</td>
+              <td class="tabular text-secondary">${numero(s.media, 1)} ${p.unidade}/dia</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+      semanasCard.appendChild(tabelaSemanas);
+      mainCol.appendChild(semanasCard);
+    }
+
     grid.appendChild(mainCol);
 
     // === Side panel ===

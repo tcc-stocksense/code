@@ -7,7 +7,7 @@ import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonKpiGrid, skeletonChart, skeletonTable } from '../components/skeleton.js';
-import { dataBR, numero } from '../core/format.js';
+import { moedaBRcompacta, dataBR, numero } from '../core/format.js';
 import { iconAlert } from '../components/icons.js';
 
 requireAuth();
@@ -57,11 +57,9 @@ async function carregarDashboard() {
       page.appendChild(banner);
     }
 
-    // KPIs — 3 cards. O card "Valor em risco" do protótipo foi removido:
-    // o backend não expõe esse número e a regra de cálculo não está definida.
+    // KPIs
     const kpiGrid = document.createElement('div');
     kpiGrid.className = 'kpi-grid';
-    kpiGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
 
     kpiGrid.appendChild(kpiCard({
       titulo: 'Risco de faltar',
@@ -74,6 +72,21 @@ async function carregarDashboard() {
       sub: 'estoque no ou abaixo do ponto de reposição',
       cor: 'var(--status-critico)',
     }));
+    // Valor em risco — o backend ainda não expõe esse número e a regra de cálculo
+    // (coef. ABRAS) não foi definida; o card fica no lugar, em estado "sem dado".
+    if (dados.valorEmRisco != null) {
+      kpiGrid.appendChild(kpiCard({
+        titulo: 'Valor em risco',
+        valor: moedaBRcompacta(dados.valorEmRisco),
+        sub: 'venda perdida estimada (coef. ABRAS)',
+      }));
+    } else {
+      kpiGrid.appendChild(kpiCard({
+        titulo: 'Valor em risco',
+        valor: '—',
+        sub: 'aguardando confirmação da regra',
+      }));
+    }
     kpiGrid.appendChild(kpiCard({
       titulo: 'Acurácia do modelo',
       valor: dados.acuracia != null ? numero(dados.acuracia, 1) + '%' : '—',
@@ -98,10 +111,14 @@ async function carregarDashboard() {
       `;
       page.appendChild(chartCard);
 
+      // A projeção volta a ser desenhada assim que o backend enviar a série;
+      // hoje `projecao` chega vazia e o gráfico mostra só o histórico.
       linha(document.getElementById('chart-faturamento'), {
         labels: serie.map(s => dataBR(s.semana)),
         historico: serie.map(s => s.total),
-        labelHist: 'Faturamento da semana',
+        projecao: dados.projecao || [],
+        labelHist: 'Histórico',
+        labelProj: 'Projeção',
       });
     } else {
       const vazio = document.createElement('div');

@@ -8,27 +8,19 @@ requireAuth();
 const page = renderLayout('importar');
 
 /**
- * O backend expõe dois endpoints de importação, ambos multipart com o campo
- * `arquivo` e apenas `.xlsx`. A ordem importa: as vendas são casadas com os
- * produtos por SKU, então Produtos precisa entrar primeiro.
+ * Obrigatórias têm endpoint no backend (multipart, campo `arquivo`, só `.xlsx`).
+ * A ordem importa: as vendas são casadas com os produtos por SKU, então Produtos
+ * precisa entrar primeiro.
  *
- * As planilhas "desejáveis" do protótipo (estabelecimento, fornecedores,
- * produto × fornecedor) não têm endpoint e por isso não são oferecidas.
+ * As desejáveis continuam na tela, mas ainda não têm endpoint de importação — o
+ * envio é recusado com aviso em vez de reportar sucesso de um upload que não houve.
  */
 const PLANILHAS = [
-  {
-    key: 'produtos',
-    nome: 'Produtos',
-    rota: '/importacao/produtos',
-    campos: 'sku, nome, categoria, unidade de medida',
-  },
-  {
-    key: 'vendas',
-    nome: 'Vendas',
-    rota: '/importacao/vendas',
-    campos: 'data, sku, quantidade',
-    dependeDe: 'produtos',
-  },
+  { key: 'produtos',        nome: 'Produtos',             grupo: 'Obrigatórias', obrigatorio: true,  campos: 'sku, nome, categoria, unidade de medida' },
+  { key: 'vendas',          nome: 'Vendas',               grupo: 'Obrigatórias', obrigatorio: true,  campos: 'data, sku, quantidade', dependeDe: 'produtos' },
+  { key: 'estabelecimento', nome: 'Estabelecimento',      grupo: 'Desejáveis',   obrigatorio: false, campos: 'nome, cnpj, endereço' },
+  { key: 'fornecedores',    nome: 'Fornecedores',         grupo: 'Desejáveis',   obrigatorio: false, campos: 'id, nome, contato, lead_time_dias' },
+  { key: 'prodForn',        nome: 'Produto × Fornecedor', grupo: 'Desejáveis',   obrigatorio: false, campos: 'sku, id_fornecedor, preco_compra' },
 ];
 
 const estados = {};
@@ -53,7 +45,7 @@ page.innerHTML = `
     </ul>
   </details>
   <div id="blocos-obrigatorias"></div>
-  <div id="aviso-desejaveis"></div>
+  <div id="blocos-desejaveis"></div>
   <div class="row-between" style="margin-top:24px">
     <span class="text-meta" id="status-resumo"></span>
     <button class="btn btn-primary" id="btn-processar" disabled>Processar dados</button>
@@ -62,18 +54,24 @@ page.innerHTML = `
 `;
 
 const containerObrig = document.getElementById('blocos-obrigatorias');
+const containerDesej = document.getElementById('blocos-desejaveis');
 
-const label = document.createElement('div');
-label.style.cssText = 'font-size:11px; color:var(--cor-texto-terc); text-transform:uppercase; letter-spacing:0.06em; font-weight:500; margin:18px 0 10px;';
-label.textContent = 'Obrigatórias';
-containerObrig.appendChild(label);
+function addSectionLabel(container, texto) {
+  const label = document.createElement('div');
+  label.style.cssText = 'font-size:11px; color:var(--cor-texto-terc); text-transform:uppercase; letter-spacing:0.06em; font-weight:500; margin:18px 0 10px;';
+  label.textContent = texto;
+  container.appendChild(label);
+}
+
+addSectionLabel(containerObrig, 'Obrigatórias');
+addSectionLabel(containerDesej, 'Desejáveis');
 
 PLANILHAS.forEach(pl => {
   estados[pl.key] = 'vazio';
 
   const bloco = uploadBlock({
     titulo: pl.nome,
-    obrigatorio: true,
+    obrigatorio: pl.obrigatorio,
     accept: '.xlsx',
     campos: pl.campos,
     onFile: (file) => enviarArquivo(pl, file, bloco),
@@ -84,19 +82,8 @@ PLANILHAS.forEach(pl => {
   wrapper.style.marginBottom = '8px';
   wrapper.appendChild(bloco.el);
   wrappers[pl.key] = wrapper;
-  containerObrig.appendChild(wrapper);
+  (pl.grupo === 'Obrigatórias' ? containerObrig : containerDesej).appendChild(wrapper);
 });
-
-// Planilhas sem endpoint — explicitadas em vez de silenciosamente ignoradas
-document.getElementById('aviso-desejaveis').innerHTML = `
-  <div class="card" style="margin-top:18px; padding:14px">
-    <div class="label" style="margin-bottom:6px">Estabelecimento, fornecedores e produto × fornecedor</div>
-    <p class="text-meta" style="margin:0">
-      Ainda não há endpoint de importação para essas planilhas. Lead time e dados de
-      fornecedor usam os valores padrão do sistema até que a API os exponha.
-    </p>
-  </div>
-`;
 
 function bloquearDependentes() {
   PLANILHAS.forEach(pl => {
@@ -123,8 +110,21 @@ async function enviarArquivo(pl, file, bloco) {
   try {
     const formData = new FormData();
     formData.append('arquivo', file);
+    formData.append('tipo', pl.key);
 
-    const r = await apiUpload(pl.rota, formData);
+    const r = await apiUpload('/importacao', formData);
+
+    // Planilha sem endpoint: nada foi enviado. Reportar sucesso aqui seria mentir.
+    if (r.ignorado) {
+      estados[pl.key] = 'erro';
+      bloco.setEstado('erro', {
+        nome: file.name,
+        mensagem: 'A API ainda não recebe esta planilha — nada foi importado.',
+      });
+      toast.erro(`${pl.nome}: ainda sem endpoint de importação no backend`);
+      atualizarResumo();
+      return;
+    }
 
     estados[pl.key] = 'sucesso';
     bloco.setEstado('sucesso', { nome: file.name, linhas: r.importados });

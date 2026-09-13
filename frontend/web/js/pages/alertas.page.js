@@ -120,10 +120,11 @@ async function carregarAlertas() {
       // Sugestão
       const sugestaoEl = document.createElement('div');
       sugestaoEl.style.textAlign = 'right';
+      // `fornecedor` ainda não vem no AlertaResponse — a linha fica vazia até vir.
       sugestaoEl.innerHTML = sugestao != null
         ? `<div style="font-size:16px; font-weight:500; color:var(--cor-primaria)">Pedir ${sugestao} ${un}</div>
-           <div class="text-meta">até o ponto de reposição + segurança</div>`
-        : `<div class="text-meta">sem sugestão</div>`;
+           <div class="text-meta">${a.fornecedor || 'até o ponto de reposição + segurança'}</div>`
+        : `<div class="text-meta">${a.fornecedor || 'sem sugestão'}</div>`;
 
       // Botão detalhe
       const btnDetalhe = document.createElement('a');

@@ -5,3 +5,9 @@ __pycache__/
 *.pyo
 .pytest_cache/
 app/tests/fixtures/
+.ipynb_checkpoints/
+
+# Material academico: notebook, figuras e PDFs. Sem funcao em runtime,
+# e a imagem ja e de 1,5-2,5 GB por causa de prophet/cmdstan (R4).
+analysis/
+docs/

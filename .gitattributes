@@ -1,0 +1,27 @@
+# core.autocrlf=true nesta máquina converte LF -> CRLF no checkout. Para os
+# arquivos abaixo isso QUEBRA a execução, então eles ficam fixos em LF.
+#
+# Por que importa aqui:
+#   *.sh      — bash não tolera \r: "$'\r': command not found". Vale no Git Bash
+#               E na EC2, e os scripts 03/04 mandam heredocs por SSH para um bash
+#               remoto, que receberia o \r junto.
+#   backup.sh — roda na instância Linux, via cron.
+#   Caddyfile / *.conf — arquivos de configuração montados dentro de containers.
+#   gradlew   — script de shell, mesmo motivo.
+
+*.sh        text eol=lf
+*.bash      text eol=lf
+gradlew     text eol=lf
+Caddyfile   text eol=lf
+*.conf      text eol=lf
+
+# Scripts .bat/.cmd são o oposto: precisam de CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Binários — nunca converter.
+*.xlsx      binary
+*.png       binary
+*.pdf       binary
+*.jar       binary
+*.pem       binary

@@ -12,13 +12,13 @@ router = APIRouter(prefix="/predict", tags=["predict"])
 
 
 @router.post("", response_model=PredictResponse)
-async def predict(request: PredictRequest) -> PredictResponse:
+def predict(request: PredictRequest) -> PredictResponse:
     """
     Recebe histórico de vendas de um produto e retorna previsão de demanda,
     KPIs de estoque e métricas comparativas dos modelos Holt-Winters e Prophet.
     """
     try:
-        return await executar_previsao(request)
+        return executar_previsao(request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:

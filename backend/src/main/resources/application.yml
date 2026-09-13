@@ -34,8 +34,23 @@ ml:
     url: ${ML_SERVICE_URL:http://localhost:8000}
 
 jwt:
-  secret: ${JWT_SECRET:stocksense-dev-secret-troque-em-producao-min-32-bytes-1234567890}
+  # Sem default de proposito (D-10): variavel ausente quebra o boot em vez de
+  # subir com um segredo versionado. O valor de dev vem do docker-compose.yml.
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+# Actuator (D-12): expoe apenas /actuator/health, para o healthcheck do Docker.
+# show-details: never mantem a resposta em {"status":"UP"} — sem detalhe de
+# banco, disco ou versao. Nao ha rota para /actuator no Caddyfile, entao o
+# endpoint so e alcancavel de dentro da rede Docker.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 server:
   port: ${SERVER_PORT:8080}

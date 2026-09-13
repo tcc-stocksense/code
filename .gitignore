@@ -42,3 +42,10 @@ npm-debug.log*
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
+.ipynb_checkpoints/
+
+# ── Infra / AWS ───────────────────────────────────────────────────────────────
+infra/lab-credentials.env
+infra/dist/
+infra/scripts/.outputs.env
+infra/terraform/plano.tfplan

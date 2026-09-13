@@ -163,8 +163,12 @@ def main() -> int:
                    help="Dias de histórico, terminando ontem. Mínimo exigido pelo motor: 90.")
     p.add_argument("--primeiro-id", type=int, default=1,
                    help="produto_id inicial. Use 11+ para não colidir com o catálogo já importado.")
-    p.add_argument("--saida", type=Path, default=Path("massa-sintetica"),
-                   help="Diretório de saída.")
+    # Default relativo AO SCRIPT, não ao diretório de onde se chama: o caminho
+    # fica previsível e cai dentro de fixtures/, que o ml-service/.gitignore já
+    # ignora — senão os .xlsx gerados apareceriam como untracked no git.
+    p.add_argument("--saida", type=Path,
+                   default=Path(__file__).parent / "fixtures" / "massa-sintetica",
+                   help="Diretório de saída. Padrão: app/tests/fixtures/massa-sintetica/")
     p.add_argument("--semente", type=int, default=SEMENTE_PADRAO,
                    help="Semente aleatória — mesma semente, mesmo catálogo.")
     args = p.parse_args()

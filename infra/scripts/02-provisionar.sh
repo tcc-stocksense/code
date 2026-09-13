@@ -35,6 +35,7 @@ if [ -f "$CREDS" ]; then
   echo "==> Carregando credenciais de infra/lab-credentials.env"
   # Aceita com ou sem 'export', e ignora comentários e o [default] do formato INI.
   while IFS= read -r linha; do
+    linha="${linha%$'\r'}"   # colagem vinda do Windows traz CR e quebraria o token
     linha="${linha#export }"
     case "$linha" in
       \#*|\[*|'') continue ;;

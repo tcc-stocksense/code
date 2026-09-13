@@ -56,46 +56,52 @@ Descobrir na véspera da defesa custa a defesa.
 
 ---
 
-## Estado atual (auditado em 2026-09-12)
+## Estado atual (auditado em 2026-09-13)
 
-Auditado contra o código e o `git log`, não contra a documentação. A auditoria anterior
-(2026-08-30) errava em quatro pontos, corrigidos abaixo — a trilha B tinha fechado e este
-arquivo não sabia.
+Auditado contra o código, o `git log` e os recursos que existem de fato na AWS.
+**O sistema está no ar** desde 2026-09-13 em `http://107.20.236.251`.
 
 | Item | Estado |
 |---|---|
 | `infra/infraestrutura-nuvem.md` | ✅ commit `eb147c6` |
-| `infra/terraform/*.tf` | ✅ commit `4a479d5`, **adaptado ao Learner Lab** em 2026-09-12 — `terraform validate` passa, **nunca aplicado** |
+| `infra/terraform/*.tf` | ✅ adaptado ao Learner Lab e **aplicado** — 15 de 16 recursos (ver D-24) |
 | `Caddyfile` | ✅ commit `fabf7b3` |
 | `docker-compose.prod.yml` | ✅ commit `fabf7b3` |
-| Scripts de deploy (`infra/scripts/`) | ✅ **novos** — 01 a 05 + `backup.sh`, ver [`scripts/README.md`](./scripts/README.md) |
-| Correções da Parte 8 | ✅ **6 de 8** (D-09, D-10, D-11, D-12, D-13, D-15) · D-14 aguarda medição · 1 descartada (D-16) |
-| Integração do frontend (`tasks-integracao.md`) | ✅ **10 de 11** — mergeada na `main` (PR #10). Falta só a I-11 (fumaça no navegador) |
-| Recursos na AWS | ❌ **nenhum existe** — nunca houve `terraform apply` |
+| Scripts de deploy (`infra/scripts/`) | ✅ 01 a 05 + `backup.sh` + `medir-memoria.sh` — **todos executados com sucesso**, exceto o `backup.sh` |
+| Correções da Parte 8 | ✅ **6 de 8** (D-09, D-10, D-11, D-12, D-13, D-15) · D-14 destravado, ver nota · 1 descartada (D-16) |
+| Integração do frontend (`tasks-integracao.md`) | ✅ **10 de 11** — falta a I-11, agora executável contra a URL de produção |
+| **Recursos na AWS** | ✅ **EC2 `i-01fb1975491b85fb1` (t3.medium) rodando**, EIP `107.20.236.251`, VPC, SG, bucket S3 |
+| **Aplicação em produção** | ✅ 5 containers `healthy`; fumaça completa passou (D-33) |
 | `ml-service/analysis/` (núcleo acadêmico da T10) | ✅ versionado na branch `analise-validacao-modelos` — **não mergeada** |
-| Benchmark do motor (T-54) | ✅ executado em 2026-08-30 — `docs/benchmark-motor.md` |
-| Pin `cmdstanpy==1.2.4` (T-12) | ✅ na branch de deploy (D-46), validado na imagem no D-04 — ainda ausente na `main` |
+| Benchmark do motor (T-54) | ✅ 2026-08-30 — `docs/benchmark-motor.md`; confirmado na t3.medium no D-35 |
+| Pin `cmdstanpy==1.2.4` (T-12) | ✅ **validado na EC2** — Prophet MAPE 14,18% × HW 55,74% no D-33. Ainda ausente na `main` |
 
-**Escrito ≠ executado.** O Terraform tem `terraform init` rodado (o `.terraform.lock.hcl` está
-versionado) e `validate` passando, mas nunca passou por `plan` nem `apply`. Nenhum dólar de
-crédito foi gasto até aqui.
+**O que falta para o TCC não é mais infraestrutura.** O caminho crítico do deploy fechou:
+D-21 → D-33 concluídos. O que resta são HTTPS (D-18/D-26/D-32, adiados de propósito), o backup
+(D-36…D-39, bloqueado pela SCP do lab) e os números de evidência (D-34, D-42, D-44, D-45), mais
+as medições que exigem catálogo real de ~312 SKUs (D-07, D-35, D-43).
 
-### Restrições do AWS Academy Learner Lab (confirmado em 2026-09-12)
+### Restrições do AWS Academy Learner Lab (atualizado em 2026-09-13)
 
-A conta é **Learner Lab**, não uma conta AWS comum — o que o §7 deste projeto assumia. Quatro
-consequências que mudam tasks:
+A conta é **Learner Lab**, não uma conta AWS comum — o que o §7 deste projeto assumia. **Cinco**
+consequências, a última descoberta durante o apply:
 
 | Restrição | Efeito |
 |---|---|
-| `iam:CreateRole` negado | O `backup.tf` **não cria mais role/policy/instance profile**. Usa a `LabRole` pronta do lab, por `var.instance_profile_name`. Perde-se o privilégio mínimo de `s3:PutObject` — limitação de ambiente, registrar no §10.2 |
-| `budgets:*` negado | **D-23 não aplicável.** O controle de gasto passa a ser o painel do próprio lab |
+| `iam:CreateRole` negado | O `backup.tf` **não cria role/policy/instance profile**. Usa a `LabRole` pronta (`var.instance_profile_name = "LabInstanceProfile"`, confirmado no console). Perde-se o privilégio mínimo de `s3:PutObject` — registrar no §10.2 |
+| `budgets:*` negado | **D-23 não aplicável.** O controle de gasto é o painel do próprio lab |
+| `s3:GetBucketObjectLockConfiguration` negado por SCP | **Descoberto no apply (D-24).** Aborta a criação do bucket depois de criá-lo, deixando de fora bloqueio público, criptografia e **lifecycle**. Faz qualquer apply futuro falhar no mesmo ponto. Bloqueia o D-37 |
 | Credenciais temporárias | Expiram em ~3–4h e exigem `AWS_SESSION_TOKEN`. Recolar em `infra/lab-credentials.env` a cada sessão |
-| Sessão do lab encerra | O lab **para as instâncias** ao fim da sessão. O Elastic IP e o EBS persistem; os containers voltam pelo `restart: unless-stopped`. "No ar 24/7" não existe neste ambiente |
+| Sessão do lab encerra | O lab **para as instâncias** ao fim da sessão. O EIP e o EBS persistem; os containers voltam pelo `restart: unless-stopped`. "No ar 24/7" não existe neste ambiente |
 
-⚠️ **A confirmar no primeiro apply:** se a `t3.medium` está entre os tipos permitidos. Alguns
-labs limitam o tamanho da instância, e cair para `t3.small` (2 GB) **não cabe** no orçamento de
-memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) deixa de ser opcional.
+✅ **`t3.medium` É permitida** — confirmado no apply de 2026-09-13. O plano B do D-08 (eliminar o
+container nginx para caber numa `t3.small`) **não foi necessário** e volta a ser opcional.
 
+⚠️ **Credencial seedada exposta.** Com o sistema publicado, o `admin@stocksense.local` / `admin123`
+da migration `V2` está alcançável pela internet, e o hash está num repositório **público**. O D-16
+descartou trocá-la assumindo que "a URL é conhecida por três pessoas e a instância fica desligada
+por padrão" — a primeira premissa caiu. Mitigação: manter a instância desligada fora das
+demonstrações (§7.1, que também economiza crédito) ou trocar a senha por `UPDATE` no banco.
 ---
 
 ## Épico D0 — Ensaio local do stack de produção `Trilha A`
@@ -435,7 +441,10 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   2 GB e AWS CLI.
   Commit `4a479d5`. **`terraform init` rodado; `plan` e `apply`, nunca.**
 
-- [ ] **D-21 — `terraform.tfvars`** `A`
+- [x] **D-21 — `terraform.tfvars`** `A`
+  ✅ **Feito em 2026-09-13**, gerado pelo `02-provisionar.sh`. `dev_ip` resolvido por
+  `checkip.amazonaws.com` e `instance_profile_name = "LabInstanceProfile"`, confirmado no
+  console (IAM → Roles → LabRole → "Instance profile ARNs").
   📌 **Automatizado em 2026-09-12** no [`02-provisionar.sh`](../scripts/02-provisionar.sh):
   ele resolve o `dev_ip` por `curl checkip.amazonaws.com` a cada execução (o IP
   residencial muda) e preserva o resto do arquivo. Acrescenta `instance_profile_name`,
@@ -445,7 +454,10 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   ⚠️ IP residencial muda. Se o SSH parar de conectar depois de um tempo, é isto — reaplicar com o
   IP novo.
 
-- [ ] **D-22 — `terraform plan` revisado** `A`
+- [x] **D-22 — `terraform plan` revisado** `A`
+  ✅ **Feito em 2026-09-13.** 16 recursos planejados; as quatro conferências passaram:
+  nenhum NAT Gateway, exatamente 1 Elastic IP, SG sem 8080/8000/3306 e nenhuma role IAM
+  sendo criada. `instance_type = "t3.medium"` confirmado no plano.
   Ler o plano inteiro antes de aplicar. Conferir explicitamente: **nenhum `aws_nat_gateway`**
   (~US$ 32/mês, um terço do crédito — §4.2), um único Elastic IP, e o `SG-web` sem regra para
   8080/8000/3306.
@@ -462,12 +474,46 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   Escrever antes do `apply` para entrar na mesma execução.
   _Depende de: D-22_
 
-- [ ] **D-24 — `terraform apply`** `A`
+- [~] **D-24 — `terraform apply`** `A` `15 de 16 — S3 bloqueado pela SCP`
+  🔶 **Aplicado em 2026-09-13, com uma falha parcial.** 15 dos 16 recursos criados:
+
+  | Recurso | Id |
+  |---|---|
+  | EC2 `t3.medium` | `i-01fb1975491b85fb1` |
+  | Elastic IP | `107.20.236.251` |
+  | VPC | `vpc-028883f4797082259` |
+  | Security group | `sg-0d1a8c54d9a4d292d` |
+  | Bucket S3 | `stocksense-backup-6a9ff8eb` |
+
+  ✅ **`t3.medium` é permitida no Learner Lab** — era a maior incógnita do backlog, e o
+  plano B do D-08 não precisou ser acionado.
+
+  ⛔ **QUARTA restrição do Learner Lab, descoberta aqui.** O apply abortou em
+  `aws_s3_bucket.backup`: uma *service control policy* da organização
+  (`p-gi77lu0b`) nega `s3:GetBucketObjectLockConfiguration`, que o provider AWS lê
+  automaticamente logo após criar o bucket. O bucket **foi criado e está no state**, mas os
+  três recursos seguintes não chegaram a ser aplicados:
+  `aws_s3_bucket_public_access_block`, `aws_s3_bucket_server_side_encryption_configuration`
+  e `aws_s3_bucket_lifecycle_configuration`.
+  Impacto: baixo hoje — a AWS aplica bloqueio de acesso público e SSE-S3 por padrão em
+  buckets novos desde 2023. O que se perde de fato é o **lifecycle de 30 dias**, então
+  dumps antigos não expiram sozinhos. Bloqueia o D-37 até ser resolvido.
+  ⚠️ **Consequência operacional:** enquanto esses recursos estiverem na configuração,
+  qualquer `terraform apply` futuro volta a falhar no mesmo ponto. Resolver antes do
+  próximo apply — removê-los do `.tf` e configurar o bucket pelo console, ou aceitar os
+  padrões e documentar no §10.2.
   Guardar os outputs: `ip_publico`, `instance_id`, `bucket_backup`, `comando_ssh`. O
   `bucket_backup` tem sufixo aleatório (`random_id`) — o script do D-36 precisa desse nome.
   _Depende de: D-22, D-23_
 
-- [ ] **D-25 — Proteger o `.tfstate` e o `.pem`** `A` ⚠️
+- [x] **D-25 — Proteger o `.tfstate` e o `.pem`** `A` ⚠️
+  ✅ **Feito em 2026-09-13.** Cópia em `tcc-stocksense/segredos-infra/` — **fora do
+  repositório**, com `terraform.tfstate`, `stocksense-key.pem`, `outputs.env` e um
+  `LEIA-ME.txt` que registra os ids dos recursos (para achar tudo no console caso o state
+  se perca mesmo assim).
+  **Por que fora e não em `infra/`:** os dois são gitignorados, e é justamente isso que os
+  torna vulneráveis — `git clean -xdf` apaga arquivos ignorados e levaria original e cópia
+  juntos. Falta ainda uma cópia fora desta máquina (Drive/pendrive), que é do usuário.
   O state fica **local** e guarda a **chave SSH privada em texto claro**; o
   `stocksense-key.pem` é gravado ao lado. Ambos são gitignorados — e é justamente por isso que
   perder a pasta significa perder o controle da infra (sem SSH, sem `destroy` limpo). Fazer cópia
@@ -475,12 +521,19 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   "certo", mas é overkill para um projeto de uma pessoa.
   _Depende de: D-24_
 
-- [ ] **D-26 — Apontar o DNS** `A`
+- [~] **D-26 — Apontar o DNS** `A` `adiada com a D-18`
+  ⏸️ **Adiada junto com o D-18 (2026-09-13).** O sistema subiu em HTTP puro no Elastic IP
+  `107.20.236.251`, então não há DNS a apontar ainda. Quando houver nome, é aqui que ele
+  aponta — e o `nslookup` tem de confirmar **antes** do D-32, por causa do rate limit do ACME.
   Cadastrar o subdomínio escolhido no D-18 apontando para o `ip_publico`. Confirmar com
   `nslookup` **antes** de subir o Caddy com TLS.
   _Depende de: D-18, D-24_
 
-- [ ] **D-27 — Confirmar o bootstrap** `A`
+- [x] **D-27 — Confirmar o bootstrap** `A`
+  ✅ **Feito em 2026-09-13**, dentro do `03-enviar.sh`. Sentinela
+  `/var/log/stocksense-bootstrap-done` presente; Docker **29.1.3** e compose **2.40.3**
+  (bem mais novos que os 24.0.7 da máquina de desenvolvimento, sem consequência prática);
+  **swap de 2,0 GiB ativo**, conforme o §6.1 exige.
   Entrar por SSH (~3 min após o `apply`) e verificar:
   `ls /var/log/stocksense-bootstrap-done`, `free -h` (2 GB de swap ativos), `docker --version`,
   `docker compose version`, `aws --version`. Se o arquivo-sentinela não existir, o `user_data`
@@ -490,20 +543,33 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
 ---
 
 ## Épico D4 — Subir a aplicação na EC2 `Trilha A`
-- [ ] **D-28 — Levar o código/imagens para a instância** `A`
+- [x] **D-28 — Levar o código/imagens para a instância** `A`
+  ✅ **Feito em 2026-09-13** pelo `03-enviar.sh`, executando a opção (c) do D-17. Eixo (2):
+  `git clone` da branch na VM, commit `3bc38ee` — o mesmo da máquina local, então o
+  `Caddyfile`, o `docker-compose.prod.yml` e o `frontend/web` montados são exatamente os
+  testados no ensaio do D-04. Eixo (1): 350 MB transferidos e `docker load` sem erro.
   Executar o que o D-17 decidiu. Se confirmada a opção (c): **passos 2, 3 e 5** do
   [`docs/deploy-runbook.md`](docs/deploy-runbook.md) — empacotar (`docker save | gzip`), `git clone`
   na VM para os arquivos de bind mount, e `docker load` via SSH.
   _Depende de: D-17, D-27_
   _Depende de: D-17, D-27_
 
-- [ ] **D-29 — `.env` de produção na VM** `A`
+- [x] **D-29 — `.env` de produção na VM** `A`
+  ✅ **Feito em 2026-09-13** pelo `04-subir.sh`. Segredos gerados na própria instância com
+  `openssl rand`, nunca reaproveitados do ensaio local, `chmod 600`. O script só cria o
+  arquivo se ele não existir — a lição do D-04: o MySQL aplica `MYSQL_USER`/`MYSQL_PASSWORD`
+  apenas na primeira inicialização do volume, então regerar depois quebraria a autenticação
+  do backend sem aparecer em log nenhum.
   As quatro variáveis com **valores novos e fortes** (`JWT_SECRET` com 32+ bytes aleatórios),
   `SITE_ADDRESS` com o domínio do D-18, `chmod 600`. **Nunca versionado, nunca reaproveitado do
   ensaio local.**
   _Depende de: D-26, D-28_
 
-- [ ] **D-30 — Build, uma imagem por vez** `A`
+- [x] **D-30 — Build, uma imagem por vez** `A`
+  ✅ **Resolvida sem existir, em 2026-09-13 — como o D-17 previu.** Com a opção (c) o build
+  aconteceu na máquina local e a t3.medium recebeu imagens prontas. **A instância não
+  compilou nada**, então o risco do §9.3 (Gradle estourando os 4 GB) nunca teve chance de
+  se materializar. Na VM sobrou `docker load` (D-28) e `up -d --no-build` (D-31).
   Se o D-17 escolheu build na VM: `build ml-service`, **depois** `build backend` — em paralelo
   estoura os 4 GB (§9.3). Se escolheu registry: `docker compose pull`.
   📌 **Com a opção (c) recomendada, esta task some da instância:** o build acontece na máquina local
@@ -512,12 +578,23 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   ganho da decisão — o §9.3 deixa de ser risco de deploy.
   _Depende de: D-28_
 
-- [ ] **D-31 — `up -d` e healthchecks internos** `A`
+- [x] **D-31 — `up -d` e healthchecks internos** `A`
+  ✅ **Feito em 2026-09-13.** Cinco containers `running`; `db`, `ml-service` e `backend`
+  `healthy` em ~34s. Healthchecks por dentro (§9.6): backend devolve `{"status":"UP"}` e o
+  ml-service `{"status":"ok","service":"ml-service","version":"1.0.0"}` pela rede interna.
+  **R6 provado na nuvem:** `docker port` volta vazio para `db`, `ml-service` e `backend` —
+  só o Caddy publica portas. `GET http://107.20.236.251/` → 200.
   Subir, conferir `ps` (todos `running`, `db` e `ml-service` `healthy`) e bater nos healthchecks
   por dentro (§9.6). O `/actuator/health` do backend só existe depois do D-12.
   _Depende de: D-29, D-30_
 
-- [ ] **D-32 — Certificado TLS emitido** `A`
+- [~] **D-32 — Certificado TLS emitido** `A` `adiada com a D-18`
+  ⏸️ **Adiada junto com o D-18 (2026-09-13).** O `04-subir.sh` subiu com `SITE_ADDRESS=:80`,
+  o modo HTTP puro do `Caddyfile:18` — o Let's Encrypt não emite certificado para endereço
+  IP (§5). Quando houver domínio: `infra/scripts/04-subir.sh <dominio>` troca o
+  `SITE_ADDRESS` e reinicia o Caddy, sem recriar nada na AWS.
+  ⚠️ **Obrigatória antes da defesa.** Sem HTTPS o JWT trafega em claro (§1.7), o navegador
+  mostra "Não seguro" e o D-45 pede o cadeado nas capturas.
   `https://<domínio>` com cadeado válido, e `http://` redirecionando sozinho.
   ⚠️ **Rate limit do Let's Encrypt: 5 falhas por hora por hostname.** Se o DNS não estava propagado
   no primeiro `up`, o ACME falha; repetir às cegas queima a cota e você fica uma hora sem conseguir
@@ -531,7 +608,16 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
 
 > **É aqui que as duas trilhas se encontram.** Antes do `tasks-integracao.md` fechar, só o D-33 roda.
 
-- [ ] **D-33 — Fumaça pela API** `A`
+- [x] **D-33 — Fumaça pela API** `A`
+  ✅ **Feito em 2026-09-13** pelo `05-fumaca.sh`, contra a URL de produção. Login ok;
+  importação de **10 produtos** e **1.690 linhas de vendas / 180 dias**, zero erros; motor
+  com **10/10 processados e 0 falhas**; `/dashboard`, `/alertas`, `/curva-abc`, `/produtos`,
+  `/produtos/1/detalhe` e `/produtos/1/metricas` todos **200**.
+  🎯 **O que mais importa para o TCC:** as métricas da T10 vieram reais da EC2 — Prophet
+  **MAPE 14,18%** (`selecionado: true`) contra Holt-Winters **55,74%**. O pin do
+  `cmdstanpy==1.2.4` (D-46) atravessou o `docker save`/`load` intacto, então **a comparação
+  de modelos na nuvem é válida** e não um fallback silencioso para Holt-Winters.
+  **Valida a trilha A inteira sem depender do frontend.**
   Rodar a coleção `docs/postman/StockSense_E2E.postman_collection.json` contra a URL de produção:
   login → `POST /api/importacao/produtos` → `/vendas` → `POST /api/motor/recalcular` → conferir
   dashboard, alertas, curva ABC e métricas. **Valida a trilha A inteira sem depender do frontend.**
@@ -544,7 +630,21 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   `tasks-integracao.md` avisa que todo campo calculado vem `null` até o primeiro recálculo.
   _Depende de: D-33, D-11, `tasks-integracao.md` I-11_
 
-- [ ] **D-35 — Cronometrar o lote real** `A`
+- [~] **D-35 — Cronometrar o lote real** `A` `parcial: 10 SKUs`
+  🔶 **Medido em 2026-09-13, mas com catálogo pequeno.** `POST /api/motor/recalcular` levou
+  **5 s para 10 produtos = 0,50 s/produto** na t3.medium. Comparação das três medições:
+
+  | Ambiente | s/produto |
+  |---|---|
+  | Desktop 12 CPUs, fora do Docker (D-41) | 0,42–0,53 |
+  | Docker local, 3,95 GB (2026-09-12) | 0,40 |
+  | **t3.medium, produção** | **0,50** |
+
+  A instância pequena fica **dentro da mesma faixa** do desktop. Projeção para 312 SKUs:
+  **~2,6 min**, coerente com os ~2,8 min do D-41 e muito abaixo dos **5 a 25 min do R1** —
+  que sai definitivamente da lista de riscos.
+  ⚠️ **Segue `[~]`:** 10 produtos não exercitam pressão de memória nem consumo de crédito de
+  CPU como 312 exercitariam. O tempo por produto é sólido; o tempo total do lote real, não.
   Medir `POST /api/motor/recalcular` com o catálogo completo na t3.medium. É o número que confirma
   (ou derruba) a estimativa de 5–25 min do R1, e ele vai para a metodologia do TCC.
   _Depende de: D-33_
@@ -568,7 +668,10 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   access key no disco.**
   _Depende de: D-24_
 
-- [ ] **D-37 — Agendar o backup** `A`
+- [ ] **D-37 — Agendar o backup** `A` `BLOQUEADA pela SCP do lab`
+  ⛔ **Bloqueada desde 2026-09-13 pela SCP do lab.** O bucket existe, mas sem o
+  `lifecycle_configuration` (ver D-24), então dumps antigos não expirariam. Resolver a
+  pendência do D-24 antes desta.
   Instalar em `/etc/cron.daily/`. Confirmar que o objeto aparece no S3 no dia seguinte.
   _Depende de: D-36, D-31_
 
@@ -608,7 +711,22 @@ memória de 3,9 GB do §6.1 — nesse caso o D-08 (eliminar o container nginx) d
   (§6.2). Gráfico do CloudWatch durante o D-35.
   _Depende de: D-35_
 
-- [ ] **D-43 — Memória real sob carga** `A`
+- [~] **D-43 — Memória real sob carga** `A` `parcial: 10 SKUs`
+  🔶 **Primeira medição na instância, 2026-09-13**, logo após o lote do D-33:
+
+  | Container | Uso | Limite | % |
+  |---|---|---|---|
+  | `db` | 420,9 MiB | 600 MiB | **70,2%** |
+  | `backend` | 309,6 MiB | 1 GiB | 30,2% |
+  | `ml-service` | 296,1 MiB | 1,758 GiB | 16,5% |
+  | `caddy` + `frontend` | 17,6 MiB | — | — |
+
+  Instância: **1,6 GiB usados de 3,7 GiB**, 2,2 GiB disponíveis. **Swap praticamente
+  intocado — 76 KiB de 2,0 GiB.** Disco em 30% dos 29 GB.
+  Os números batem com o ensaio local do D-07, o que valida o orçamento do §6.1 e confirma
+  o `db` como o container mais apertado.
+  ⚠️ **Segue `[~]` pelo mesmo motivo do D-35 e do D-07:** com 10 produtos não houve carga.
+  Fecha de verdade com catálogo de ~312 SKUs.
   `docker stats` e `free -h` durante o lote, na instância. Confronto com o orçamento de 3,9 GB do
   §6.1 e verificação de quanto swap foi realmente tocado.
   _Depende de: D-35_

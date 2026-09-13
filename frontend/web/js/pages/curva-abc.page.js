@@ -11,15 +11,22 @@ requireAuth();
 const page = renderLayout('curva-abc');
 
 let chartInstance = null;
+let periodoAtual = '30';
 
-// O filtro de período do protótipo foi removido: GET /api/curva-abc não aceita
-// `?periodo=` — o backend classifica sobre todo o histórico importado.
+// Atenção: GET /api/curva-abc ainda não lê `?periodo=` (pendência P-02 do backlog).
+// O filtro segue na tela; enquanto o backend não implementar o recorte, todas as
+// opções devolvem a classificação sobre todo o histórico importado.
 page.innerHTML = `
   <div class="page-header">
     <div>
       <h1 class="page-title">Classificação ABC dos produtos</h1>
       <p class="page-subtitle">Quais produtos respondem pela maior parte do seu faturamento</p>
     </div>
+    <select class="select" id="filtro-periodo" style="width:200px" title="O backend ainda não aplica o recorte de período (P-02)">
+      <option value="30">Últimos 30 dias</option>
+      <option value="60">Últimos 60 dias</option>
+      <option value="90">Últimos 90 dias</option>
+    </select>
   </div>
   <div id="abc-content"></div>
 `;
@@ -29,12 +36,17 @@ content.appendChild(skeletonChart());
 content.appendChild(skeletonKpiGrid(3));
 content.appendChild(skeletonTable(10, 5));
 
+document.getElementById('filtro-periodo').addEventListener('change', (e) => {
+  periodoAtual = e.target.value;
+  carregarABC();
+});
+
 async function carregarABC() {
   content.innerHTML = '';
   content.appendChild(skeletonChart());
 
   try {
-    const dados = await apiGet('/curva-abc');
+    const dados = await apiGet(`/curva-abc?periodo=${periodoAtual}`);
     const itens = dados?.itens ?? [];
 
     if (itens.length === 0) {

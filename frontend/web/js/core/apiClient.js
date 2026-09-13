@@ -115,6 +115,8 @@ function adaptarDetalhe(p) {
     semaforo: semaforoPorPR(estoque, pontoReposicao),
     semCalculo: pontoReposicao == null,
     semPrevisao: previsoes.length === 0,
+    // Ainda não existe no ProdutoDetalheResponse; preservado para quando existir.
+    vendasSemana: p.vendasSemana ?? null,
   };
 }
 
@@ -130,6 +132,8 @@ function adaptarAlerta(a) {
     diasRuptura: num(a.diasAteRuptura ?? a.diasRuptura),
     leadTime: num(a.leadTimeMedio ?? a.leadTime),
     semaforo: traduzSemaforo(a.semaforo) ?? semaforoPorPR(estoque, pontoReposicao),
+    // Ainda não existe no AlertaResponse; preservado para quando existir.
+    fornecedor: a.fornecedor ?? null,
   };
 }
 
@@ -144,6 +148,11 @@ function adaptarDashboard(d) {
       semana: s.semana,
       total: num(s.total) ?? 0,
     })),
+    // Campos que o DashboardResponse ainda não traz. Mantidos aqui para que as
+    // telas continuem exibindo os elementos correspondentes em estado vazio,
+    // e para que passem a funcionar sozinhas quando a API começar a enviá-los.
+    valorEmRisco: num(d.valorEmRisco),
+    projecao: d.projecaoFaturamento ?? d.projecao ?? [],
   };
 }
 
@@ -298,7 +307,25 @@ async function requestGet(path) {
   return normalizarResposta(path, 'GET', data);
 }
 
+/**
+ * `/importacao` é a rota genérica das telas: o destino real sai do campo `tipo`
+ * do FormData. Produtos e vendas têm endpoint; as planilhas desejáveis ainda não
+ * — para essas devolvemos `ignorado: true` em vez de fingir que o envio ocorreu.
+ */
+function rotaImportacaoBackend(formData) {
+  const tipo = String(formData.get('tipo') || '').toLowerCase();
+  if (tipo === 'produtos') return '/importacao/produtos';
+  if (tipo === 'vendas') return '/importacao/vendas';
+  return null;
+}
+
 async function requestUpload(path, formData) {
+  if (path === '/importacao') {
+    const destino = rotaImportacaoBackend(formData);
+    if (!destino) return { ignorado: true, importados: 0, totalLinhas: 0, erros: [], avisos: [] };
+    return requestUpload(destino, formData);
+  }
+
   const headers = {};
   const token = sessionStorage.getItem('stocksense_token');
   if (token) {

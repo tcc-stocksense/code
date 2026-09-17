@@ -4,7 +4,7 @@ import { renderLayout } from '../components/layout.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonTable } from '../components/skeleton.js';
-import { numero } from '../core/format.js';
+import { numero, esc } from '../core/format.js';
 import { iconCheck } from '../components/icons.js';
 
 requireAuth();
@@ -41,22 +41,35 @@ function calcularSugestao(alerta, estoqueSeguranca) {
 
 async function carregarAlertas() {
   try {
-    const [alertas, produtos] = await Promise.all([
+    const [resposta, produtos] = await Promise.all([
       apiGet('/alertas'),
       apiGet('/produtos'),
     ]);
 
+    // GET /api/alertas devolve todo produto que tem ponto de reposição — inclusive
+    // os VERDES, que não precisam ser pedidos. O nome da tela é "produtos para pedir
+    // agora", então o verde não entra. Filtramos aqui para não mexer no contrato;
+    // se o time preferir filtrar no AlertaService, este filtro vira redundante e
+    // pode sair (ver B-02 em docs/pendencias-integracao.md).
+    const todos = resposta || [];
+    const alertas = todos.filter(a => a.semaforo !== 'ok');
+    const saudaveis = todos.length - alertas.length;
+
     container.innerHTML = '';
 
-    if (!alertas || alertas.length === 0) {
+    if (alertas.length === 0) {
       const semCalculo = (produtos || []).filter(p => p.semCalculo).length;
       document.getElementById('subtitle').textContent = '';
+
+      // Três estados vazios diferentes: motor nunca rodou, rodou e está tudo em dia,
+      // ou rodou mas parte do catálogo ficou de fora.
+      const nuncaCalculou = todos.length === 0 && semCalculo > 0;
       container.appendChild(emptyState({
-        titulo: semCalculo > 0 ? 'Nenhum alerta calculado' : 'Nenhum produto em risco',
-        msg: semCalculo > 0
+        titulo: nuncaCalculou ? 'Nenhum alerta calculado' : 'Nenhum produto em risco',
+        msg: nuncaCalculou
           ? `${semCalculo} produtos ainda estão sem ponto de reposição — rode o motor preditivo para gerar os alertas.`
-          : 'Seu estoque está em dia. Nenhum produto precisa ser pedido agora.',
-        acao: semCalculo > 0 ? { label: 'Ir para Importar', href: 'importar.html' } : undefined,
+          : `Seu estoque está em dia: ${saudaveis} ${saudaveis === 1 ? 'produto está' : 'produtos estão'} acima do ponto de reposição.`,
+        acao: nuncaCalculou ? { label: 'Ir para Importar', href: 'importar.html' } : undefined,
       }));
       return;
     }
@@ -68,8 +81,10 @@ async function carregarAlertas() {
       || (a.diasRuptura ?? 1e9) - (b.diasRuptura ?? 1e9));
 
     const criticos = alertas.filter(a => a.semaforo === 'critico').length;
-    document.getElementById('subtitle').textContent =
-      `${criticos} ${criticos === 1 ? 'produto está' : 'produtos estão'} no ou abaixo do ponto de reposição · ${alertas.length} no total`;
+    const partes = [`${criticos} ${criticos === 1 ? 'produto está' : 'produtos estão'} no ou abaixo do ponto de reposição`];
+    partes.push(`${alertas.length} ${alertas.length === 1 ? 'precisa' : 'precisam'} de atenção`);
+    if (saudaveis > 0) partes.push(`${saudaveis} em dia (fora da lista)`);
+    document.getElementById('subtitle').textContent = partes.join(' · ');
 
     // Produtos sem cálculo ficam fora da lista de alertas — avisar explicitamente.
     const semCalculo = (produtos || []).filter(p => p.semCalculo).length;
@@ -101,8 +116,8 @@ async function carregarAlertas() {
       // Info do produto
       const info = document.createElement('div');
       info.innerHTML = `
-        <div style="font-weight:500; margin-bottom:2px">${a.nome}</div>
-        <div class="text-meta">${ref?.categoria || ''}${ref?.categoria ? ' · ' : ''}estoque atual ${a.estoque} ${un} · ponto de reposição ${numero(a.pontoReposicao ?? 0, 1)} ${un}</div>
+        <div style="font-weight:500; margin-bottom:2px">${esc(a.nome)}</div>
+        <div class="text-meta">${esc(ref?.categoria || '')}${ref?.categoria ? ' · ' : ''}estoque atual ${a.estoque} ${esc(un)} · ponto de reposição ${numero(a.pontoReposicao ?? 0, 1)} ${esc(un)}</div>
       `;
 
       // Urgência
@@ -120,10 +135,11 @@ async function carregarAlertas() {
       // Sugestão
       const sugestaoEl = document.createElement('div');
       sugestaoEl.style.textAlign = 'right';
+      // `fornecedor` ainda não vem no AlertaResponse — a linha fica vazia até vir.
       sugestaoEl.innerHTML = sugestao != null
-        ? `<div style="font-size:16px; font-weight:500; color:var(--cor-primaria)">Pedir ${sugestao} ${un}</div>
-           <div class="text-meta">até o ponto de reposição + segurança</div>`
-        : `<div class="text-meta">sem sugestão</div>`;
+        ? `<div style="font-size:16px; font-weight:500; color:var(--cor-primaria)">Pedir ${sugestao} ${esc(un)}</div>
+           <div class="text-meta">${esc(a.fornecedor || 'até o ponto de reposição + segurança')}</div>`
+        : `<div class="text-meta">${esc(a.fornecedor || 'sem sugestão')}</div>`;
 
       // Botão detalhe
       const btnDetalhe = document.createElement('a');

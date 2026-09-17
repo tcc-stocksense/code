@@ -13,7 +13,7 @@ lado do cliente, reconciliando as telas com o contrato que o backend já publica
 | | Antes | Depois |
 |---|---|---|
 | Endpoints do backend ligados | 9 de 11 | **11 de 11** |
-| Telas servindo mock sem avisar | 4 | **0** |
+| Telas servindo mock sem avisar | 4 | **0** (Configurações foi a última, corrigida em 13/09 — ver B-04) |
 | Fallback silencioso para dados fictícios | sim | **não** |
 
 ---
@@ -106,16 +106,31 @@ dispara um banner contando quantos produtos estão nessa situação.
 | **Comparativo (T10)** | Reescrita sobre `/produtos/{id}/metricas`. Mostra cobertura ("N de M produtos têm métricas"). |
 | **Importar (T3)** | Dois uploads separados, **na ordem** (Vendas fica bloqueada até Produtos ter sucesso), só `.xlsx`. Exibe `importados / totalLinhas`, `diasDeHistorico`, `erros[]` por linha e `avisos[]`. Motor síncrono com aviso de espera e resumo do recálculo. |
 
-### 1.5 Removido por não existir no contrato
+### 1.5 Mantido na tela, sem dado no backend
 
-| Item | Tela | Motivo |
-|---|---|---|
-| Card "Valor em risco" | Home | Sem campo no `DashboardResponse` e sem regra de cálculo definida |
-| Filtro de período `?periodo=` | Curva ABC | O endpoint aceitava o parâmetro e o ignorava — o filtro era decorativo |
-| Coluna "Fornecedor" | Alertas | Sem campo no `AlertaResponse` |
-| Planilhas desejáveis (estabelecimento, fornecedores, produto × fornecedor) | Importar | Sem endpoint de importação |
-| Projeção de 4 semanas no gráfico | Home | `seriesFaturamento` é só histórico |
-| Tabela "vendas por semana" | Detalhe | Sem campo no `ProdutoDetalheResponse` |
+Elementos que o protótipo já tinha e que **continuam na interface**, em estado vazio,
+porque a API ainda não fornece o dado. Nenhum foi apagado: cada um volta a funcionar
+sozinho no dia em que o campo correspondente aparecer no response.
+
+| Item | Tela | O que falta na API | Como se comporta hoje |
+|---|---|---|---|
+| Card "Valor em risco" | Home | Campo no `DashboardResponse` e a regra de cálculo (coef. ABRAS) | Exibe `—` com "aguardando confirmação da regra" |
+| Projeção de 4 semanas no gráfico | Home | Série projetada (`seriesFaturamento` é só histórico) | Gráfico desenha só a linha do histórico |
+| Filtro de período `?periodo=` | Curva ABC | O endpoint recebe o parâmetro e ignora (P-02) | Select funciona; todas as opções devolvem o mesmo ranking |
+| Coluna "Fornecedor" | Alertas | Campo no `AlertaResponse` | Linha mostra a origem da sugestão no lugar do nome |
+| Tabela "vendas por semana" | Detalhe | Campo no `ProdutoDetalheResponse` | Não renderiza enquanto a série não vier |
+| Planilhas desejáveis (estabelecimento, fornecedores, produto × fornecedor) | Importar | Endpoint de importação | Blocos de upload continuam na tela; o envio é recusado com aviso claro |
+
+> O `apiClient` repassa `valorEmRisco`, `projecao`, `fornecedor` e `vendasSemana` mesmo
+> não existindo hoje — assim as telas não precisam de alteração quando o backend passar
+> a enviá-los.
+
+**Uma ressalva sobre as planilhas desejáveis.** No código anterior à integração, arrastar
+uma dessas planilhas deixava o bloco **verde de sucesso** sem que nada fosse enviado — o
+`apiClient` devolvia `{ linhas: 0, ignorado: true }` silenciosamente. Isso foi corrigido:
+o bloco agora mostra erro com a mensagem "A API ainda não recebe esta planilha — nada foi
+importado". O bloco continua ali; o que mudou foi parar de reportar sucesso de um upload
+que não aconteceu.
 
 ### 1.6 Desabilitado com aviso (não apagado)
 

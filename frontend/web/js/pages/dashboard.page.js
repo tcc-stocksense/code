@@ -7,7 +7,7 @@ import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonKpiGrid, skeletonChart, skeletonTable } from '../components/skeleton.js';
-import { dataBR, numero } from '../core/format.js';
+import { moedaBRcompacta, dataBR, numero } from '../core/format.js';
 import { iconAlert } from '../components/icons.js';
 
 requireAuth();
@@ -50,18 +50,16 @@ async function carregarDashboard() {
         ${iconAlert()}
         <div class="banner-body">
           <strong>Você tem ${dados.risco7Dias} ${dados.risco7Dias === 1 ? 'produto que precisa' : 'produtos que precisam'} ser ${dados.risco7Dias === 1 ? 'pedido' : 'pedidos'}.</strong>
-          <small>${dados.criticoAgora} no ou abaixo do ponto de reposição agora.</small>
+          <small>${dados.criticoAgora} ${dados.criticoAgora === 1 ? 'rompe' : 'rompem'} em menos de 3 dias.</small>
         </div>
         <a href="alertas.html" class="btn btn-secondary btn-sm">Ver lista</a>
       `;
       page.appendChild(banner);
     }
 
-    // KPIs — 3 cards. O card "Valor em risco" do protótipo foi removido:
-    // o backend não expõe esse número e a regra de cálculo não está definida.
+    // KPIs
     const kpiGrid = document.createElement('div');
     kpiGrid.className = 'kpi-grid';
-    kpiGrid.style.gridTemplateColumns = 'repeat(3, 1fr)';
 
     kpiGrid.appendChild(kpiCard({
       titulo: 'Risco de faltar',
@@ -71,9 +69,26 @@ async function carregarDashboard() {
     kpiGrid.appendChild(kpiCard({
       titulo: 'Crítico agora',
       valor: dados.criticoAgora ?? 0,
-      sub: 'estoque no ou abaixo do ponto de reposição',
+      // O backend conta `diasAteRuptura < 3` (DashboardService.LIMITE_CRITICO_DIAS),
+      // não estoque ≤ ponto de reposição — esse é o critério da tela de Alertas.
+      sub: 'produtos que rompem em menos de 3 dias',
       cor: 'var(--status-critico)',
     }));
+    // Valor em risco — o backend ainda não expõe esse número e a regra de cálculo
+    // (coef. ABRAS) não foi definida; o card fica no lugar, em estado "sem dado".
+    if (dados.valorEmRisco != null) {
+      kpiGrid.appendChild(kpiCard({
+        titulo: 'Valor em risco',
+        valor: moedaBRcompacta(dados.valorEmRisco),
+        sub: 'venda perdida estimada (coef. ABRAS)',
+      }));
+    } else {
+      kpiGrid.appendChild(kpiCard({
+        titulo: 'Valor em risco',
+        valor: '—',
+        sub: 'aguardando confirmação da regra',
+      }));
+    }
     kpiGrid.appendChild(kpiCard({
       titulo: 'Acurácia do modelo',
       valor: dados.acuracia != null ? numero(dados.acuracia, 1) + '%' : '—',
@@ -98,10 +113,14 @@ async function carregarDashboard() {
       `;
       page.appendChild(chartCard);
 
+      // A projeção volta a ser desenhada assim que o backend enviar a série;
+      // hoje `projecao` chega vazia e o gráfico mostra só o histórico.
       linha(document.getElementById('chart-faturamento'), {
         labels: serie.map(s => dataBR(s.semana)),
         historico: serie.map(s => s.total),
-        labelHist: 'Faturamento da semana',
+        projecao: dados.projecao || [],
+        labelHist: 'Histórico',
+        labelProj: 'Projeção',
       });
     } else {
       const vazio = document.createElement('div');
@@ -116,7 +135,8 @@ async function carregarDashboard() {
 
     // Tabela próximos alertas (top 5)
     const ORDEM = { critico: 0, atencao: 1, ok: 2 };
-    const proximos = [...(alertas || [])]
+    const proximos = (alertas || [])
+      .filter(a => a.semaforo !== 'ok')   // mesma regra da tela de Alertas (B-02)
       .sort((a, b) => (ORDEM[a.semaforo] ?? 3) - (ORDEM[b.semaforo] ?? 3)
         || (a.diasRuptura ?? 1e9) - (b.diasRuptura ?? 1e9))
       .slice(0, 5);
@@ -158,13 +178,26 @@ async function carregarDashboard() {
           : p.diasRuptura <= 0 ? 'zerado'
           : `${numero(p.diasRuptura, 1)} dias`;
 
-        tr.innerHTML += `
-          <td>${p.nome}</td>
-          <td class="tabular">${p.estoque}</td>
-          <td class="tabular">${p.pontoReposicao != null ? numero(p.pontoReposicao, 1) : '—'}</td>
-          <td class="tabular">${diasTxt}</td>
-          <td><a href="produto-detalhe.html?id=${p.id}" class="btn btn-tertiary btn-sm">Detalhe</a></td>
-        `;
+        // Mesmo motivo do B-01: nada de `innerHTML +=` depois de um appendChild.
+        const celula = (texto, className) => {
+          const td = document.createElement('td');
+          if (className) td.className = className;
+          td.textContent = texto;
+          return td;
+        };
+        tr.appendChild(celula(p.nome));
+        tr.appendChild(celula(p.estoque, 'tabular'));
+        tr.appendChild(celula(p.pontoReposicao != null ? numero(p.pontoReposicao, 1) : '—', 'tabular'));
+        tr.appendChild(celula(diasTxt, 'tabular'));
+
+        const tdAcao = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = `produto-detalhe.html?id=${p.id}`;
+        link.className = 'btn btn-tertiary btn-sm';
+        link.textContent = 'Detalhe';
+        tdAcao.appendChild(link);
+        tr.appendChild(tdAcao);
+
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);

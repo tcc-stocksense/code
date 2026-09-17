@@ -37,7 +37,7 @@ não é burocracia de checklist, é o que teria pego B-01, B-02 e B-03.
 
 ## Bloco B — Bugs encontrados na revisão
 
-### B-01 — A edição de estoque da tela Estoque (T4) está morta `CRÍTICO`
+### B-01 — A edição de estoque da tela Estoque (T4) está morta `CRÍTICO` · ✅ RESOLVIDO
 
 **Onde:** `frontend/web/js/pages/estoque.page.js:143-162`
 
@@ -73,7 +73,7 @@ resolve o M-01 (abaixo).
 
 ---
 
-### B-02 — A tela de Alertas lista o catálogo inteiro `ALTO`
+### B-02 — A tela de Alertas lista o catálogo inteiro `ALTO` · ✅ RESOLVIDO (no front)
 
 **Onde:** `backend/.../service/AlertaService.kt:39-48` + `frontend/web/js/pages/alertas.page.js:92`
 
@@ -104,7 +104,7 @@ render é `isCritico ? 'critical' : 'warning'`, tudo que não é vermelho vira a
 
 ---
 
-### B-03 — O KPI "Crítico agora" está com o rótulo errado `MÉDIO`
+### B-03 — O KPI "Crítico agora" está com o rótulo errado `MÉDIO` · ✅ RESOLVIDO
 
 **Onde:** `frontend/web/js/pages/dashboard.page.js:53` e `:73`
 
@@ -134,7 +134,7 @@ significados diferentes.
 
 ---
 
-### B-04 — A tela de Configurações finge que salvou `MÉDIO`
+### B-04 — A tela de Configurações finge que salvou `MÉDIO` · ✅ RESOLVIDO
 
 **Onde:** `frontend/web/js/pages/configuracoes.page.js:124-130`
 
@@ -167,7 +167,7 @@ um `title` explicando.
 
 ## Bloco M — Menores
 
-### M-01 — XSS via nome de produto e mensagens de importação `BAIXO`
+### M-01 — XSS via nome de produto e mensagens de importação `BAIXO` · ✅ RESOLVIDO
 
 **Onde:** `estoque.page.js:143`, `dashboard.page.js:161`, `importar.page.js:141`
 
@@ -179,7 +179,7 @@ superfície.
 É o tipo de detalhe que a banca pergunta. A correção de B-01 (trocar `innerHTML` por
 `textContent` + `appendChild`) já resolve dois dos três pontos de graça.
 
-### M-02 — Produto com ponto de reposição zero vira "sem cálculo" `BAIXO`
+### M-02 — Produto com ponto de reposição zero vira "sem cálculo" `BAIXO` · ✅ RESOLVIDO
 
 **Onde:** `frontend/web/js/core/apiClient.js:32`
 
@@ -195,7 +195,7 @@ Some-se a isso que a tela de Estoque usa dois critérios diferentes para o mesmo
 o filtro usa `p.semaforo == null` (`estoque.page.js:74`) e o banner usa `p.semCalculo`
 (`:87`), que só olha `pontoReposicao == null`. Nesse caso os dois discordam.
 
-### M-03 — CORS liberado sem restrição de ambiente `BAIXO`
+### M-03 — CORS liberado sem restrição de ambiente `BAIXO` · 📌 DECISÃO REGISTRADA
 
 **Onde:** `backend/.../config/SecurityConfig.kt:35-50`
 
@@ -278,3 +278,38 @@ O bloco **P** não precisa de ação agora: está tratado no front e documentado
 *Ao concluir um item, marcar aqui e refletir a mudança em `status-integracao.md`. Se o
 contrato mudar (caso do B-02 pelo backend), `contrato-api-frontend.md` é o que precisa ser
 atualizado primeiro — os outros documentos derivam dele.*
+
+---
+
+## Correções aplicadas — 13/09/2026
+
+Todos os itens do bloco B e do bloco M foram tratados. Só o **I-11** continua aberto,
+porque depende do ambiente de pé (backend + MySQL + ml-service).
+
+| Item | O que foi feito | Arquivos |
+|---|---|---|
+| **B-01** | A linha da tabela passou a ser montada só com `createElement`/`appendChild`. Nenhum `innerHTML +=` sobrou em `estoque.page.js` nem na tabela do dashboard. O botão do lápis volta a abrir a edição inline. | `pages/estoque.page.js`, `pages/dashboard.page.js` |
+| **B-02** | Filtro `semaforo !== 'ok'` na tela de Alertas e nos "próximos alertas" do dashboard. **Escolhida a opção do front, que não mexe no contrato** — se o time preferir filtrar no `AlertaService`, este filtro vira redundante e pode sair (o comentário no código aponta para cá). O subtítulo agora informa quantos produtos ficaram de fora por estarem em dia. | `pages/alertas.page.js`, `pages/dashboard.page.js` |
+| **B-03** | Card e banner passaram a dizer "produtos que rompem em menos de 3 dias", que é o que o `DashboardService` conta. A frase sobre ponto de reposição continua só na tela de Alertas, onde está correta. | `pages/dashboard.page.js` |
+| **B-04** | Fora do modo mock, a tela ganha um banner explicando que nada é salvo e o botão Salvar fica desabilitado com `title`. O `submit` por Enter também é barrado. Em modo mock o comportamento antigo continua. A tela **não** foi removida — os campos seguem úteis para conferir layout. | `pages/configuracoes.page.js` |
+| **M-01** | Helper `esc()` em `core/format.js`; nomes de produto e mensagens de importação escapados. Nas tabelas de Estoque e do dashboard o problema sumiu junto com o B-01, via `textContent`. | `core/format.js` + 6 telas |
+| **M-02** | A guarda virou `if (pr == null \|\| est == null)`. `PR = 0` passou a ser resultado válido (produto fica verde com qualquer estoque). O filtro "sem cálculo" da tela de Estoque passou a usar `semCalculo`, o mesmo critério do banner. | `core/apiClient.js`, `pages/estoque.page.js` |
+| **M-03** | Não alterado — é backend. Registrado aqui como decisão consciente: o CORS de dev libera `localhost:*` sem `@Profile`. Para restringir, basta anotar `SecurityConfig` com `@Profile("dev")`. | — |
+
+### Bug extra encontrado na verificação
+
+O modo mock estava salvando **0** em qualquer edição de estoque. O `mock.js` lia
+`body.estoque`, mas as telas passaram a enviar `estoqueAtual` (nome do campo no backend
+real) desde `3b5f60d`. O caminho com API real sempre esteve certo — quem quebrou foi o
+offline. `mock.js` agora aceita os dois nomes.
+
+### Como foi verificado
+
+Além da checagem de sintaxe e dos testes do adaptador, desta vez a interface foi exercitada
+**num navegador de verdade** (Chromium headless, modo mock ligado, sem backend): abrir a
+tela de Estoque, clicar no lápis, editar, salvar e conferir o valor na célula — que é
+exatamente o critério de aceite do I-11 para o B-01. Foi esse teste que pegou o bug do
+`mock.js`; nenhuma verificação estática o encontraria.
+
+O I-11 completo continua pendente: ele exige o motor preditivo rodando de verdade, e é o
+único jeito de validar B-02 e B-03 com dados reais em vez de mock.

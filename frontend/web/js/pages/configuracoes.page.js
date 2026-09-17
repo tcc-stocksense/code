@@ -1,10 +1,17 @@
 import { requireAuth } from '../core/auth.js';
+import { mockAtivo } from '../core/config.js';
 import { renderLayout } from '../components/layout.js';
 import { toast } from '../components/toast.js';
+import { esc } from '../core/format.js';
 import { iconCheck } from '../components/icons.js';
 
 requireAuth();
 const page = renderLayout('config');
+
+// B-04: não existe `PUT /api/configuracoes/*` — a T9 é Pós-MVP no contrato.
+// A tela continua navegável (os campos ajudam a validar o layout), mas fora do
+// modo mock ela não finge que salvou: avisa e desabilita o botão.
+const PERSISTE = mockAtivo();
 
 page.style.maxWidth = '760px';
 page.innerHTML = `
@@ -19,11 +26,20 @@ page.innerHTML = `
     <div class="tab" data-tab="usuario">Usuário</div>
     <div class="tab" data-tab="notif">Notificações</div>
   </div>
+  ${PERSISTE ? '' : `
+    <div class="banner banner-info" style="margin-bottom:20px">
+      <div class="banner-body">
+        <strong>Estas configurações ainda não são salvas.</strong>
+        <small>O backend não expõe endpoint de configurações (T9, Pós-MVP). Os campos abaixo
+        funcionam para conferência do layout, mas o que você digitar se perde ao sair da tela.</small>
+      </div>
+    </div>
+  `}
   <form class="card" id="config-form">
     <div id="tab-content"></div>
     <div class="row" style="justify-content:flex-end; margin-top:24px; gap:10px; align-items:center">
       <span class="text-meta" id="salvo-msg" style="color:var(--status-ok); display:none">${iconCheck(14)} Salvo.</span>
-      <button type="submit" class="btn btn-primary">Salvar</button>
+      <button type="submit" class="btn btn-primary" id="btn-salvar"${PERSISTE ? '' : ' disabled title="Indisponível: o backend ainda não expõe endpoint de configurações."'}>Salvar</button>
     </div>
   </form>
 `;
@@ -43,15 +59,15 @@ function renderTab() {
       <div class="stack" style="gap:14px; max-width:480px">
         <div class="field">
           <label class="field-label">Nome fantasia</label>
-          <input class="input" id="f-nome" value="${estab.nome}">
+          <input class="input" id="f-nome" value="${esc(estab.nome)}">
         </div>
         <div class="field">
           <label class="field-label">CNPJ</label>
-          <input class="input" id="f-cnpj" value="${estab.cnpj}">
+          <input class="input" id="f-cnpj" value="${esc(estab.cnpj)}">
         </div>
         <div class="field">
           <label class="field-label">Endereço</label>
-          <input class="input" id="f-endereco" value="${estab.endereco}">
+          <input class="input" id="f-endereco" value="${esc(estab.endereco)}">
         </div>
       </div>
     `;
@@ -64,11 +80,11 @@ function renderTab() {
       <div class="stack" style="gap:14px; max-width:480px">
         <div class="field">
           <label class="field-label">Nome</label>
-          <input class="input" id="f-user-nome" value="${usuario.nome}">
+          <input class="input" id="f-user-nome" value="${esc(usuario.nome)}">
         </div>
         <div class="field">
           <label class="field-label">Email</label>
-          <input class="input" type="email" id="f-user-email" value="${usuario.email}">
+          <input class="input" type="email" id="f-user-email" value="${esc(usuario.email)}">
         </div>
         <div>
           <a href="#" class="text-small" id="link-senha">Alterar senha</a>
@@ -123,6 +139,11 @@ document.getElementById('tabs').addEventListener('click', (e) => {
 // Salvar
 document.getElementById('config-form').addEventListener('submit', (e) => {
   e.preventDefault();
+  if (!PERSISTE) {
+    // Também cobre o Enter dentro de um campo, que dispara submit com o botão desabilitado.
+    toast.erro('Ainda não há endpoint de configurações no backend — nada foi salvo.');
+    return;
+  }
   const msg = document.getElementById('salvo-msg');
   msg.style.display = 'inline-flex';
   toast.sucesso('Configurações salvas.');

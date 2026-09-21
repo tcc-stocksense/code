@@ -65,8 +65,9 @@ class MotorJobStatus {
     }
 
     /**
-     * Mesma tomada atômica, sem exceção — para o cron (T-35), que ao encontrar um lote em
-     * andamento **pula** aquele estabelecimento em vez de falhar.
+     * A tomada atômica em si, sem exceção — primitiva sobre a qual o
+     * `iniciarJobOuConflitar` é construído, e à disposição de quem prefira ramificar a
+     * falhar. O cron (T-35) chega aqui pelo `MotorLoteService.processarLoteSeOcioso`.
      *
      * @return true se este chamador ficou com o job.
      */

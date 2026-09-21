@@ -393,7 +393,7 @@
 
 ## Épico 6 — Agendamento `MVP-opcional`
 
-- [ ] **T-35 — `MotorScheduler`** `MVP-opcional`
+- [x] **T-35 — `MotorScheduler`** `MVP-opcional`
   Habilitar `@EnableScheduling` na classe principal.
   `@Scheduled(cron = "0 0 3 1 * *")` → roda todo dia 1 às 3h.
   Chama o **núcleo compartilhado** `processarLoteMotor()` (ver T-39) para cada
@@ -404,6 +404,22 @@
   ⚠️ Antes do Épico 7 esta task chamaria `MotorService.executarMotor()` direto num loop.
   Após o Épico 7, deve reusar o núcleo `processarLoteMotor()` e o guard da T-52 — é um dos
   **três gatilhos** que compartilham o mesmo ponto de entrada (manual, pós-importação, cron).
+  ✅ Feito em `MotorScheduler` (`service`), com `@EnableScheduling` na `StockSenseApplication`.
+  Varre **todos** os estabelecimentos do catálogo: num `@Scheduled` não há requisição nem JWT,
+  então o `estabelecimentoId` não pode vir do contexto de segurança. Hoje há um só (ADR #4),
+  mas varrer todos é o que o ADR #5 pede.
+  **Fuso explícito** (`America/Sao_Paulo`): os containers rodam em UTC e não havia `TZ` em
+  lugar nenhum do compose — sem `zone`, "3h" seria meia-noite no horário de Brasília, colado
+  na virada do mês. `cron`, `zone` e um `enabled` são propriedades (`motor.scheduler.*`), para
+  a infra ajustar ou desligar sem recompilar.
+  O cron usa `MotorLoteService.processarLoteSeOcioso` — casca nova que devolve `null` quando o
+  guard da T-52 recusa. Um agendado que esbarra num lote manual não é erro: o mensal espera o
+  próximo mês e o lote em curso entrega o mesmo resultado. Falha de um estabelecimento não
+  aborta a varredura, mesma regra que o lote aplica produto a produto.
+  Cobertura: `MotorSchedulerTest` (7) + `MotorSchedulerAgendamentoTest` (3, contexto Spring real
+  sem banco — os placeholders do `@Scheduled` só resolvem no boot, então um cron malformado ou
+  fuso inexistente passaria por compilação e teste unitário) + 3 em `MotorLoteServiceTest`.
+  Suíte: 73 testes, 0 falhas.
 
 ---
 

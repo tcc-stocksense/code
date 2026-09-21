@@ -1,5 +1,6 @@
 package br.com.stocksense.service
 
+import br.com.stocksense.exception.MotorEmExecucaoException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -45,6 +46,29 @@ class MotorLoteService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     /**
+     * Roda o lote **se** não houver outro em andamento; caso haja, desiste em silêncio.
+     *
+     * É a casca do cron (T-35): um recálculo agendado que esbarra num lote manual não é
+     * erro, é o agendador chegando na hora errada — o mensal pode esperar o próximo mês,
+     * e o lote que já está rodando entrega o mesmo resultado.
+     *
+     * A política de "pular" mora aqui, num método com nome, em vez de espalhada pelo
+     * scheduler: o gatilho continua sendo o mesmo `processarLoteMotor` de todo mundo.
+     *
+     * @return o resultado do lote, ou `null` se foi pulado por já haver um em andamento.
+     */
+    fun processarLoteSeOcioso(estabelecimentoId: Int): ResultadoLote? =
+        try {
+            processarLoteMotor(estabelecimentoId)
+        } catch (ex: MotorEmExecucaoException) {
+            log.info(
+                "Lote do motor pulado para estabelecimento {}: já há um em andamento",
+                estabelecimentoId,
+            )
+            null
+        }
+
+    /**
      * Processa todos os produtos do estabelecimento e recalcula a ABC.
      *
      * **Guard de concorrência (T-52):** o job é tomado aqui dentro, antes de qualquer
@@ -56,7 +80,7 @@ class MotorLoteService(
      *   este callback é para quem quiser acompanhar por fora.
      * @throws br.com.stocksense.exception.MotorEmExecucaoException se já houver lote em
      *   andamento para o estabelecimento (vira `409 Conflict`). Quem prefere pular a
-     *   falhar — o cron — deve checar antes com `MotorJobStatus.tentarIniciarJob`.
+     *   falhar — o cron — usa `processarLoteSeOcioso`.
      */
     fun processarLoteMotor(
         estabelecimentoId: Int,

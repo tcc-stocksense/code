@@ -10,6 +10,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MotorLoteServiceTest {
@@ -189,5 +191,43 @@ class MotorLoteServiceTest {
 
         // O status ja esta atualizado quando o onProgress roda.
         assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), vistos)
+    }
+
+    @Test
+    fun `processarLoteSeOcioso devolve null em vez de lancar quando ha lote em andamento`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10)
+
+        jobStatus.iniciarJobOuConflitar(estabelecimentoId)
+
+        // Nao lanca: o cron nao pode quebrar porque chegou na hora errada.
+        val resultado = loteService.processarLoteSeOcioso(estabelecimentoId)
+
+        assertNull(resultado)
+        verify(exactly = 0) { motorService.executarMotor(any()) }
+    }
+
+    @Test
+    fun `processarLoteSeOcioso roda normalmente quando o motor esta ocioso`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10, 20)
+        every { motorService.executarMotor(any()) } returns Unit
+        every { abcService.recalcularAbc(estabelecimentoId) } returns AbcResultado(2, false)
+
+        val resultado = loteService.processarLoteSeOcioso(estabelecimentoId)
+
+        assertNotNull(resultado)
+        assertEquals(2, resultado.produtosProcessados)
+        assertEquals(EstadoJob.CONCLUIDO, jobStatus.consultar(estabelecimentoId).estado)
+    }
+
+    @Test
+    fun `processarLoteSeOcioso propaga falha real do lote - so o conflito e silenciado`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10)
+        every { motorService.executarMotor(10) } returns Unit
+        every { abcService.recalcularAbc(estabelecimentoId) } throws IllegalStateException("banco fora")
+
+        // Conflito de concorrencia vira null; erro de verdade continua subindo.
+        assertFailsWith<IllegalStateException> {
+            loteService.processarLoteSeOcioso(estabelecimentoId)
+        }
     }
 }

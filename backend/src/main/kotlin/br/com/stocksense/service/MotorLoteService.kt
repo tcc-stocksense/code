@@ -40,52 +40,78 @@ data class ResultadoLote(
 class MotorLoteService(
     private val motorService: MotorService,
     private val abcService: AbcService,
+    private val jobStatus: MotorJobStatus,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * Processa todos os produtos do estabelecimento e recalcula a ABC.
      *
+     * **Guard de concorrência (T-52):** o job é tomado aqui dentro, antes de qualquer
+     * trabalho. O guard vive no núcleo — e não em cada gatilho — para que manual,
+     * pós-importação e cron passem todos por ele sem chance de desvio.
+     *
      * @param onProgress chamado após cada produto (com ou sem falha) com o total já
-     *   tentado e o total do lote. Usado pelo acompanhamento de progresso; o default
-     *   não faz nada, para quem só quer o resultado final.
+     *   tentado e o total do lote. O `MotorJobStatus` é alimentado de qualquer forma;
+     *   este callback é para quem quiser acompanhar por fora.
+     * @throws br.com.stocksense.exception.MotorEmExecucaoException se já houver lote em
+     *   andamento para o estabelecimento (vira `409 Conflict`). Quem prefere pular a
+     *   falhar — o cron — deve checar antes com `MotorJobStatus.tentarIniciarJob`.
      */
     fun processarLoteMotor(
         estabelecimentoId: Int,
         onProgress: (feitos: Int, total: Int) -> Unit = { _, _ -> },
     ): ResultadoLote {
-        val produtoIds = motorService.listarProdutoIds(estabelecimentoId)
-        val total = produtoIds.size
+        // Fora do try: se o guard recusar, o job em andamento é de OUTRO chamador —
+        // marcar FALHOU aqui destruiria o estado de um lote que está passando bem.
+        jobStatus.iniciarJobOuConflitar(estabelecimentoId)
 
-        log.info("Lote do motor iniciado para estabelecimento {}: {} produtos", estabelecimentoId, total)
+        try {
+            val produtoIds = motorService.listarProdutoIds(estabelecimentoId)
+            val total = produtoIds.size
+            jobStatus.definirTotal(estabelecimentoId, total)
 
-        var processados = 0
-        var falhas = 0
-        var feitos = 0
-        for (produtoId in produtoIds) {
-            try {
-                motorService.executarMotor(produtoId)
-                processados++
-            } catch (ex: Exception) {
-                log.warn("Motor falhou para produto {}: {}", produtoId, ex.message)
-                falhas++
+            log.info("Lote do motor iniciado para estabelecimento {}: {} produtos", estabelecimentoId, total)
+
+            var processados = 0
+            var falhas = 0
+            var feitos = 0
+            for (produtoId in produtoIds) {
+                try {
+                    motorService.executarMotor(produtoId)
+                    processados++
+                } catch (ex: Exception) {
+                    log.warn("Motor falhou para produto {}: {}", produtoId, ex.message)
+                    falhas++
+                }
+                feitos++
+                jobStatus.atualizarProgresso(estabelecimentoId, feitos, total)
+                onProgress(feitos, total)
             }
-            feitos++
-            onProgress(feitos, total)
+
+            val abc = abcService.recalcularAbc(estabelecimentoId)
+
+            val resultado = ResultadoLote(
+                produtosProcessados = processados,
+                produtosComFalha = falhas,
+                produtosClassificadosAbc = abc.produtosClassificados,
+                abcProxy = abc.abcProxy,
+            )
+
+            jobStatus.concluir(estabelecimentoId, resultado)
+
+            log.info(
+                "Lote do motor concluído para estabelecimento {}: {} processados, {} falhas, {} classificados na ABC",
+                estabelecimentoId, processados, falhas, abc.produtosClassificados,
+            )
+
+            return resultado
+        } catch (ex: Exception) {
+            // Falha do lote inteiro (a ABC, por exemplo — a falha POR PRODUTO é tratada
+            // no loop). Libera o guard: sem isto, um erro travaria o motor até o restart.
+            log.error("Lote do motor falhou para estabelecimento {}", estabelecimentoId, ex)
+            jobStatus.falhar(estabelecimentoId)
+            throw ex
         }
-
-        val abc = abcService.recalcularAbc(estabelecimentoId)
-
-        log.info(
-            "Lote do motor concluído para estabelecimento {}: {} processados, {} falhas, {} classificados na ABC",
-            estabelecimentoId, processados, falhas, abc.produtosClassificados,
-        )
-
-        return ResultadoLote(
-            produtosProcessados = processados,
-            produtosComFalha = falhas,
-            produtosClassificadosAbc = abc.produtosClassificados,
-            abcProxy = abc.abcProxy,
-        )
     }
 }

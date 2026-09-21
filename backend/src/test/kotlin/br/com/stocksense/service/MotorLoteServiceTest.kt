@@ -1,5 +1,6 @@
 package br.com.stocksense.service
 
+import br.com.stocksense.exception.MotorEmExecucaoException
 import br.com.stocksense.exception.MotorPreditivoException
 import io.mockk.every
 import io.mockk.mockk
@@ -8,19 +9,24 @@ import io.mockk.verifyOrder
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class MotorLoteServiceTest {
 
     private val motorService = mockk<MotorService>()
     private val abcService = mockk<AbcService>()
+
+    // Real, nao mock: o guard e o objeto sob teste nos cenarios de concorrencia,
+    // e nos demais o seu comportamento real (tomar e liberar o job) e o esperado.
+    private val jobStatus = MotorJobStatus()
     private lateinit var loteService: MotorLoteService
 
     private val estabelecimentoId = 1
 
     @BeforeTest
     fun setUp() {
-        loteService = MotorLoteService(motorService, abcService)
+        loteService = MotorLoteService(motorService, abcService, jobStatus)
     }
 
     @Test
@@ -107,5 +113,81 @@ class MotorLoteServiceTest {
         val resultado = loteService.processarLoteMotor(estabelecimentoId)
 
         assertTrue(resultado.abcProxy)
+    }
+
+    @Test
+    fun `lote concorrente no mesmo estabelecimento recebe conflito`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10)
+        every { motorService.executarMotor(10) } returns Unit
+        every { abcService.recalcularAbc(estabelecimentoId) } returns AbcResultado(1, false)
+
+        // Simula um lote já em andamento (o disparo concorrente que chegou primeiro).
+        jobStatus.iniciarJobOuConflitar(estabelecimentoId)
+
+        assertFailsWith<MotorEmExecucaoException> {
+            loteService.processarLoteMotor(estabelecimentoId)
+        }
+        // O guard recusou antes de qualquer trabalho.
+        verify(exactly = 0) { motorService.executarMotor(any()) }
+    }
+
+    @Test
+    fun `guard nao bloqueia estabelecimentos diferentes`() {
+        every { motorService.listarProdutoIds(2) } returns listOf(10)
+        every { motorService.executarMotor(10) } returns Unit
+        every { abcService.recalcularAbc(2) } returns AbcResultado(1, false)
+
+        jobStatus.iniciarJobOuConflitar(estabelecimentoId)
+
+        val resultado = loteService.processarLoteMotor(2)
+
+        assertEquals(1, resultado.produtosProcessados)
+    }
+
+    @Test
+    fun `lote bem sucedido conclui o job e libera o guard`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10, 20)
+        every { motorService.executarMotor(any()) } returns Unit
+        every { abcService.recalcularAbc(estabelecimentoId) } returns AbcResultado(2, false)
+
+        val resultado = loteService.processarLoteMotor(estabelecimentoId)
+
+        val job = jobStatus.consultar(estabelecimentoId)
+        assertEquals(EstadoJob.CONCLUIDO, job.estado)
+        assertEquals(2, job.feitos)
+        assertEquals(2, job.total)
+        assertEquals(resultado, job.resumo)
+    }
+
+    @Test
+    fun `falha do lote inteiro marca FALHOU e libera o guard`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10)
+        every { motorService.executarMotor(10) } returns Unit
+        // A ABC roda fora do try-catch por produto: se ela explode, o lote inteiro falha.
+        every { abcService.recalcularAbc(estabelecimentoId) } throws IllegalStateException("banco fora")
+
+        assertFailsWith<IllegalStateException> {
+            loteService.processarLoteMotor(estabelecimentoId)
+        }
+
+        assertEquals(EstadoJob.FALHOU, jobStatus.consultar(estabelecimentoId).estado)
+        // Guard liberado: um erro nao pode travar o motor ate o restart.
+        jobStatus.iniciarJobOuConflitar(estabelecimentoId)
+    }
+
+    @Test
+    fun `progresso do lote e refletido no MotorJobStatus`() {
+        every { motorService.listarProdutoIds(estabelecimentoId) } returns listOf(10, 20, 30)
+        every { motorService.executarMotor(any()) } returns Unit
+        every { abcService.recalcularAbc(estabelecimentoId) } returns AbcResultado(3, false)
+
+        val vistos = mutableListOf<Pair<Int, Int>>()
+        loteService.processarLoteMotor(estabelecimentoId) { _, _ ->
+            val j = jobStatus.consultar(estabelecimentoId)
+            vistos += j.feitos to j.total
+        }
+
+        // O status ja esta atualizado quando o onProgress roda.
+        assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), vistos)
     }
 }

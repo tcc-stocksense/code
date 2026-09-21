@@ -474,7 +474,7 @@
   aborta o lote" iria junto. Por isso `processarLoteMotor` também **não** é `@Transactional`.
   Cobertura: `MotorLoteServiceTest` (6 testes). Suíte: 46 testes, 0 falhas.
 
-- [ ] **T-40 — Estado do job em memória (`MotorJobStatus`)** `MVP`
+- [x] **T-40 — Estado do job em memória (`MotorJobStatus`)** `MVP`
   Bean singleton que guarda o estado do recálculo por estabelecimento:
   `{ estado: PENDENTE|PROCESSANDO|CONCLUIDO|FALHOU, feitos: Int, total: Int, iniciadoEm, concluidoEm?, resumo?: ResultadoLote }`.
   *(o "executando" citado na revisão = estado `PROCESSANDO` do contrato congelado — ver T-42/T-52.)*
@@ -484,6 +484,13 @@
   lote é idempotente e pode ser re-disparado manualmente*. Evolução futura (fora do escopo):
   tabela `execucao_motor`.
   _Depende de: T-39_
+  ✅ Feito em `MotorJobStatus` (`@Component`), com `EstadoJob` e `JobMotor` no mesmo arquivo.
+  `ConcurrentHashMap<Int, JobMotor>` e todas as transições via `compute`/`computeIfPresent`,
+  que o mapa executa atomicamente por chave — é essa atomicidade que sustenta o guard da T-52.
+  Campos alinhados ao contrato congelado da T-42, que só precisará ler e serializar.
+  Implementado junto com a T-52: o guard não tem onde guardar estado sem este bean, e um lock
+  ad-hoc criaria a segunda fonte de verdade que a T-52 proíbe.
+  Cobertura: `MotorJobStatusTest` (9 testes).
 
 - [ ] **T-41 — `POST /api/motor/recalcular` assíncrono (202)** `MVP`
   Habilitar `@EnableAsync` na classe principal + configurar um `TaskExecutor` dedicado
@@ -584,7 +591,7 @@
 > A **T-54 (benchmark)** é a única com prioridade **IMEDIATA** — roda antes da confirmação do
 > volume de SKUs e calibra a prioridade de todo o épico.
 
-- [ ] **T-52 — Guard de concorrência do motor (409)** `MVP`
+- [x] **T-52 — Guard de concorrência do motor (409)** `MVP`
   Ponto único de proteção contra recálculos simultâneos: antes de chamar `processarLoteMotor()`,
   verificar o `MotorJobStatus` do estabelecimento e **rejeitar com `409 Conflict`** se já houver um
   job em andamento (estado `PROCESSANDO`). O guard vale para os **três gatilhos**, que passam todos
@@ -593,6 +600,17 @@
   - **Teste:** dois disparos concorrentes para o mesmo estabelecimento → o segundo recebe `409`.
   - **Teste:** disparo para estabelecimento diferente **não** é bloqueado (guard é por estabelecimento).
   _Depende de: T-40_
+  ✅ Feito. O guard vive **dentro do `processarLoteMotor`** (núcleo da T-39), não em cada gatilho:
+  assim manual, pós-importação e cron passam por ele sem chance de desvio. Duas portas sobre a
+  mesma tomada atômica: `iniciarJobOuConflitar` lança `MotorEmExecucaoException` (→ `409` no
+  `GlobalExceptionHandler`) para os gatilhos HTTP, e `tentarIniciarJob` devolve `false` para o
+  cron da T-35, que **pula** o estabelecimento em vez de falhar.
+  Detalhe que importa: a tomada do guard fica **fora** do `try`. Se ela recusar, o job em
+  andamento é de outro chamador — marcar `FALHOU` ali destruiria o estado de um lote saudável.
+  E o `catch` do lote inteiro chama `falhar()`, senão um erro na ABC travaria o motor até o restart.
+  Testes: os dois exigidos (disparo concorrente → 409; estabelecimento diferente → não bloqueia),
+  mais um de 20 threads simultâneas provando que **exatamente uma** vence a corrida.
+  Cobertura: +5 em `MotorLoteServiceTest`. Suíte: 60 testes, 0 falhas.
   ⚠️ Pré-requisito de qualquer gatilho múltiplo — implementar junto/antes de T-41, T-44 e T-35.
 
 - [ ] **T-53 — Warm-up do Prophet no startup do ml-service** `MVP`

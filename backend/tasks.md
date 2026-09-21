@@ -457,7 +457,7 @@
 
 ### Backend
 
-- [ ] **T-39 — Extrair núcleo compartilhado `processarLoteMotor()`** `MVP`
+- [x] **T-39 — Extrair núcleo compartilhado `processarLoteMotor()`** `MVP`
   Refatorar a lógica de lote hoje embutida no `MotorController.recalcular()` (T-23) para um
   método reutilizável — em `MotorService` ou num novo `MotorLoteService`:
   `processarLoteMotor(estabelecimentoId: Int, onProgress: (feitos: Int, total: Int) -> Unit = {}): ResultadoLote`.
@@ -466,6 +466,13 @@
   cada produto concluído. Retorna `{ produtosProcessados, produtosComFalha, produtosClassificadosAbc, abcProxy }`.
   **Sem mudança de comportamento** — só extração; `POST /recalcular` continua funcionando igual até T-41.
   _Depende de: T-21, T-22, T-23_
+  ✅ Feito em `MotorLoteService` (bean novo), com `ResultadoLote` no mesmo arquivo. O
+  `MotorController` virou invólucro fino — sai do controller a lógica de lote, que violava
+  o §11 do CLAUDE.md. **Bean separado, não método do `MotorService`:** `@Transactional` age
+  por proxy, então o loop chamando `executarMotor` de dentro do próprio `MotorService` seria
+  auto-invocação e cada produto perderia a sua transação — o contrato de "falha isolada não
+  aborta o lote" iria junto. Por isso `processarLoteMotor` também **não** é `@Transactional`.
+  Cobertura: `MotorLoteServiceTest` (6 testes). Suíte: 46 testes, 0 falhas.
 
 - [ ] **T-40 — Estado do job em memória (`MotorJobStatus`)** `MVP`
   Bean singleton que guarda o estado do recálculo por estabelecimento:
@@ -598,7 +605,7 @@
   _Depende de: —_ (serviço Python; independente do backend)
   ⚠️ Tarefa do **ml-service**, registrada aqui por pertencer ao Épico 7. Refletir no `ml-service/tasks.md`.
 
-- [ ] **T-54 — Benchmark do lote (calibra a prioridade do épico)** `IMEDIATA`
+- [x] **T-54 — Benchmark do lote (calibra a prioridade do épico)** `IMEDIATA`
   Script Python que **gera dados sintéticos** de vendas (90+ dias) para **50, 150 e 300 produtos**,
   dispara o lote atual (`POST /api/motor/recalcular` síncrono de hoje, T-23) e **mede o tempo total
   e o tempo médio por produto** em cada volume. Reusar `generate_synthetic_data.py` do ml-service.
@@ -608,6 +615,13 @@
     será usada na **metodologia do TCC**.
   _Depende de: T-23 (já implementado), ml-service no ar_
   ✅ **Pode e deve rodar ANTES da confirmação do volume de SKUs** — é o que destrava a decisão.
+  ✅ **EXECUTADO em 2026-08-30** com Prophet ativo em 100% das chamadas — resultados em
+  `docs/benchmark-motor.md`: **0,42–0,53 s/produto**, escala linear, nenhuma chamada acima de
+  1,1 s (zero risco para o read-timeout de 30 s do Feign). Projeção de **~2,8 min para 312 SKUs**,
+  contra os 5–25 min estimados. Confirmado em produção pela **D-35: 0,50 s/produto na t3.medium**.
+  ⚠️ **Consequência para o Épico 7:** o volume de SKUs deixou de ser a incógnita que travava a
+  decisão. O async deixa de ser **bloqueador** e vira **melhoria de experiência** — a conclusão do
+  benchmark sugere rebaixar o épico para `MVP-opcional`. Validar com o orientador.
   📝 **Esboço pronto (2026-07-12):** `ml-service/benchmark_motor.py` — mede N chamadas `/predict`
   sequenciais (custo dominante do lote), reusa `generate_synthetic_data.py`, faz warm-up do Prophet
   e grava a tabela em `docs/benchmark-motor.md`. **Só a sintaxe foi validada; falta EXECUTAR** com o

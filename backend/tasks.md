@@ -393,7 +393,7 @@
 
 ## Épico 6 — Agendamento `MVP-opcional`
 
-- [ ] **T-35 — `MotorScheduler`** `MVP-opcional`
+- [x] **T-35 — `MotorScheduler`** `MVP-opcional`
   Habilitar `@EnableScheduling` na classe principal.
   `@Scheduled(cron = "0 0 3 1 * *")` → roda todo dia 1 às 3h.
   Chama o **núcleo compartilhado** `processarLoteMotor()` (ver T-39) para cada
@@ -404,6 +404,22 @@
   ⚠️ Antes do Épico 7 esta task chamaria `MotorService.executarMotor()` direto num loop.
   Após o Épico 7, deve reusar o núcleo `processarLoteMotor()` e o guard da T-52 — é um dos
   **três gatilhos** que compartilham o mesmo ponto de entrada (manual, pós-importação, cron).
+  ✅ Feito em `MotorScheduler` (`service`), com `@EnableScheduling` na `StockSenseApplication`.
+  Varre **todos** os estabelecimentos do catálogo: num `@Scheduled` não há requisição nem JWT,
+  então o `estabelecimentoId` não pode vir do contexto de segurança. Hoje há um só (ADR #4),
+  mas varrer todos é o que o ADR #5 pede.
+  **Fuso explícito** (`America/Sao_Paulo`): os containers rodam em UTC e não havia `TZ` em
+  lugar nenhum do compose — sem `zone`, "3h" seria meia-noite no horário de Brasília, colado
+  na virada do mês. `cron`, `zone` e um `enabled` são propriedades (`motor.scheduler.*`), para
+  a infra ajustar ou desligar sem recompilar.
+  O cron usa `MotorLoteService.processarLoteSeOcioso` — casca nova que devolve `null` quando o
+  guard da T-52 recusa. Um agendado que esbarra num lote manual não é erro: o mensal espera o
+  próximo mês e o lote em curso entrega o mesmo resultado. Falha de um estabelecimento não
+  aborta a varredura, mesma regra que o lote aplica produto a produto.
+  Cobertura: `MotorSchedulerTest` (7) + `MotorSchedulerAgendamentoTest` (3, contexto Spring real
+  sem banco — os placeholders do `@Scheduled` só resolvem no boot, então um cron malformado ou
+  fuso inexistente passaria por compilação e teste unitário) + 3 em `MotorLoteServiceTest`.
+  Suíte: 73 testes, 0 falhas.
 
 ---
 
@@ -457,7 +473,7 @@
 
 ### Backend
 
-- [ ] **T-39 — Extrair núcleo compartilhado `processarLoteMotor()`** `MVP`
+- [x] **T-39 — Extrair núcleo compartilhado `processarLoteMotor()`** `MVP`
   Refatorar a lógica de lote hoje embutida no `MotorController.recalcular()` (T-23) para um
   método reutilizável — em `MotorService` ou num novo `MotorLoteService`:
   `processarLoteMotor(estabelecimentoId: Int, onProgress: (feitos: Int, total: Int) -> Unit = {}): ResultadoLote`.
@@ -466,8 +482,15 @@
   cada produto concluído. Retorna `{ produtosProcessados, produtosComFalha, produtosClassificadosAbc, abcProxy }`.
   **Sem mudança de comportamento** — só extração; `POST /recalcular` continua funcionando igual até T-41.
   _Depende de: T-21, T-22, T-23_
+  ✅ Feito em `MotorLoteService` (bean novo), com `ResultadoLote` no mesmo arquivo. O
+  `MotorController` virou invólucro fino — sai do controller a lógica de lote, que violava
+  o §11 do CLAUDE.md. **Bean separado, não método do `MotorService`:** `@Transactional` age
+  por proxy, então o loop chamando `executarMotor` de dentro do próprio `MotorService` seria
+  auto-invocação e cada produto perderia a sua transação — o contrato de "falha isolada não
+  aborta o lote" iria junto. Por isso `processarLoteMotor` também **não** é `@Transactional`.
+  Cobertura: `MotorLoteServiceTest` (6 testes). Suíte: 46 testes, 0 falhas.
 
-- [ ] **T-40 — Estado do job em memória (`MotorJobStatus`)** `MVP`
+- [x] **T-40 — Estado do job em memória (`MotorJobStatus`)** `MVP`
   Bean singleton que guarda o estado do recálculo por estabelecimento:
   `{ estado: PENDENTE|PROCESSANDO|CONCLUIDO|FALHOU, feitos: Int, total: Int, iniciadoEm, concluidoEm?, resumo?: ResultadoLote }`.
   *(o "executando" citado na revisão = estado `PROCESSANDO` do contrato congelado — ver T-42/T-52.)*
@@ -477,6 +500,13 @@
   lote é idempotente e pode ser re-disparado manualmente*. Evolução futura (fora do escopo):
   tabela `execucao_motor`.
   _Depende de: T-39_
+  ✅ Feito em `MotorJobStatus` (`@Component`), com `EstadoJob` e `JobMotor` no mesmo arquivo.
+  `ConcurrentHashMap<Int, JobMotor>` e todas as transições via `compute`/`computeIfPresent`,
+  que o mapa executa atomicamente por chave — é essa atomicidade que sustenta o guard da T-52.
+  Campos alinhados ao contrato congelado da T-42, que só precisará ler e serializar.
+  Implementado junto com a T-52: o guard não tem onde guardar estado sem este bean, e um lock
+  ad-hoc criaria a segunda fonte de verdade que a T-52 proíbe.
+  Cobertura: `MotorJobStatusTest` (9 testes).
 
 - [ ] **T-41 — `POST /api/motor/recalcular` assíncrono (202)** `MVP`
   Habilitar `@EnableAsync` na classe principal + configurar um `TaskExecutor` dedicado
@@ -577,7 +607,7 @@
 > A **T-54 (benchmark)** é a única com prioridade **IMEDIATA** — roda antes da confirmação do
 > volume de SKUs e calibra a prioridade de todo o épico.
 
-- [ ] **T-52 — Guard de concorrência do motor (409)** `MVP`
+- [x] **T-52 — Guard de concorrência do motor (409)** `MVP`
   Ponto único de proteção contra recálculos simultâneos: antes de chamar `processarLoteMotor()`,
   verificar o `MotorJobStatus` do estabelecimento e **rejeitar com `409 Conflict`** se já houver um
   job em andamento (estado `PROCESSANDO`). O guard vale para os **três gatilhos**, que passam todos
@@ -586,6 +616,17 @@
   - **Teste:** dois disparos concorrentes para o mesmo estabelecimento → o segundo recebe `409`.
   - **Teste:** disparo para estabelecimento diferente **não** é bloqueado (guard é por estabelecimento).
   _Depende de: T-40_
+  ✅ Feito. O guard vive **dentro do `processarLoteMotor`** (núcleo da T-39), não em cada gatilho:
+  assim manual, pós-importação e cron passam por ele sem chance de desvio. Duas portas sobre a
+  mesma tomada atômica: `iniciarJobOuConflitar` lança `MotorEmExecucaoException` (→ `409` no
+  `GlobalExceptionHandler`) para os gatilhos HTTP, e `tentarIniciarJob` devolve `false` para o
+  cron da T-35, que **pula** o estabelecimento em vez de falhar.
+  Detalhe que importa: a tomada do guard fica **fora** do `try`. Se ela recusar, o job em
+  andamento é de outro chamador — marcar `FALHOU` ali destruiria o estado de um lote saudável.
+  E o `catch` do lote inteiro chama `falhar()`, senão um erro na ABC travaria o motor até o restart.
+  Testes: os dois exigidos (disparo concorrente → 409; estabelecimento diferente → não bloqueia),
+  mais um de 20 threads simultâneas provando que **exatamente uma** vence a corrida.
+  Cobertura: +5 em `MotorLoteServiceTest`. Suíte: 60 testes, 0 falhas.
   ⚠️ Pré-requisito de qualquer gatilho múltiplo — implementar junto/antes de T-41, T-44 e T-35.
 
 - [ ] **T-53 — Warm-up do Prophet no startup do ml-service** `MVP`
@@ -598,7 +639,7 @@
   _Depende de: —_ (serviço Python; independente do backend)
   ⚠️ Tarefa do **ml-service**, registrada aqui por pertencer ao Épico 7. Refletir no `ml-service/tasks.md`.
 
-- [ ] **T-54 — Benchmark do lote (calibra a prioridade do épico)** `IMEDIATA`
+- [x] **T-54 — Benchmark do lote (calibra a prioridade do épico)** `IMEDIATA`
   Script Python que **gera dados sintéticos** de vendas (90+ dias) para **50, 150 e 300 produtos**,
   dispara o lote atual (`POST /api/motor/recalcular` síncrono de hoje, T-23) e **mede o tempo total
   e o tempo médio por produto** em cada volume. Reusar `generate_synthetic_data.py` do ml-service.
@@ -608,6 +649,13 @@
     será usada na **metodologia do TCC**.
   _Depende de: T-23 (já implementado), ml-service no ar_
   ✅ **Pode e deve rodar ANTES da confirmação do volume de SKUs** — é o que destrava a decisão.
+  ✅ **EXECUTADO em 2026-08-30** com Prophet ativo em 100% das chamadas — resultados em
+  `docs/benchmark-motor.md`: **0,42–0,53 s/produto**, escala linear, nenhuma chamada acima de
+  1,1 s (zero risco para o read-timeout de 30 s do Feign). Projeção de **~2,8 min para 312 SKUs**,
+  contra os 5–25 min estimados. Confirmado em produção pela **D-35: 0,50 s/produto na t3.medium**.
+  ⚠️ **Consequência para o Épico 7:** o volume de SKUs deixou de ser a incógnita que travava a
+  decisão. O async deixa de ser **bloqueador** e vira **melhoria de experiência** — a conclusão do
+  benchmark sugere rebaixar o épico para `MVP-opcional`. Validar com o orientador.
   📝 **Esboço pronto (2026-07-12):** `ml-service/benchmark_motor.py` — mede N chamadas `/predict`
   sequenciais (custo dominante do lote), reusa `generate_synthetic_data.py`, faz warm-up do Prophet
   e grava a tabela em `docs/benchmark-motor.md`. **Só a sintaxe foi validada; falta EXECUTAR** com o

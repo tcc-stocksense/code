@@ -174,7 +174,7 @@ Arquivo: `03-metodologia.md`
   diferença menor que 0,7 pp, cinco deles abaixo de 0,06 pp. **Nenhum modelo
   domina o outro** — dizer isso com todas as letras.
 - `[ ]` **Tabela** — ganho sobre o baseline ingênuo: o motor vence em **10 de 10**
-  produtos, com redução mediana de erro de **49,4%** (mín. 12,8%, máx. 69,4%)
+  produtos, com redução mediana de erro de **45,1%** (mín. 12,8%, máx. 69,4%)
 - `[ ]` **Figuras** — `g2_previsto_real_*` (as curvas dos dois modelos são
   visualmente indistinguíveis) e `g3_barras_erro_*`
 - `[ ]` Leitura dos MAPEs altos: Pão Francês em 81% parece falha até se comparar

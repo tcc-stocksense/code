@@ -56,6 +56,18 @@ venv/Scripts/python.exe -m jupyter nbconvert --to notebook --execute --inplace a
 venv/Scripts/python.exe analysis/_coletar_dados_doc.py
 ```
 
+## Verificação dos números
+
+```bash
+ml-service/venv/Scripts/python.exe docs/artigo/verificar_numeros.py saida.txt
+```
+
+Confere cada célula das tabelas do artigo contra `dados_documento.json`, além
+das afirmações quantitativas do texto corrido ("supera em 10 de 10 produtos",
+"margem inferior a 0,7 pp em nove deles"). **Rodar sempre que o texto ou os
+dados mudarem.** Na primeira execução ele já pegou uma mediana calculada
+errado — 49,4% onde o correto era 45,1% — antes de o número ir para o artigo.
+
 ## Marcadores no texto
 
 - `[CITAR: ...]` — afirmação que precisa de fonte que ainda não está no repositório.

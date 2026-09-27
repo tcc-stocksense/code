@@ -257,6 +257,41 @@ Arquivo: `03-metodologia.md`
 
 ---
 
+## Numeração de figuras e tabelas
+
+A numeração é **contínua no documento inteiro**, não reinicia por seção. Só
+fecha quando todas as seções estiverem escritas e a seleção de figuras estiver
+decidida — por isso os arquivos de seção usam numeração provisória, que o script
+de geração renumera ao montar o `.docx`.
+
+Situação atual:
+
+| Seção | Figuras | Tabelas |
+|---|---|---|
+| 2 | nenhuma prevista | Tabela de trabalhos relacionados |
+| 3 | contexto C4, containers C4, DER, mosaico de telas | multiplicador semanal |
+| 4 | a definir — ver abaixo | descritiva, métricas, margens, ganho, backtesting, reposição |
+| 5 | nenhuma | nenhuma |
+
+**A seção 4 precisa de uma decisão de corte.** Existem 14 PNGs gerados pela
+camada de análise (7 tipos × 2 produtos). Usar todos infla a seção e é
+improvável que caiba. Ordem de prioridade sugerida, da mais para a menos
+essencial:
+
+1. `g2_previsto_real_*` — ajuste fora da amostra; mostra que as curvas dos dois
+   modelos são indistinguíveis, que é o resultado central
+2. `g1_decomposicao_*` — existe sinal previsível a capturar
+3. `g7_reposicao_*` — a tradução de estatística em decisão de compra
+4. `g6_backtesting_*` — robustez em janelas independentes
+5. `g5_residuos_*` — diagnóstico de ajuste
+6. `g4_erro_horizonte_*` — crescimento do erro com o horizonte
+7. `g3_barras_erro_*` — redundante com a tabela de métricas; primeiro a cortar
+
+`[!]` **Depende de:** limite de páginas do artigo, que o template não declara.
+Calibrar pelos artigos GRP01–GRP05 em `7-sem-TCC/docs/exemplos/`.
+
+---
+
 ## Pendências que dependem de terceiros
 
 | # | O que falta | Bloqueia |

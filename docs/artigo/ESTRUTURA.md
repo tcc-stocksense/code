@@ -131,17 +131,21 @@ a abordagem de melhor desempenho para o contexto específico do varejo de bairro
 Arquivo: `03-metodologia.md`
 
 - `[✓]` **3.1** Organização do projeto `[fixo]` — equipe, cinco fases, monorepo
-- `[✓]` **3.2** Arquitetura da solução `[fixo]` — **Figura**: C4 nível 2
-  (`docs/arquitetura/diagram-container-c2.png`); blocos A–E e fluxo em 6 passos
+- `[✓]` **3.2** Arquitetura da solução `[fixo]` — **Figura 1**: contexto C4 nível 1
+  (`diagram-contexto.png`); **Figura 2**: containers C4 nível 2
+  (`diagram-container-c2.png`); blocos A–E e fluxo em 6 passos
 - `[✓]` **3.3** Base de dados `[fixo]`
-  - 3.3.1 Esquema de ingestão (planilhas, mínimo de 90 dias)
-  - 3.3.2 Base de validação sintética — **Tabela**: multiplicador semanal;
+  - 3.3.1 Modelo de dados — **Figura 3**: DER (`database/der-diagram.mwb`,
+    exportar como imagem); as 7 tabelas em três blocos
+  - 3.3.2 Esquema de ingestão (planilhas, mínimo de 90 dias)
+  - 3.3.3 Base de validação sintética — **Tabela**: multiplicador semanal;
     **Equação**: geradora
 - `[✓]` **3.4** Tecnologias consideradas e descartadas `[fixo]` — ARIMA,
   aprendizado profundo, PostgreSQL, módulo ESG, ABC no motor
 - `[✓]` **3.5** Implementação `[fixo]` — modelos, métricas, protocolo de
-  avaliação, critério de seleção, parâmetros de reposição, equivalência com
-  produção. Nove equações numeradas.
+  avaliação, critério de seleção, parâmetros de reposição, interface
+  (**Figura 4**: mosaico de telas) e equivalência com produção. Nove equações
+  numeradas.
 - `[!]` Pendência: `[CITAR: metodologia científica]` na abertura da seção
 
 ---
@@ -262,3 +266,5 @@ Arquivo: `03-metodologia.md`
 | 3 | Referência de metodologia científica do curso | Abertura da seção 3 |
 | 4 | Titulação e nome do orientador | Front matter |
 | 5 | Aval do orientador à pergunta de pesquisa de 1.1 | 1.1, e por tabela 1.2 e a seção 5 |
+| 6 | Exportar o DER de `database/der-diagram.mwb` como imagem | Figura 3 (seção 3.3.1) |
+| 7 | Capturas das telas principais da aplicação | Figura 4 (seção 3.5.6) |

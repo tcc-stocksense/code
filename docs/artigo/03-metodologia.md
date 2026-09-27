@@ -42,13 +42,30 @@ reconstruído do zero de forma determinística.
 
 ## 3.2 Arquitetura da solução
 
-**Figura 1 - Diagrama de containers da solução (C4, nível 2)**
+A arquitetura é descrita em dois níveis de abstração, seguindo o modelo C4. O
+primeiro situa o sistema em relação a quem o usa e ao que consome; o segundo
+abre a caixa e mostra os componentes internos.
+
+**Figura 1 - Diagrama de contexto (C4, nível 1)**
+
+`[FIGURA: tcc-stocksense/docs/arquitetura/diagram-contexto.png]`
+
+Fonte: Autoral, 2026
+
+A Figura 1 delimita a fronteira do sistema. Há um único ator humano — o lojista,
+gestor do estabelecimento — e uma única fonte de dados: as planilhas exportadas
+pelo sistema de frente de caixa do próprio mercado. Não há integração com
+sistemas externos, e essa ausência é uma decisão, não uma lacuna: exigir
+integração com ERP ou com API de fornecedor reintroduziria exatamente a barreira
+de custo e complexidade que o trabalho se propõe a contornar.
+
+**Figura 2 - Diagrama de containers (C4, nível 2)**
 
 `[FIGURA: tcc-stocksense/docs/arquitetura/diagram-container-c2.png]`
 
 Fonte: Autoral, 2026
 
-Conforme ilustrado na Figura 1, a solução é composta por quatro elementos: a
+Conforme ilustrado na Figura 2, a solução é composta por quatro elementos: a
 interface do lojista, a API orquestradora, o motor preditivo e o banco de dados.
 
 **A. Aplicação web**
@@ -107,11 +124,55 @@ banco; e toda escrita passa pela API.
 
 ## 3.3 Base de dados
 
-A base de dados do projeto tem dois níveis, que convém não confundir: o esquema
-de ingestão, que define o que o sistema aceita de um estabelecimento real, e a
-base de validação, sobre a qual os resultados deste artigo foram medidos.
+A base de dados do projeto tem três níveis, que convém não confundir: o modelo
+relacional que sustenta o sistema, o esquema de ingestão que define o que ele
+aceita de um estabelecimento real, e a base de validação sobre a qual os
+resultados deste artigo foram medidos.
 
-### 3.3.1 Esquema de ingestão
+### 3.3.1 Modelo de dados
+
+**Figura 3 - Modelo entidade-relacionamento**
+
+`[FIGURA: tcc-stocksense/database/der-diagram.mwb — exportar como imagem]`
+
+Fonte: Autoral, 2026
+
+O esquema tem sete tabelas, versionadas por migrações incrementais, e organiza-se
+em três blocos.
+
+O **bloco cadastral** reúne `estabelecimento`, `produto`, `fornecedor` e a
+associativa `produto_fornecedor`. O estabelecimento guarda também as credenciais
+de acesso, decisão detalhada adiante. A tabela `produto` é identificada pelo
+código que o próprio gestor usa na planilha, e não por chave gerada pelo sistema,
+para que o mesmo identificador atravesse todas as planilhas enviadas sem exigir
+tradução. A associativa `produto_fornecedor` carrega o prazo médio de entrega e
+sua variabilidade — os dois parâmetros que alimentam a Equação (7) —, modelada
+como *muitos-para-muitos* porque um produto pode ter mais de um fornecedor com
+prazos distintos.
+
+O **bloco transacional** é a tabela `venda`, que registra produto, data-hora,
+quantidade, valor e indicador de promoção. É a maior tabela do sistema e a única
+com índice composto por produto e data, porque a consulta que a percorre é
+sempre a mesma: recuperar a série histórica de um produto em ordem cronológica
+para alimentar o motor.
+
+O **bloco analítico** guarda o que o motor produz. `previsao` armazena um ponto
+por dia previsto, com o modelo que o gerou; `metrica_modelo` armazena MAPE, RMSE
+e MAE por modelo e execução, com um campo booleano que marca o vencedor. As duas
+tabelas são separadas porque têm cardinalidades diferentes — uma execução gera
+trinta previsões e apenas duas linhas de métrica, uma por modelo. Manter as
+métricas dos dois modelos, e não só as do vencedor, é o que torna possível o
+painel comparativo que constitui o núcleo empírico deste trabalho: sem a linha
+do modelo perdedor não há comparação a exibir.
+
+Os parâmetros calculados — ponto de reposição, estoque de segurança, desvio
+padrão da demanda, dias até ruptura e a data do último cálculo — são gravados na
+própria tabela `produto`, e não em tabela à parte. São valores de cardinalidade
+um por produto, sobrescritos a cada execução do motor, e a desnormalização
+permite que as telas de estoque e de alertas sejam servidas por uma única
+consulta, sem junção.
+
+### 3.3.2 Esquema de ingestão
 
 A entrada do sistema são planilhas no formato `.xlsx`. Duas são obrigatórias:
 o catálogo de produtos, com identificador, nome e estoque atual, e o histórico
@@ -128,7 +189,7 @@ confiabilidade estatística. Produtos que não atingem esse mínimo são recusad
 pelo motor, e a interface sinaliza a ausência de previsão em vez de exibir um
 valor sem lastro.
 
-### 3.3.2 Base de validação empírica
+### 3.3.3 Base de validação empírica
 
 Os resultados apresentados na seção 4 foram obtidos sobre um conjunto de dados
 sintético, gerado por código com semente fixa, e não sobre vendas reais de um
@@ -141,7 +202,7 @@ permitem verificar se o motor **recupera uma estrutura conhecida**, porque a
 estrutura verdadeira da série foi definida por construção. O que se valida aqui
 é a instrumentação — se a régua mede o que diz medir —, não a magnitude do erro
 em um mercado específico. A validação externa sobre histórico real permanece
-como trabalho futuro, e a subseção 3.3.1 descreve o formato pelo qual esse
+como trabalho futuro, e a subseção 3.3.2 descreve o formato pelo qual esse
 histórico entraria sem alteração de código.
 
 O gerador produz 10 produtos ao longo de 365 dias do ano de 2024, totalizando
@@ -311,7 +372,7 @@ de `100 − MAPE`.
 ### 3.5.3 Protocolo de avaliação
 
 A avaliação principal usa divisão cronológica em 80% para treino e 20% para
-teste, o que corresponde, no conjunto descrito na subseção 3.3.2, a 292 dias de
+teste, o que corresponde, no conjunto descrito na subseção 3.3.3, a 292 dias de
 treino (de 1º de janeiro a 18 de outubro de 2024) e 73 dias de teste (de 19 de
 outubro a 30 de dezembro de 2024).
 
@@ -399,7 +460,40 @@ Na ausência das planilhas desejáveis, os parâmetros assumem os valores padrã
 três dias para o prazo de entrega, 1,0 para sua variabilidade e 95% para o nível
 de serviço.
 
-### 3.5.6 Equivalência entre a análise e o sistema em produção
+### 3.5.6 Interface do lojista
+
+O motor só cumpre sua função se o que ele calcula chegar ao gestor em termos
+acionáveis. A interface web expõe sete telas, das quais quatro concentram o uso
+cotidiano.
+
+**Figura 4 - Telas principais da aplicação**
+
+`[FIGURA: capturar de code/frontend/web — sugestão de mosaico com Dashboard,
+Estoque, Alertas e Comparativo de modelos]`
+
+Fonte: Autoral, 2026
+
+A tela de **importação** recebe as planilhas, valida cada arquivo
+individualmente e só habilita o processamento quando as duas obrigatórias estão
+íntegras. A de **estoque** lista o catálogo com um semáforo de urgência,
+calculado por comparação entre o estoque atual e o ponto de reposição do produto
+— e não por um corte fixo de dias, que ignoraria o prazo de entrega específico
+de cada item. A de **alertas** ordena por urgência os produtos que cruzaram o
+ponto de reposição, com a quantidade sugerida derivada do estoque de segurança.
+A de **comparativo de modelos** expõe MAPE, RMSE e MAE por produto e por modelo,
+com indicação de qual foi selecionado.
+
+Essa última tela merece nota, porque inverte uma convenção de produto: ela
+mostra ao usuário final a métrica de erro do próprio sistema, inclusive a do
+modelo perdedor. A decisão decorre do propósito do trabalho — a comparação entre
+modelos é o objeto de estudo, e ocultá-la na interface esvaziaria a contribuição
+empírica. Em um produto comercial, essa tela provavelmente seria restrita.
+
+As telas de sugestão de compra e de configurações completas foram especificadas
+mas deixadas fora do escopo de entrega, por não contribuírem para a pergunta de
+pesquisa.
+
+### 3.5.7 Equivalência entre a análise e o sistema em produção
 
 Uma decisão de implementação sustenta a validade interna de todos os resultados
 da seção 4: a camada de análise **importa os módulos de produção** em vez de

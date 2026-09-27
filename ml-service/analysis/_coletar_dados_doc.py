@@ -111,6 +111,9 @@ for pid in (ID_ESTAVEL, ID_VOLATIL):
         r_pr = au.avaliar_prophet(series[pid])
         linha["prophet"] = {"mape": r_pr["metricas"].mape, "rmse": r_pr["metricas"].rmse,
                             "mae": r_pr["metricas"].mae}
+    r_nv = au.avaliar_naive_sazonal(series[pid])
+    linha["naive_sazonal"] = {"mape": r_nv["metricas"].mape, "rmse": r_nv["metricas"].rmse,
+                              "mae": r_nv["metricas"].mae}
     resultados[str(pid)] = linha
 dados["walkforward"] = resultados
 
@@ -122,6 +125,8 @@ for pid in (ID_ESTAVEL, ID_VOLATIL):
     if PROPHET_OK:
         bt_pr = au.backtesting_rolling(series[pid], au.prever_prophet)
         entrada["prophet"] = bt_pr.to_dict("records")
+    bt_nv = au.backtesting_rolling(series[pid], au.prever_naive_sazonal)
+    entrada["naive_sazonal"] = bt_nv.to_dict("records")
     backtest[str(pid)] = entrada
 dados["backtesting"] = backtest
 
@@ -159,8 +164,11 @@ comparativo = pd.read_csv(csv)
 dados["comparativo"] = comparativo.to_dict("records")
 vitorias = comparativo[comparativo["vencedor"]]["modelo"].value_counts().to_dict()
 dados["vitorias"] = {k: int(v) for k, v in vitorias.items()}
+
+# Margem HW x Prophet (o baseline nao entra: a disputa e entre os dois modelos)
+motor = comparativo[comparativo.get("papel", "motor") == "motor"]
 dados["margens"] = []
-for pid, g in comparativo.groupby("produto_id"):
+for pid, g in motor.groupby("produto_id"):
     if len(g) == 2:
         mapes = g.set_index("modelo")["mape"]
         dados["margens"].append({
@@ -169,7 +177,30 @@ for pid, g in comparativo.groupby("produto_id"):
             "margem_pp": round(abs(float(mapes["holt_winters"] - mapes["prophet"])), 4),
         })
 
+# ── 7. Ganho do modelo vencedor sobre o baseline ingenuo sazonal ────────────
+dados["ganho_vs_baseline"] = []
+naive = comparativo[comparativo["modelo"] == "naive_sazonal"].set_index("produto_id")
+for pid, g in comparativo[comparativo["vencedor"]].groupby("produto_id"):
+    if pid not in naive.index:
+        continue
+    mape_venc = float(g["mape"].iloc[0])
+    mape_naive = float(naive.loc[pid, "mape"])
+    ganho_pp = mape_naive - mape_venc
+    dados["ganho_vs_baseline"].append({
+        "produto_id": int(pid),
+        "nome": g["nome"].iloc[0],
+        "modelo_vencedor": g["modelo"].iloc[0],
+        "mape_vencedor": round(mape_venc, 4),
+        "mape_naive": round(mape_naive, 4),
+        "ganho_pp": round(ganho_pp, 4),
+        "ganho_rel_pct": round(100 * ganho_pp / mape_naive, 2) if mape_naive else None,
+    })
+dados["n_supera_baseline"] = sum(
+    1 for r in dados["ganho_vs_baseline"] if r["ganho_pp"] > 0
+)
+
 destino = RAIZ / "analysis" / "results" / "dados_documento.json"
 destino.write_text(json.dumps(dados, indent=2, ensure_ascii=False), encoding="utf-8")
 print("JSON salvo:", destino)
 print("Prophet OK:", PROPHET_OK, "| vitórias:", dados["vitorias"])
+print("Supera o baseline ingênuo em:", dados["n_supera_baseline"], "/", len(dados["ganho_vs_baseline"]), "produtos")

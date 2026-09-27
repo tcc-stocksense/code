@@ -240,3 +240,88 @@ def carregar_series_reais(
         indice = pd.date_range(diario.index.min(), diario.index.max(), freq="D")
         series[int(produto_id)] = diario.reindex(indice, fill_value=0).astype(float)
     return series
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Baseline ingênuo sazonal — referência de comparação, NÃO faz parte do motor
+# ─────────────────────────────────────────────────────────────────────────────
+# Vive na camada de análise de propósito: é instrumento de avaliação, não um
+# terceiro modelo candidato. O motor em produção continua escolhendo apenas
+# entre Holt-Winters e Prophet; o ingênuo serve para responder se essa escolha
+# entrega ganho sobre uma regra que não estima parâmetro nenhum.
+_PERIODO_SAZONAL: int = 7
+
+
+def prever_naive_sazonal(
+    treino: pd.Series,
+    validacao: pd.Series,
+    periodo: int = _PERIODO_SAZONAL,
+) -> np.ndarray:
+    """
+    Previsão ingênua sazonal: repete o último ciclo semanal observado no treino.
+
+    Formalmente, ŷ(T+h) = y(T + h − m·⌈h/m⌉), com m = 7 (Hyndman e
+    Athanasopoulos, 2021): cada dia previsto recebe o valor do mesmo dia da
+    semana na última semana completa do conjunto de treino.
+
+    Args:
+        treino: Série de treino (DatetimeIndex diário).
+        validacao: Série de validação — só o comprimento é usado.
+        periodo: Tamanho do ciclo sazonal em dias (padrão 7).
+
+    Returns:
+        np.ndarray com uma previsão por dia da janela de validação.
+    """
+    ultimo_ciclo = np.asarray(treino.values[-periodo:], dtype=float)
+    n_previsoes = len(validacao)
+    repeticoes = int(np.ceil(n_previsoes / periodo))
+    return np.tile(ultimo_ciclo, repeticoes)[:n_previsoes]
+
+
+def avaliar_naive_sazonal(serie: pd.Series) -> dict:
+    """
+    Avalia o baseline ingênuo na mesma janela de validação dos modelos.
+
+    Usa o mesmo split 80/20 e o mesmo `_calcular_metricas` do motor, para que
+    o MAPE do ingênuo seja comparável ao dos modelos sem nenhuma ressalva
+    metodológica.
+
+    Args:
+        serie: Série temporal diária com DatetimeIndex.
+
+    Returns:
+        dict com chaves: treino, validacao, previsto (pd.Series), metricas.
+    """
+    treino, validacao = split_temporal(serie)
+    previsto = prever_naive_sazonal(treino, validacao)
+    metricas = hw._calcular_metricas(validacao.values, previsto)
+    return _resultado(treino, validacao, previsto, metricas)
+
+
+def treinar_e_avaliar_naive(serie: pd.Series) -> tuple[MetricasModelo, pd.Series]:
+    """
+    Espelha a assinatura de `treinar_e_avaliar` dos serviços de produção.
+
+    Permite tratar o baseline como um "modelo" nos laços de comparação do
+    notebook, sem que ele entre na disputa pelo vencedor. A previsão final
+    repete o último ciclo semanal da série completa, pelo mesmo horizonte de
+    30 dias adotado pelo motor.
+
+    Args:
+        serie: Série temporal diária com DatetimeIndex.
+
+    Returns:
+        metricas: MetricasModelo da janela de validação (split 80/20).
+        previsao: pd.Series de 30 dias iniciando no dia seguinte ao último.
+    """
+    metricas = avaliar_naive_sazonal(serie)["metricas"]
+
+    horizonte = hw._FORECAST_HORIZON
+    ultimo_ciclo = np.asarray(serie.values[-_PERIODO_SAZONAL:], dtype=float)
+    valores = np.tile(
+        ultimo_ciclo, int(np.ceil(horizonte / _PERIODO_SAZONAL))
+    )[:horizonte]
+    indice = pd.date_range(
+        serie.index.max() + pd.Timedelta(days=1), periods=horizonte, freq="D"
+    )
+    return metricas, pd.Series(valores, index=indice)

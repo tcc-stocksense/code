@@ -220,9 +220,9 @@ gaussiano multiplicativo de média 1,0, cujo desvio padrão é o parâmetro de
 variabilidade do produto e cujo valor é truncado ao intervalo [0,1; 3,0].
 
 O multiplicador semanal `S(t)` é o elemento que justifica o emprego de modelos
-sazonais, e sua amplitude está na Tabela 1.
+sazonais, e sua amplitude está na Tabela 2.
 
-**Tabela 1 - Multiplicador de demanda por dia da semana**
+**Tabela 2 - Multiplicador de demanda por dia da semana**
 
 | Dia da semana | Multiplicador |
 |---|---:|

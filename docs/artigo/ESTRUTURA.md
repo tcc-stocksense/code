@@ -138,8 +138,8 @@ Arquivo: `03-metodologia.md`
   - 3.3.1 Modelo de dados — **Figura 3**: DER (`database/der-diagram.mwb`,
     exportar como imagem); as 7 tabelas em três blocos
   - 3.3.2 Esquema de ingestão (planilhas, mínimo de 90 dias)
-  - 3.3.3 Base de validação sintética — **Tabela**: multiplicador semanal;
-    **Equação**: geradora
+  - 3.3.3 Base de validação sintética — **Tabela 2**: multiplicador semanal;
+    **Equação (1)**: geradora
 - `[✓]` **3.4** Tecnologias consideradas e descartadas `[fixo]` — ARIMA,
   aprendizado profundo, PostgreSQL, módulo ESG, ABC no motor
 - `[✓]` **3.5** Implementação `[fixo]` — modelos, métricas, protocolo de
@@ -150,80 +150,28 @@ Arquivo: `03-metodologia.md`
 
 ---
 
-## 4 Resultados e discussão `[fixo]`
+## 4 Resultados e discussão `[fixo]` — `[✓]` escrita
 
-> Todos os números saem de `ml-service/analysis/results/dados_documento.json`.
-> Nenhum é digitado à mão.
+Arquivo: `04-resultados.md`. Todos os números saem de
+`ml-service/analysis/results/dados_documento.json` e são conferidos por
+`verificar_numeros.py`.
 
-### 4.1 Perfil do conjunto de dados
-
-- `[ ]` **Tabela** — estatística descritiva dos 10 produtos: variabilidade,
-  média/dia, desvio, CV, % de zeros
-- `[ ]` **Figuras** — decomposição de dois produtos contrastantes
-  (`g1_decomposicao_produto1.png`, `g1_decomposicao_produto5.png`): mesma
-  estrutura sazonal, resíduo de amplitude muito diferente
-- `[ ]` Leitura: o CV nunca é baixo, mesmo no produto quase determinístico,
-  porque a oscilação semanal já produz dispersão — parte do "desvio" é estrutura
-  previsível, não ruído. Prepara a leitura dos MAPEs altos adiante.
-
-### 4.2 Acurácia dos modelos e ganho sobre o baseline
-
-- `[ ]` **Tabela** — MAPE, RMSE e MAE por produto × modelo; placar de 6 × 4 para
-  Holt-Winters
-- `[ ]` **Tabela** — margem de MAPE entre os dois modelos: 9 de 10 produtos com
-  diferença menor que 0,7 pp, cinco deles abaixo de 0,06 pp. **Nenhum modelo
-  domina o outro** — dizer isso com todas as letras.
-- `[ ]` **Tabela** — ganho sobre o baseline ingênuo: o motor vence em **10 de 10**
-  produtos, com redução mediana de erro de **45,1%** (mín. 12,8%, máx. 69,4%)
-- `[ ]` **Figuras** — `g2_previsto_real_*` (as curvas dos dois modelos são
-  visualmente indistinguíveis) e `g3_barras_erro_*`
-- `[ ]` Leitura dos MAPEs altos: Pão Francês em 81% parece falha até se comparar
-  com os 93% do ingênuo. O erro é alto porque a série é difícil, não porque o
-  modelo é ruim — e o motor ainda extrai sinal dela.
-
-### 4.3 Robustez e diagnóstico
-
-- `[ ]` **Tabelas** — backtesting de origem móvel, cinco dobras, dois produtos
-- `[ ]` **Figuras** — `g6_backtesting_*`, `g5_residuos_*`
-- `[ ]` A dobra de 188,4% do produto 5 **não deve ser omitida**: o baseline
-  também estourou na mesma janela (160,0%) e o RMSE mal se moveu. Como os dois
-  disparam juntos, fica demonstrado que é artefato do denominador do MAPE, não
-  falha de previsão. Analisar a dobra ruim é mais forte que escondê-la.
-
-### 4.4 Da previsão à decisão de reposição
-
-- `[ ]` **Tabela** — estoque de segurança, ponto de reposição e dias até ruptura
-  para dois produtos, com todas as etapas do cálculo
-- `[ ]` **Figuras** — `g7_reposicao_*`
-- `[ ]` Leitura de negócio: o Arroz tem 15 unidades contra ponto de reposição de
-  65,8 — já deveria ter sido pedido, ruptura em 1,15 dia. A Banana tem 200 contra
-  85,0, situação confortável.
-
-### 4.5 Discussão `[fixo]`
-
-> O template usa lead-ins em negrito abrindo parágrafo. Cada bloco abaixo é um.
-
-- `[ ]` **Por que os modelos empatam:** o achado central e mais original. Em
-  10 de 10 produtos o otimizador convergiu para α ≈ β ≈ γ ≈ 0. Com α = 0 o
-  Holt-Winters deixa de ser filtro adaptativo e degenera para reta com padrão
-  semanal fixo — a mesma família de função que o Prophet ajusta nesse cenário.
-  O otimizador chegou lá porque o gerador não tem quebra alguma: adaptar-se ao
-  dado recente seria reagir a ruído puro.
-- `[ ]` **O que isso valida e o que delimita:** valida o motor, que recuperou a
-  estrutura conhecida, inclusive a informação de que ela é estacionária; e
-  delimita o alcance, porque o empate é propriedade deste conjunto de dados, não
-  verdade geral sobre os dois modelos.
-- `[ ]` **Por que o ingênuo perde por tanto:** o baseline repete **uma** semana —
-  uma realização ruidosa por dia da semana —, enquanto o Holt-Winters estima o
-  perfil semanal a partir de ~40 semanas, e a média mata o ruído. O α ≈ 0 não
-  tornou o modelo trivial: tornou-o um estimador de perfil semanal, e é aí que
-  estão os 49% de ganho.
-- `[ ]` **Consequência arquitetural:** em dados reais, com quebras de patamar e
-  sazonalidade que evolui, espera-se α > 0 e separação entre os modelos. É essa
-  previsão testável que justifica manter os dois no sistema com seleção
-  automática por produto, em vez de fixar um.
-
----
+- `[✓]` **4.1** Perfil do conjunto de dados — **Tabela 3** (descritiva);
+  **Figuras 5 e 6** (`g1_decomposicao_*`). O CV nunca é baixo porque a oscilação
+  semanal já produz dispersão: parte do desvio é estrutura, não ruído.
+- `[✓]` **4.2** Acurácia dos modelos e ganho sobre o baseline — **Tabela 4**
+  (MAPE/RMSE/MAE, placar 6 × 4), **Tabela 5** (margens: 9 de 10 abaixo de
+  0,7 pp), **Tabela 6** (ganho: 10 de 10, redução mediana de 45,1%);
+  **Figuras 7 e 8** (`g2_previsto_real_*`).
+- `[✓]` **4.3** Robustez e diagnóstico — **Tabelas 7 e 8** (backtesting);
+  **Figuras 9 e 10** (`g6_backtesting_*`), **Figuras 11 e 12**
+  (`g5_residuos_*`). A dobra de 19/11 do produto 5 é analisada, não omitida:
+  MAPE e RMSE apontam vencedores opostos sobre os mesmos dados.
+- `[✓]` **4.4** Da previsão à decisão de reposição — **Tabela 9**;
+  **Figuras 13 e 14** (`g7_reposicao_*`).
+- `[✓]` **4.5** Discussão `[fixo]` — **Tabela 10** (α, β, γ) e quatro blocos com
+  lead-in em negrito: por que os modelos empatam · o que isso valida e o que
+  delimita · por que o baseline perde por tanto · consequência arquitetural.
 
 ## 5 Considerações finais `[fixo]`
 
@@ -259,36 +207,24 @@ Arquivo: `03-metodologia.md`
 
 ## Numeração de figuras e tabelas
 
-A numeração é **contínua no documento inteiro**, não reinicia por seção. Só
-fecha quando todas as seções estiverem escritas e a seleção de figuras estiver
-decidida — por isso os arquivos de seção usam numeração provisória, que o script
-de geração renumera ao montar o `.docx`.
-
-Situação atual:
+Contínua no documento inteiro. **Fechada para as seções 3 e 4**; só a Tabela 1
+depende da seção 2 ainda não escrita.
 
 | Seção | Figuras | Tabelas |
 |---|---|---|
-| 2 | nenhuma prevista | Tabela de trabalhos relacionados |
-| 3 | contexto C4, containers C4, DER, mosaico de telas | multiplicador semanal |
-| 4 | a definir — ver abaixo | descritiva, métricas, margens, ganho, backtesting, reposição |
+| 2 | nenhuma prevista | **1** — trabalhos relacionados |
+| 3 | **1** contexto C4 · **2** containers C4 · **3** DER · **4** telas | **2** — multiplicador semanal |
+| 4 | **5–6** decomposição · **7–8** previsto × real · **9–10** backtesting · **11–12** resíduos · **13–14** reposição | **3** descritiva · **4** métricas · **5** margens · **6** ganho · **7–8** backtesting · **9** reposição · **10** α β γ |
 | 5 | nenhuma | nenhuma |
 
-**A seção 4 precisa de uma decisão de corte.** Existem 14 PNGs gerados pela
-camada de análise (7 tipos × 2 produtos). Usar todos infla a seção e é
-improvável que caiba. Ordem de prioridade sugerida, da mais para a menos
-essencial:
+Total: **14 figuras e 10 tabelas**. Das 14 figuras da camada de análise, entram
+12 — ficam de fora `g3_barras_erro_*` (redundante com a Tabela 4) e
+`g4_erro_horizonte_*` (o argumento sobre acúmulo de erro no horizonte cabe em
+texto). As outras duas figuras são os diagramas C4 e o DER.
 
-1. `g2_previsto_real_*` — ajuste fora da amostra; mostra que as curvas dos dois
-   modelos são indistinguíveis, que é o resultado central
-2. `g1_decomposicao_*` — existe sinal previsível a capturar
-3. `g7_reposicao_*` — a tradução de estatística em decisão de compra
-4. `g6_backtesting_*` — robustez em janelas independentes
-5. `g5_residuos_*` — diagnóstico de ajuste
-6. `g4_erro_horizonte_*` — crescimento do erro com o horizonte
-7. `g3_barras_erro_*` — redundante com a tabela de métricas; primeiro a cortar
-
-`[!]` **Depende de:** limite de páginas do artigo, que o template não declara.
-Calibrar pelos artigos GRP01–GRP05 em `7-sem-TCC/docs/exemplos/`.
+Pela densidade dos artigos GRP01–GRP05 (230–250 palavras por página com muitas
+figuras), 14 figuras cabem folgadamente no teto de 30 páginas — o GRP02 tem 29
+figuras em 24 páginas.
 
 ---
 

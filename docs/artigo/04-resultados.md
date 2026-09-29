@@ -231,9 +231,32 @@ tamanho do denominador, não a qualidade da previsão. Declarar e explicar a dob
 desfavorável é mais sólido que apresentar apenas as janelas convenientes, e
 reforça a limitação do MAPE já registrada na subseção 3.5.2.
 
-**Figura 9 - Diagnóstico de resíduos — produto 1 (Holt-Winters)**
+**Figura 9 - Backtesting de origem móvel — produto 1 (Arroz 5kg)**
+
+`[FIGURA: ml-service/analysis/figures/g6_backtesting_produto1.png]`
+
+Fonte: Autoral, 2026
+
+**Figura 10 - Backtesting de origem móvel — produto 5 (Banana Prata kg)**
+
+`[FIGURA: ml-service/analysis/figures/g6_backtesting_produto5.png]`
+
+Fonte: Autoral, 2026
+
+As Figuras 9 e 10 tornam visível o contraste entre os dois produtos. No arroz as
+três linhas correm próximas e estáveis; na banana, a dobra de novembro produz um
+pico que afeta as três abordagens simultaneamente — inclusive o baseline —, o
+que é a assinatura gráfica de um problema da métrica, e não de um modelo.
+
+**Figura 11 - Diagnóstico de resíduos — produto 1 (Holt-Winters)**
 
 `[FIGURA: ml-service/analysis/figures/g5_residuos_produto1_holt_winters.png]`
+
+Fonte: Autoral, 2026
+
+**Figura 12 - Diagnóstico de resíduos — produto 5 (Holt-Winters)**
+
+`[FIGURA: ml-service/analysis/figures/g5_residuos_produto5_holt_winters.png]`
 
 Fonte: Autoral, 2026
 
@@ -241,8 +264,11 @@ O diagnóstico de resíduos verifica se o modelo extraiu toda a estrutura
 disponível. Um ajuste adequado deixa resíduos centrados em zero, sem padrão
 temporal e sem autocorrelação — aproximadamente ruído branco. O critério de
 refutação é explícito: um pico na função de autocorrelação no atraso 7
-indicaria sazonalidade semanal não capturada. A Figura 9 não apresenta esse
-pico, o que sustenta a conclusão de que o que restou é ruído irredutível.
+indicaria sazonalidade semanal não capturada. A Figura 11 não apresenta esse
+pico, o que sustenta a conclusão de que o que restou é ruído irredutível. A
+Figura 12 mostra o mesmo padrão para a banana prata, com resíduos de amplitude
+muito maior — coerente com a decomposição da Figura 6 — mas igualmente sem
+estrutura remanescente.
 
 ## 4.4 Da previsão à decisão de reposição
 
@@ -278,11 +304,23 @@ mais de um dia. A banana tem 200 unidades contra 85,02 e está confortável por
 cerca de treze dias. É essa tradução — de erro estatístico para instrução
 acionável — que sustenta a proposta da plataforma.
 
-**Figura 10 - Projeção de estoque e ponto de reposição — produto 1**
+**Figura 13 - Projeção de estoque e ponto de reposição — produto 1 (Arroz 5kg)**
 
 `[FIGURA: ml-service/analysis/figures/g7_reposicao_produto1.png]`
 
 Fonte: Autoral, 2026
+
+**Figura 14 - Projeção de estoque e ponto de reposição — produto 5 (Banana Prata kg)**
+
+`[FIGURA: ml-service/analysis/figures/g7_reposicao_produto5.png]`
+
+Fonte: Autoral, 2026
+
+As Figuras 13 e 14 projetam o consumo do estoque atual à demanda média prevista
+e marcam o instante em que a linha cruza o ponto de reposição. No arroz o
+cruzamento já ocorreu; na banana, ocorre por volta do oitavo dia — bem antes da
+ruptura, que é o comportamento desejado, já que o pedido precisa ser feito com a
+antecedência do prazo de entrega.
 
 ## 4.5 Discussão
 

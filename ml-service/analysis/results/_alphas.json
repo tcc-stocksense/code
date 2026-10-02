@@ -1,0 +1,72 @@
+[
+  {
+    "pid": 1,
+    "nome": "Arroz 5kg",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  },
+  {
+    "pid": 2,
+    "nome": "Feijão Carioca 1kg",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  },
+  {
+    "pid": 3,
+    "nome": "Leite Integral 1L",
+    "a": 4e-05,
+    "b": 4e-05,
+    "g": 9e-05
+  },
+  {
+    "pid": 4,
+    "nome": "Pão Francês",
+    "a": 0.00202,
+    "b": 0.0009,
+    "g": 0.00036
+  },
+  {
+    "pid": 5,
+    "nome": "Banana Prata kg",
+    "a": 1e-05,
+    "b": 0.0,
+    "g": 9e-05
+  },
+  {
+    "pid": 6,
+    "nome": "Sal Refinado 1kg",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  },
+  {
+    "pid": 7,
+    "nome": "Açúcar Cristal 1kg",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  },
+  {
+    "pid": 8,
+    "nome": "Óleo de Soja 900ml",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  },
+  {
+    "pid": 9,
+    "nome": "Frango Inteiro kg",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  },
+  {
+    "pid": 10,
+    "nome": "Refrigerante 2L",
+    "a": 0.0,
+    "b": 0.0,
+    "g": 0.0
+  }
+]

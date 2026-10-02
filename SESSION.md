@@ -22,6 +22,87 @@
 
 ---
 
+## Última Sessão — 2026-09/10 (Artigo do TCC — redação completa, baseline ingênuo e guia de estudo)
+
+> Branch: `analise-validacao-modelos`. Sessão longa, dedicada à redação do artigo científico.
+> **O artigo está completo de ponta a ponta** em `docs/artigo/`, gerando `.docx` no template
+> da SPTech. Ponto de entrada: [`docs/artigo/README.md`](docs/artigo/README.md).
+
+### O que foi feito
+
+- **Baseline ingênuo sazonal** (`ŷ(t) = y(t−7)`) acrescentado à camada de análise. Era o furo
+  mais grave do comparativo: sem um piso, HW × Prophet só respondia *qual dos dois é melhor*,
+  nunca *se algum vale a pena*. **Resultado: o motor supera o ingênuo em 10/10 produtos, com
+  redução mediana de erro de 45,1%** (mín. 12,8%, máx. 69,4%). Vive em `analysis/`, não em
+  `app/services/` — é instrumento de avaliação, não um terceiro modelo do motor.
+- **Artigo completo**, sete arquivos em `docs/artigo/`, ~14.000 palavras, 16 figuras e 11 tabelas:
+  front matter (resumo/abstract), introdução, fundamentação, metodologia, resultados,
+  considerações finais e referências.
+- **`gerar_docx.py`** — monta o `.docx` usando o template da SPTech como doador de formatação.
+- **`verificar_numeros.py`** — confere cada célula das tabelas contra `dados_documento.json`.
+  Pegou uma mediana calculada errada (49,4% onde o certo era 45,1%) antes de ir para o artigo.
+- **`gerar_der.py`** — desenha o DER a partir das migrations Flyway, em vez de exportar do
+  Workbench. Se o schema mudar, o diagrama se regenera.
+- **Entrevistas viraram dado primário.** As 7 respostas do formulário entraram como 3.3.1
+  (método) e 4.1 (resultados). Achado mais forte: **7/7 decidem a compra olhando a prateleira**,
+  inclusive os 4 que já têm software.
+- **Infra entrou no artigo** (3.2, bloco F) após merge da `main`, com **`gerar_infra.py`**
+  desenhando a topologia a partir dos `.tf` — era o único elemento da arquitetura sem figura.
+- Figuras externas copiadas para `docs/artigo/figuras/` — o artigo passa a ser autocontido.
+- **`docs/GUIA-DE-ESTUDO-TCC.md`** — guia de estudo do grupo, ~4.000 palavras. Absorve e
+  substitui o antigo `NOTAS-DEFESA.md`. Traz os conceitos do zero (série temporal, HW, Prophet,
+  as três métricas com exemplo numérico, baseline, split cronológico, Ballou passo a passo),
+  os resultados comentados, as perguntas de banca com resposta, a tabela honesta das oito
+  vulnerabilidades e a divisão de estudo entre os cinco integrantes.
+- **Redução deliberada da carga matemática do artigo**, para diminuir a superfície de perguntas
+  na arguição: **de 9 equações para 3**. Ficaram só as de Ballou (estoque de segurança, ponto de
+  reposição, dias até ruptura) — aritmética de negócio, que é o que o grupo defende com
+  naturalidade. As demais viraram prosa; a explicação detalhada migrou para o guia de estudo.
+  Em contrapeso, a interface ganhou a tabela dos sete indicadores e 4.5 ganhou a leitura de
+  negócio.
+- **`verificar_referencias.py`** — audita figuras, tabelas, equações e subseções. Nasceu de um
+  bug real: renumerar por substituição simples não casa com o plural, e **quatro referências**
+  ("As Figuras 5 e 6", "7 e 8", "9 e 10", "13 e 14") ficaram apontando para as figuras erradas.
+  Todas corrigidas.
+
+### Decisões tomadas
+
+| Decisão | Motivo |
+|---|---|
+| Seguir o template **oficial** da SPTech (5 seções), não a estrutura sugerida por IA | Arquitetura é `3.2`, não seção própria; limitações é parágrafo na 5; não há seção de hipóteses — viraram objetivos específicos em 1.2 |
+| Markdown durante a escrita, `.docx` gerado por script | `.docx` é binário e não mostra diff; a formatação é aplicada no fim, não à mão |
+| Validação sobre dados **sintéticos**, declarada na metodologia | Não há dado do parceiro. Declarar em 3.3.4 é mais forte que ser cobrado nas limitações |
+| Entre os TCCs da instituição, citar só o **GRP03** | Aplicou Prophet a estoque sem comparar modelos — é a lacuna que este trabalho preenche. GRP04 e GRP05 não preveem demanda |
+| Dois achados de campo que **contrariam** o projeto entram declarados | 6/7 relatam sazonalidade mensal (o dataset só modela a semanal); 3/7 citam validade como dor principal, módulo cortado do escopo |
+| Reduzir a matemática exposta, **mas manter o α≈0** | A explicação do empate é a única resposta do artigo para "por que empataram", e essa pergunta é certa na banca. Simplificada, sem equação — não removida |
+| Diagramas **derivados da fonte**, não desenhados à mão | DER a partir das migrations, infra a partir do Terraform. Mesma lógica dos números: se a fonte muda, a figura acompanha |
+
+### Pendências em aberto
+
+- **Prenomes** de FERREIRA; MOTA e SILVA; ARAÚJO — sem eles a referência ABNT é inválida.
+- **Referência de metodologia científica** do curso (marcador `[CITAR:]` na abertura da seção 3).
+- **Figura 7** — capturar mosaico 2×2 das telas (painel, estoque, alertas, comparativo). É a
+  **única figura pendente** de 17.
+- **Ordem ABSTRACT/RESUMO** — o template manda inglês primeiro; GRP01, GRP02 e GRP04 fazem o
+  inverso. Confirmar com o orientador.
+- **BPMN TO-BE** contém a tarefa "Verificar produtos próximos do vencimento (ESG)", que saiu do
+  escopo, e o typo "vemdas". Figura promete o que o sistema não entrega — editar.
+- **Extensão: decisão ainda em aberto.** O artigo segue em ~14.000 palavras (≈55 páginas). A
+  rodada de corte redistribuiu o risco — tirou matemática, pôs produto — mas **não encurtou**:
+  os cortes foram compensados pelas adições. Encurtar de verdade agora é escolha de conteúdo.
+  Candidatas, por ordem de dor: 3.2 Arquitetura (919 palavras) e 4.1 Caracterização do campo
+  (819) — esta última vale defender, porque ancora o problema em dado real. Referência da turma:
+  GRP01 17 páginas, GRP02 24, GRP03 22, GRP05 40, GRP04 48.
+- `7-sem-TCC/docs/` **não é repositório** — os SVG originais dos BPMN, a revisão bibliográfica
+  em `.docx`, o mapa do problema e o Ishikawa não estão versionados em lugar nenhum. Só os PNG
+  derivados, agora em `docs/artigo/figuras/`. Risco de perda se a máquina falhar.
+- **BPMN TO-BE** contém a tarefa "Verificar produtos próximos do vencimento (ESG)", que saiu do
+  escopo, e o typo "vemdas" — a figura promete o que o sistema não entrega.
+- **Prenomes** de FERREIRA; MOTA e SILVA; ARAÚJO e a **referência de metodologia científica**
+  seguem como `[CITAR:]` em `referencias.md`.
+
+---
+
 ## Última Sessão — 2026-09-12/13 (Infra — deploy em produção na AWS)
 
 > Branch: `chore/infra-terraform-aws`. Duas sessões emendadas. A primeira preparou tudo sem
@@ -230,6 +311,56 @@ prependidas por cima do título "Última Sessão" anterior.
 ---
 
 ## Sessão — 2026-07-10 (Épico 5 — Dashboard + Alertas + Curva ABC)
+
+---
+
+## Última Sessão — 2026-07-24 (ml-service: Prophet consertado + notebook de análise validado)
+
+> Branch: `analise-validacao-modelos` (notebook de validação empírica dos modelos, Tela 10 —
+> núcleo acadêmico do TCC). Foco da sessão: fazer o Prophet funcionar e rodar o notebook ponta a ponta.
+
+### O que foi feito
+
+- **Prophet consertado (T-12 finalmente resolvido).** Diagnosticada a causa raiz do
+  `AttributeError: 'Prophet' object has no attribute 'stan_backend'`: **não** era CmdStan ausente
+  (o `~/.cmdstan/cmdstan-2.39.0` até existe). É **conflito de versões** — o `prophet 1.1.6` empacota
+  um CmdStan enxuto em `prophet/stan_model/cmdstan-2.33.1/` **sem `makefile`**, e o `cmdstanpy 1.3.0`
+  (puxado transitivamente, sem pin) passou a **exigir** o `makefile` na validação. O
+  `prophet_model.bin` já vem pré-compilado — nada precisa compilar.
+- **Conserto: pin `cmdstanpy==1.2.4`** no `ml-service/requirements.txt` (contemporâneo do cmdstan 2.33,
+  não exige makefile). Reprodutível e válido no Docker/nuvem — **descarta** o antigo caminho de instalar
+  Rtools + `install_cmdstan`, que era desnecessário. Reinstalar o prophet **não** resolvia (mesmo par de
+  versões). A alternativa de criar um `makefile` stub foi testada e descartada (some ao recriar o venv).
+- **Validação completa:** Prophet instancia/treina/prevê; `pip check` limpo; **suíte do ml-service:
+  66 testes, 0 falhas** (13 do `test_prophet_service.py`, agora rodando de verdade — antes 11 falhavam).
+- **Notebook de análise rodado ponta a ponta** (`ml-service/analysis/analise_modelos.ipynb`), 28 células,
+  0 erros, **Prophet ativo**. Regenerou as 14 figuras e o `comparativo_modelos.csv` com os dois modelos
+  competindo. **Resultado real (dados sintéticos, seed 42): 6 vitórias Holt-Winters × 4 Prophet**, margens
+  pequenas — nenhum modelo domina, a seleção por produto se justifica (boa narrativa p/ a banca).
+- Dependências do Jupyter (`analysis/requirements-analysis.txt`) instaladas no `venv` do projeto.
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| Pin `cmdstanpy==1.2.4` em vez de manipular pasta/instalar CmdStan | Reprodutível, versionado, vai pro Docker/nuvem; resolve pra todos que instalam as deps |
+| Não reinstalar prophet nem instalar Rtools/CmdStan | O `.bin` já é pré-compilado; o problema era só a validação estrita do cmdstanpy 1.3.0 |
+| Reautorar o commit do notebook (Claude → GabrielBoos22) e regenerar figuras com Prophet | Autoria correta; as figuras commitadas antes eram só Holt-Winters (Prophet caído) e não serviam pro TCC |
+
+### Pendências que ficaram em aberto
+
+- **Notebook: dataset real** — a última seção é pulada sem `analysis/data/vendas_real.xlsx`; rodar com
+  dados reais quando disponíveis.
+- **T-54 (benchmark do motor)** e **T-53 (warm-up do Prophet)** — agora **desbloqueados** (Prophet
+  funciona); podem rodar.
+- **T-10 (ml-service)** — regressor `is_promocional` no Prophet (MVP-opcional) segue não implementado;
+  ver T-55 (risco de validade acadêmica da comparação).
+- Recriar o `venv` do zero reintroduz o bug **se** as deps não forem reinstaladas do `requirements.txt`
+  atualizado — com o pin, um `pip install -r requirements.txt` já traz a versão certa.
+
+---
+
+## Última Sessão — 2026-07-10 (Épico 5 — Dashboard + Alertas + Curva ABC)
 
 > Branch: `feat/dashboard-alertas`, **empilhada** sobre a `feat/produto-detalhe-metricas`
 > (decisão do usuário — o Épico 4 ainda não foi mergeado). O PR do Épico 5 só fica limpo
@@ -781,8 +912,8 @@ ml-service/
 
 | Item | Status | Observação |
 |---|---|---|
-| Prophet: CmdStan não instalado no Windows | ❌ Bloqueado | `mingw32-make` não encontrado. Instalar Rtools: `winget install -e --id RProject.Rtools`, adicionar `C:\rtools44\mingw64\bin` ao PATH, depois `python -m cmdstanpy.install_cmdstan` |
-| Testes do `test_prophet_service.py` | ❌ 11 falhas | Dependem da resolução do CmdStan acima |
+| Prophet: `stan_backend` AttributeError (T-12) | ✅ Resolvido (2026-07-24) | **Não** era CmdStan ausente — era conflito de versões. Pin `cmdstanpy==1.2.4` no `requirements.txt` (a 1.3.0 exige `makefile` no cmdstan empacotado do prophet 1.1.6). NÃO precisa de Rtools/`install_cmdstan`; o `.bin` já é pré-compilado |
+| Testes do `test_prophet_service.py` | ✅ 13/13 passam | Após o pin do cmdstanpy; suíte completa do ml-service: 66 testes, 0 falhas |
 | `generate_report.py` | ❌ Não existe | Precisa ser criado; deve gerar PDF com gráficos de acurácia dos modelos |
 | Migrations V2, V3, V4 | ✅ Existem | Criadas em commit `3fef6bc` — V1 (schema), V2 (seed padrão), V3 (add estabelecimento_id), V4 (add índices). **Consolidadas depois em uma única `V1` + `V2` de seed** (ver commits mais recentes) |
 | ml-service executado localmente | ⚠️ Parcial | Servidor não foi levantado; testes rodaram via TestClient |

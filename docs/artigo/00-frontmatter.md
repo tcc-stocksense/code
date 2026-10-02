@@ -13,7 +13,7 @@ empírica entre Holt-Winters e Prophet)
 Danilo Silvestre Faustino, Gabriel Boos Duarte, Gabriel Sanchez, Pedro Primon,
 Pedro Paulo Pinto
 
-Orientador(a): `[CONFIRMAR: titulação e nome do orientador]`
+Orientador: Thiago Bonnacelli
 
 Faculdade São Paulo Tech School - São Paulo, SP, Brasil
 

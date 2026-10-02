@@ -202,12 +202,12 @@ resultados que fundamentam ambos estão na subseção 4.1.
 
 **Figura 5 - Modelo entidade-relacionamento**
 
-`[FIGURA: tcc-stocksense/database/der-diagram.mwb — exportar como imagem]`
+`[FIGURA: docs/arquitetura/der-stocksense.png]`
 
 Fonte: Autoral, 2026
 
 O esquema tem sete tabelas, versionadas por migrações incrementais, e organiza-se
-em três blocos.
+em três blocos, destacados por cor na Figura 5.
 
 O **bloco cadastral** reúne `estabelecimento`, `produto`, `fornecedor` e a
 associativa `produto_fornecedor`. O estabelecimento guarda também as credenciais
@@ -535,32 +535,45 @@ O motor só cumpre sua função se o que ele calcula chegar ao gestor em termos
 acionáveis. A interface web expõe sete telas, das quais quatro concentram o uso
 cotidiano.
 
+A aplicação implementa dez telas, agrupáveis em três finalidades.
+
+**Entrada de dados.** A tela de *importação* recebe as planilhas, valida cada
+arquivo individualmente e só habilita o processamento quando as duas
+obrigatórias estão íntegras. A de *login* autentica por estabelecimento.
+
+**Operação diária.** O *painel inicial* reúne quatro indicadores agregados:
+número de produtos sob risco de ruptura no horizonte de sete dias, número em
+situação crítica, valor financeiro exposto e acurácia corrente do motor,
+expressa como o complemento do MAPE do modelo selecionado. A tela de *estoque*
+lista o catálogo com um semáforo de urgência calculado por comparação entre o
+estoque atual e o ponto de reposição do produto — e não por um corte fixo de
+dias, que ignoraria o prazo de entrega específico de cada item. A de *alertas*
+ordena por urgência os produtos que cruzaram o ponto de reposição, com a
+quantidade sugerida derivada do estoque de segurança. A de *detalhe do produto*
+abre a série histórica, a previsão e os parâmetros calculados para um item, e
+permite ajustar o lead time e o nível de serviço com recálculo imediato.
+
+**Análise.** A *curva ABC* apresenta o gráfico de Pareto e a classificação por
+faturamento. O *comparativo de modelos* expõe MAPE, RMSE e MAE por produto e por
+modelo, com indicação de qual foi selecionado em cada caso.
+
 **Figura 6 - Telas principais da aplicação**
 
-`[FIGURA: capturar de code/frontend/web — sugestão de mosaico com Dashboard,
-Estoque, Alertas e Comparativo de modelos]`
+`[FIGURA: capturar da aplicação — mosaico 2 × 2 com painel inicial, estoque,
+alertas e comparativo de modelos]`
 
 Fonte: Autoral, 2026
 
-A tela de **importação** recebe as planilhas, valida cada arquivo
-individualmente e só habilita o processamento quando as duas obrigatórias estão
-íntegras. A de **estoque** lista o catálogo com um semáforo de urgência,
-calculado por comparação entre o estoque atual e o ponto de reposição do produto
-— e não por um corte fixo de dias, que ignoraria o prazo de entrega específico
-de cada item. A de **alertas** ordena por urgência os produtos que cruzaram o
-ponto de reposição, com a quantidade sugerida derivada do estoque de segurança.
-A de **comparativo de modelos** expõe MAPE, RMSE e MAE por produto e por modelo,
-com indicação de qual foi selecionado.
-
-Essa última tela merece nota, porque inverte uma convenção de produto: ela
+A tela de comparativo merece nota, porque inverte uma convenção de produto: ela
 mostra ao usuário final a métrica de erro do próprio sistema, inclusive a do
 modelo perdedor. A decisão decorre do propósito do trabalho — a comparação entre
 modelos é o objeto de estudo, e ocultá-la na interface esvaziaria a contribuição
-empírica. Em um produto comercial, essa tela provavelmente seria restrita.
+empírica. Em um produto comercial, essa tela provavelmente seria restrita a um
+perfil técnico.
 
-As telas de sugestão de compra e de configurações completas foram especificadas
-mas deixadas fora do escopo de entrega, por não contribuírem para a pergunta de
-pesquisa.
+Duas telas foram especificadas e mantidas fora do escopo de entrega, por não
+contribuírem para a pergunta de pesquisa: a sugestão de compra agrupada por
+fornecedor e a tela de configurações completa.
 
 ### 3.5.7 Equivalência entre a análise e o sistema em produção
 

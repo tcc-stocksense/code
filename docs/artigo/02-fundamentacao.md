@@ -94,7 +94,7 @@ subseção 3.5.5.
 Nem todo produto merece a mesma atenção de gestão. A classificação ABC ordena os
 itens por representatividade no faturamento e os agrupa em três classes: A, os
 poucos itens que respondem pela maior parte da receita; B, de importância
-intermediária; e C, de baixa relevância individual. O Sebrae (2023d) recomenda
+intermediária; e C, de baixa relevância individual. O Sebrae (2023c) recomenda
 explicitamente sua aplicação em mercearias e supermercados de bairro como
 ferramenta de priorização.
 
@@ -210,7 +210,7 @@ referência mínima, papel desempenhado pelo baseline descrito na subseção 3.5
 | Silva e Araújo (2022) | Curva ABC construída manualmente a partir do ERP de um supermercado de médio porte | Identificação dos itens de maior saída e priorização da gestão | Análise retrospectiva e manual; não prevê demanda nem automatiza a classificação |
 | Ferreira e Mota (2022) | Estudo de caso sobre o uso de sistema de controle de estoque em supermercado de pequeno porte | Diagnóstico da divergência entre estoque registrado e físico, gerando excesso e ruptura | Diagnóstico sem proposta de solução técnica |
 | Taylor e Letham (2018) | Modelo Prophet aplicado a séries temporais de negócio em escala | Desempenho competitivo frente a ARIMA automatizado | Validação em séries de grande porte, distantes do varejo de bairro |
-| Begattini *et al.* (`[CONFIRMAR: ano]`) | Prova de conceito de gestão de estoque farmacêutico com Prophet | Modelo preditivo aplicado sobre histórico de vendas para apoiar decisão de compra | **Modelo único, sem comparação com alternativa**; não calcula parâmetros de reposição |
+| Begattini *et al.* (2025) | Prova de conceito de gestão de estoque farmacêutico com Prophet | Modelo preditivo aplicado sobre histórico de vendas para apoiar decisão de compra | **Modelo único, sem comparação com alternativa**; não calcula parâmetros de reposição |
 | **Este trabalho (2026)** | Holt-Winters e Prophet comparados por produto, com baseline ingênuo, e conversão em parâmetros de reposição | Seleção automática por produto e ganho mensurado sobre a referência mínima | Validação sobre dados sintéticos |
 
 Fonte: Autoral, 2026
@@ -220,7 +220,7 @@ Conforme sintetizado na Tabela 1, os trabalhos revisados cobrem o problema por
 Ferreira e Mota (2022) documentam a realidade do pequeno varejo brasileiro, mas
 permanecem no plano descritivo. Taylor e Letham (2018) validam um modelo
 preditivo, porém em séries de porte muito distante do mercado de bairro.
-Begattini *et al.* aplicam previsão a estoque em contexto nacional e de pequeno
+Begattini *et al.* (2025) aplicam previsão a estoque em contexto nacional e de pequeno
 porte — o antecedente mais próximo —, mas adotam **um único modelo, sem
 comparação**, e não avançam até o cálculo de ponto de reposição.
 

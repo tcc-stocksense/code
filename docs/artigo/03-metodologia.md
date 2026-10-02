@@ -151,7 +151,7 @@ precisaria ser revista.
 
 **Figura 4 - Processo de reposição proposto (BPMN TO-BE)**
 
-`[FIGURA: ../../docs/contexto/BPMN-TO-BE 1.svg — converter para PNG]`
+`[FIGURA: docs/contexto/BPMN-TO-BE.png — converter de BPMN-TO-BE 1.svg]`
 
 Fonte: Autoral, 2026
 

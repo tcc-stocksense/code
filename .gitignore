@@ -42,6 +42,13 @@ npm-debug.log*
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
+# ── Notebooks ─────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Infra / AWS ───────────────────────────────────────────────────────────────
+infra/lab-credentials.env
+infra/dist/
+infra/scripts/.outputs.env
 
 # ── Terraform ─────────────────────────────────────────────────────────────────
 .terraform/
@@ -58,5 +65,5 @@ terraform.tfvars
 *.p12
 *.pfx
 
-# Artigo gerado (reconstruivel por gerar_docx.py)
+# ── Artigo gerado (reconstruivel por gerar_docx.py) ───────────────────────────
 docs/artigo/artigo-stocksense.docx

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 _MAPE_AVISO_LIMIAR: float = 50.0
 
 
-async def executar_previsao(request: PredictRequest) -> PredictResponse:
+def executar_previsao(request: PredictRequest) -> PredictResponse:
     """
     Orquestra o fluxo completo de previsão e cálculo de KPIs para um produto.
 

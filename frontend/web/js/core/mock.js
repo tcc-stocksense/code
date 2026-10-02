@@ -220,8 +220,11 @@ const handlers = {
     await delay(300);
     const id = parseInt(path.split('/')[2]);
     const p = PRODUTOS.find(x => x.id === id);
-    if (!p) return { estoque: body.estoque, diasRuptura: 0 };
-    p.estoque = Math.max(0, Math.round(Number(body.estoque) || 0));
+    // As telas passaram a enviar `estoqueAtual` (nome do campo no backend real).
+    // Aceitar os dois evita que o modo mock fique salvando 0 silenciosamente.
+    const novo = body?.estoqueAtual ?? body?.estoque;
+    if (!p) return { estoque: novo, diasRuptura: 0 };
+    p.estoque = Math.max(0, Math.round(Number(novo) || 0));
     const intel = inteligenciaEstoque(p);
     p.diasRuptura = intel.diasRuptura; // mantém o base coerente entre telas
     return { estoque: p.estoque, ...intel };

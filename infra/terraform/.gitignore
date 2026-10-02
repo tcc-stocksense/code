@@ -1,0 +1,7 @@
+# NUNCA versionar: o state guarda a chave privada SSH em texto claro
+*.tfstate
+*.tfstate.*
+.terraform/
+*.pem
+terraform.tfvars
+crash.log

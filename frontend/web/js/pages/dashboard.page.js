@@ -7,7 +7,7 @@ import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonKpiGrid, skeletonChart, skeletonTable } from '../components/skeleton.js';
-import { moedaBRcompacta } from '../core/format.js';
+import { moedaBRcompacta, dataBR, numero } from '../core/format.js';
 import { iconAlert } from '../components/icons.js';
 
 requireAuth();
@@ -15,17 +15,21 @@ const page = renderLayout('dashboard');
 
 // Loading state
 page.innerHTML = '';
-page.appendChild(skeletonKpiGrid(4));
+page.appendChild(skeletonKpiGrid(3));
 page.appendChild(skeletonChart());
 page.appendChild(skeletonTable(5, 4));
 
 async function carregarDashboard() {
   try {
-    const dados = await apiGet('/dashboard');
+    // A tabela "próximos alertas" sai da mesma fonte da tela de Alertas.
+    const [dados, alertas] = await Promise.all([
+      apiGet('/dashboard'),
+      apiGet('/alertas').catch(() => []),
+    ]);
 
     page.innerHTML = '';
 
-    // Saudação personalizada (como no protótipo)
+    // Saudação personalizada
     const header = document.createElement('div');
     header.className = 'stack-tight';
     header.style.marginBottom = '24px';
@@ -38,15 +42,15 @@ async function carregarDashboard() {
     `;
     page.appendChild(header);
 
-    // Banner de alerta (só se há produtos em risco)
-    if (dados.produtosEmRisco > 0) {
+    // Banner de alerta
+    if (dados.risco7Dias > 0) {
       const banner = document.createElement('div');
       banner.className = 'banner banner-warning';
       banner.innerHTML = `
         ${iconAlert()}
         <div class="banner-body">
-          <strong>Você tem ${dados.produtosEmRisco} produtos que precisam ser pedidos.</strong>
-          <small>${dados.produtosCriticos || 0} estão em estado crítico (menos de 3 dias).</small>
+          <strong>Você tem ${dados.risco7Dias} ${dados.risco7Dias === 1 ? 'produto que precisa' : 'produtos que precisam'} ser ${dados.risco7Dias === 1 ? 'pedido' : 'pedidos'}.</strong>
+          <small>${dados.criticoAgora} ${dados.criticoAgora === 1 ? 'rompe' : 'rompem'} em menos de 3 dias.</small>
         </div>
         <a href="alertas.html" class="btn btn-secondary btn-sm">Ver lista</a>
       `;
@@ -56,18 +60,22 @@ async function carregarDashboard() {
     // KPIs
     const kpiGrid = document.createElement('div');
     kpiGrid.className = 'kpi-grid';
+
     kpiGrid.appendChild(kpiCard({
       titulo: 'Risco de faltar',
-      valor: dados.produtosEmRisco ?? 0,
+      valor: dados.risco7Dias ?? 0,
       sub: 'nos próximos 7 dias',
     }));
     kpiGrid.appendChild(kpiCard({
       titulo: 'Crítico agora',
-      valor: dados.produtosCriticos ?? 0,
-      sub: 'menos de 3 dias até zerar',
+      valor: dados.criticoAgora ?? 0,
+      // O backend conta `diasAteRuptura < 3` (DashboardService.LIMITE_CRITICO_DIAS),
+      // não estoque ≤ ponto de reposição — esse é o critério da tela de Alertas.
+      sub: 'produtos que rompem em menos de 3 dias',
       cor: 'var(--status-critico)',
     }));
-    // Valor em risco — só exibe se confirmado pelo backend
+    // Valor em risco — o backend ainda não expõe esse número e a regra de cálculo
+    // (coef. ABRAS) não foi definida; o card fica no lugar, em estado "sem dado".
     if (dados.valorEmRisco != null) {
       kpiGrid.appendChild(kpiCard({
         titulo: 'Valor em risco',
@@ -83,36 +91,57 @@ async function carregarDashboard() {
     }
     kpiGrid.appendChild(kpiCard({
       titulo: 'Acurácia do modelo',
-      valor: dados.acuracia != null ? dados.acuracia.toFixed(1) + '%' : '—',
-      sub: 'MAPE médio últimas 4 semanas',
+      valor: dados.acuracia != null ? numero(dados.acuracia, 1) + '%' : '—',
+      sub: dados.acuracia != null
+        ? '100 − MAPE do modelo selecionado'
+        : 'motor ainda não executado',
     }));
     page.appendChild(kpiGrid);
 
-    // Gráfico de faturamento
-    if (dados.grafico) {
+    // Gráfico de faturamento — apenas histórico semanal (o backend não projeta faturamento)
+    const serie = dados.seriesFaturamento || [];
+    if (serie.length > 0) {
       const chartCard = document.createElement('div');
       chartCard.className = 'card';
       chartCard.style.marginBottom = '24px';
       chartCard.innerHTML = `
         <div class="row-between" style="margin-bottom:6px">
-          <h3>Previsão de faturamento</h3>
-          <span class="text-meta">histórico + projeção</span>
+          <h3>Faturamento semanal</h3>
+          <span class="text-meta">histórico · ${serie.length} semanas</span>
         </div>
         <div style="height:260px"><canvas id="chart-faturamento"></canvas></div>
       `;
       page.appendChild(chartCard);
 
+      // A projeção volta a ser desenhada assim que o backend enviar a série;
+      // hoje `projecao` chega vazia e o gráfico mostra só o histórico.
       linha(document.getElementById('chart-faturamento'), {
-        labels: dados.grafico.labels,
-        historico: dados.grafico.historico,
-        projecao: dados.grafico.projecao || [],
+        labels: serie.map(s => dataBR(s.semana)),
+        historico: serie.map(s => s.total),
+        projecao: dados.projecao || [],
         labelHist: 'Histórico',
         labelProj: 'Projeção',
       });
+    } else {
+      const vazio = document.createElement('div');
+      vazio.className = 'card';
+      vazio.style.marginBottom = '24px';
+      vazio.innerHTML = `
+        <h3 style="margin-bottom:8px">Faturamento semanal</h3>
+        <p class="text-meta">Sem histórico de vendas importado.</p>
+      `;
+      page.appendChild(vazio);
     }
 
-    // Tabela próximos alertas
-    if (dados.proximosAlertas && dados.proximosAlertas.length > 0) {
+    // Tabela próximos alertas (top 5)
+    const ORDEM = { critico: 0, atencao: 1, ok: 2 };
+    const proximos = (alertas || [])
+      .filter(a => a.semaforo !== 'ok')   // mesma regra da tela de Alertas (B-02)
+      .sort((a, b) => (ORDEM[a.semaforo] ?? 3) - (ORDEM[b.semaforo] ?? 3)
+        || (a.diasRuptura ?? 1e9) - (b.diasRuptura ?? 1e9))
+      .slice(0, 5);
+
+    if (proximos.length > 0) {
       const alertCard = document.createElement('div');
       alertCard.className = 'card';
       alertCard.innerHTML = `
@@ -128,28 +157,47 @@ async function carregarDashboard() {
           <tr>
             <th style="width:24px"></th>
             <th>Produto</th>
+            <th>Estoque</th>
+            <th>Ponto de reposição</th>
             <th>Até ruptura</th>
-            <th>Sugestão</th>
             <th></th>
           </tr>
         </thead>
       `;
       const tbody = document.createElement('tbody');
-      dados.proximosAlertas.forEach(p => {
+      proximos.forEach(p => {
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
         tr.addEventListener('click', () => { window.location.href = `produto-detalhe.html?id=${p.id}`; });
 
         const tdDot = document.createElement('td');
-        tdDot.appendChild(statusDot(p.diasRuptura));
+        tdDot.appendChild(statusDot(p.semaforo));
         tr.appendChild(tdDot);
 
-        tr.innerHTML += `
-          <td>${p.nome}</td>
-          <td class="tabular">${p.diasRuptura === 0 ? 'zerado' : p.diasRuptura + (p.diasRuptura === 1 ? ' dia' : ' dias')}</td>
-          <td class="tabular">${p.qtdSugerida != null ? p.qtdSugerida + ' ' + (p.unidade || 'un') : '—'}</td>
-          <td><a href="produto-detalhe.html?id=${p.id}" class="btn btn-tertiary btn-sm">Detalhe</a></td>
-        `;
+        const diasTxt = p.diasRuptura == null ? '—'
+          : p.diasRuptura <= 0 ? 'zerado'
+          : `${numero(p.diasRuptura, 1)} dias`;
+
+        // Mesmo motivo do B-01: nada de `innerHTML +=` depois de um appendChild.
+        const celula = (texto, className) => {
+          const td = document.createElement('td');
+          if (className) td.className = className;
+          td.textContent = texto;
+          return td;
+        };
+        tr.appendChild(celula(p.nome));
+        tr.appendChild(celula(p.estoque, 'tabular'));
+        tr.appendChild(celula(p.pontoReposicao != null ? numero(p.pontoReposicao, 1) : '—', 'tabular'));
+        tr.appendChild(celula(diasTxt, 'tabular'));
+
+        const tdAcao = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = `produto-detalhe.html?id=${p.id}`;
+        link.className = 'btn btn-tertiary btn-sm';
+        link.textContent = 'Detalhe';
+        tdAcao.appendChild(link);
+        tr.appendChild(tdAcao);
+
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -159,15 +207,12 @@ async function carregarDashboard() {
 
   } catch (err) {
     page.innerHTML = '';
-    if (err.status === 404 || err.detail?.includes('import')) {
-      page.appendChild(emptyState({
-        titulo: 'Nenhum dado encontrado',
-        msg: 'Importe dados para ver o dashboard.',
-        acao: { label: 'Ir para Importar', href: 'importar.html' },
-      }));
-    } else {
-      toast.erro(err.detail || 'Erro ao carregar o dashboard');
-    }
+    page.appendChild(emptyState({
+      titulo: 'Não foi possível carregar o dashboard',
+      msg: err.detail || 'Verifique se o backend está no ar e se há dados importados.',
+      acao: { label: 'Ir para Importar', href: 'importar.html' },
+    }));
+    toast.erro(err.detail || 'Erro ao carregar o dashboard');
   }
 }
 

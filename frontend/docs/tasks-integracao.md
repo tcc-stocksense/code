@@ -23,17 +23,17 @@
 
 ## FASE I0 — Pré-requisitos (bloqueadores)
 
-- [ ] **I-01 — CORS no backend** `BLOQUEADOR` *(tarefa do backend, registrada aqui para rastreio)*
+- [x] **I-01 — CORS no backend** `BLOQUEADOR` *(tarefa do backend, registrada aqui para rastreio)*
   O `SecurityConfig` não tem CORS: qualquer chamada do navegador em origem diferente
   (`:3000`/`:80`) falha ao desligar o mock. Pedir ao backend um `CorsConfigurationSource`
   de dev liberando a origem do front. Sem isso, só dá para validar via Postman.
 
-- [ ] **I-02 — `config.js`: base URL real + desligar mock** `MVP`
+- [x] **I-02 — `config.js`: base URL real + desligar mock** `MVP`
   `API_BASE_URL = "http://localhost:8080/api"` (atenção ao prefixo `/api`, que o plano antigo
   não tinha) e flag de mock desligado. Manter o mock acessível por flag para dev offline.
   _Depende de: I-01_
 
-- [ ] **I-03 — Auth real (JWT)** `MVP`
+- [x] **I-03 — Auth real (JWT)** `MVP`
   `login()` → `POST /api/auth/login`; guardar `{ token, estabelecimentoId, nomeFantasia }`
   (o response tem os 3 campos — o plano antigo esperava só `token`; `nomeFantasia` alimenta
   o header do layout). `requireAuth()` deixa de ser no-op; `apiClient` injeta o `Authorization`.
@@ -48,7 +48,7 @@
 > Ordem sugerida = ordem do fluxo real de uso. Cada tarefa: apontar a tela para a API real,
 > ajustar os campos ao shape do contrato e tratar os estados que o mock não tinha.
 
-- [ ] **I-04 — Tela Importar (S3): dois uploads + motor síncrono** `MVP`
+- [x] **I-04 — Tela Importar (S3): dois uploads + motor síncrono** `MVP`
   A maior divergência: **não existe** `POST /api/importacao` único. São
   `POST /api/importacao/produtos` e `POST /api/importacao/vendas` (multipart, campo `arquivo`,
   só `.xlsx`), **nessa ordem**. Depois do sucesso das obrigatórias, chamar
@@ -58,21 +58,21 @@
   Blocos "desejáveis" (estabelecimento/fornecedores) ficam desabilitados — sem endpoint.
   _Depende de: I-03_
 
-- [ ] **I-05 — Tela Estoque (S4)** `MVP`
+- [x] **I-05 — Tela Estoque (S4)** `MVP`
   `GET /api/produtos` + `PATCH /api/produtos/{id}/estoque` com body `{ "estoqueAtual": n }`.
   Semáforo relativo ao PR (🔴 `estoqueAtual ≤ pontoReposicao`, 🟡 até `×1.5`, 🟢 acima) —
   calcular na tela a partir dos campos do response; sem cortes fixos de dias.
   Tratar `pontoReposicao: null` (motor nunca rodou) como estado "sem cálculo".
   _Depende de: I-03_
 
-- [ ] **I-06 — Tela Detalhe do produto (S6)** `MVP`
+- [x] **I-06 — Tela Detalhe do produto (S6)** `MVP`
   `GET /api/produtos/{id}/detalhe`. Gráfico usa `previsoes[]` (até 30 pontos) do próprio
   response. **Desabilitar/ocultar o modal "Editar parâmetros"** — o
   `PATCH /produtos/{id}/parametros` não existe (pendência P-01). Estados: 404; campos de
   previsão `null` + `previsoes: []` → banner "sem previsão — execute o recálculo".
   _Depende de: I-03_
 
-- [ ] **I-07 — Tela Alertas (S5)** `MVP`
+- [x] **I-07 — Tela Alertas (S5)** `MVP`
   `GET /api/alertas`. Consumir `semaforo` **pronto do backend** (não recalcular por dias).
   O response **não tem** `fornecedor` nem `quantidadeSugerida`: remover a coluna fornecedor
   do MVP e derivar a sugestão de `pontoReposicao − estoqueAtual + estoqueSeguranca` (buscar
@@ -80,7 +80,7 @@
   produtos sem PR ficam fora — combinar com o estado do motor.
   _Depende de: I-03_
 
-- [ ] **I-08 — Tela Dashboard (S2)** `MVP`
+- [x] **I-08 — Tela Dashboard (S2)** `MVP`
   `GET /api/dashboard`. **Remover o card "Valor em risco"** (não existe no backend — regra
   indefinida). Acurácia = `100 − mapeMedioModeloSelecionado` (`null` → estado "sem cálculo").
   `seriesFaturamento` é **só histórico** (~8 semanas, `semana` = segunda-feira): o gráfico
@@ -89,14 +89,14 @@
   A tabela "próximos alertas" (top 5) vem de `GET /api/alertas` (mesma chamada da S5).
   _Depende de: I-03, I-07_
 
-- [ ] **I-09 — Tela Curva ABC (S7)** `MVP`
+- [x] **I-09 — Tela Curva ABC (S7)** `MVP`
   `GET /api/curva-abc` — **sem** `?periodo=` (pendência P-02): esconder/desabilitar o filtro
   de período até existir. `itens[]` já vem ordenado com `percentualAcumulado` pronto (Pareto
   é plot direto). `abcProxy: true` → exibir ressalva "ranking por quantidade (sem valor de
   venda no histórico)".
   _Depende de: I-03_
 
-- [ ] **I-10 — Tela Comparativo de modelos (S8/T10)** `MVP`
+- [x] **I-10 — Tela Comparativo de modelos (S8/T10)** `MVP`
   Só existe `GET /api/produtos/{id}/metricas` (**por produto** — a listagem geral do plano
   antigo não existe, pendência P-03). Para a visão agregada: iterar `GET /api/produtos` e
   chamar `/{id}/metricas` por produto (com limite de concorrência, ex. 4 em paralelo).
@@ -125,10 +125,36 @@
 | P-01 | `PATCH /api/produtos/{id}/parametros` (lead time, nível de serviço) | Modal da T6 desabilitado | Task nova no `backend/tasks.md` |
 | P-02 | `GET /api/curva-abc?periodo=` | Filtro de período da T7 escondido | Task nova no backend |
 | P-03 | Endpoint agregado de métricas (ou manter iteração por produto) | T10 itera N chamadas | Decidir com o time |
-| P-04 | CORS de dev (I-01) | **Bloqueia toda a integração no navegador** | `SecurityConfig` |
+| P-04 | ~~CORS de dev (I-01)~~ | ✅ resolvido — `corsConfigurationSource` liberando `localhost:*` | `SecurityConfig` |
 | P-05 | Motor assíncrono (202 + `GET /api/motor/status`) | Fase 1.5 do `tasks.md` (suspensa) | Épico 7 do backend |
 | P-06 | Disparo automático do motor pós-importação (T-44) | Enquanto não existir, o front chama o motor | Épico 7 do backend |
 
 ---
 
 *Atualizar o status (`[ ]` → `[x]`) conforme as tarefas forem concluídas; registrar decisões novas no contrato (`docs/contrato-api-frontend.md`) e, se usar o wiki, em `wiki/conceitos/integracao-backend.md`.*
+
+---
+
+## Estado em 2026-08-16 — integração aplicada
+
+Todas as tarefas I-01 … I-10 foram implementadas. O que mudou de fato:
+
+- **`apiClient.js`** deixou de cair no mock em 404. O mock virou escolha explícita
+  (botão flutuante → `core/config.js`), e ganhou uma camada de adaptação que traduz
+  o vocabulário do backend (`produtoId`, `estoqueAtual`, `classeAbc`, `diasAteRuptura`)
+  para o das telas. 401/403 derrubam a sessão e voltam ao login.
+- **`PATCH /produtos/{id}/estoque`** agora envia `{ estoqueAtual }` (antes `{ estoque }`,
+  que o backend rejeitava).
+- **Comparativo (T10)** passou a iterar `GET /produtos/{id}/metricas` com concorrência 4;
+  a rota agregada `/produtos/metricas`, que não existe, foi abandonada.
+- **Semáforo** deixou de usar cortes fixos de dias e passou a ser relativo ao ponto de
+  reposição; `pontoReposicao: null` vira o estado visível "sem cálculo".
+- **Removidos por não existirem no contrato:** card "Valor em risco" (T2), filtro de
+  período da Curva ABC (T7), coluna de fornecedor em Alertas (T5), blocos de planilhas
+  desejáveis em Importar (T3).
+- **Desabilitados com aviso:** modal "Editar parâmetros" (P-01) e a tela Sugestão de
+  compra, que sem `GET /sugestao-compra` só funciona em modo mock.
+- **`docker-compose.yml`**: a raiz do nginx passou de `./frontend` para `./frontend/web`,
+  onde o `index.html` realmente está.
+
+Falta apenas **I-11** (teste de fumaça E2E no navegador), que exige backend + MySQL no ar.

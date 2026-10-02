@@ -1,0 +1,37 @@
+# StockSense — reverse proxy e TLS
+#
+# O Caddy é o único processo com porta aberta para a internet. Ele resolve, de
+# uma vez, quatro coisas:
+#
+#   TLS      — obtém e renova o certificado do Let's Encrypt sozinho, via ACME
+#              na porta 80. Nada de certbot, nada de cron de renovação.
+#   CORS     — front e API na mesma origem, então não existe requisição
+#              cross-origin. O SecurityConfig do backend não configura CORS hoje.
+#   R6       — ml-service e MySQL não têm rota aqui. Não há como alcançá-los
+#              de fora, mesmo conhecendo as portas.
+#   R1       — o reverse_proxy do Caddy não impõe timeout de resposta por
+#              padrão. O lote do motor (5 a 25 min numa única requisição)
+#              atravessa. O nginx cortaria em 60s; o ALB da AWS também.
+#
+# SITE_ADDRESS vem do .env, via docker-compose.prod.yml:
+#   produção          SITE_ADDRESS=stocksense.duckdns.org   (HTTPS automático)
+#   teste sem DNS     SITE_ADDRESS=:80                      (HTTP puro)
+
+{$SITE_ADDRESS} {
+	encode gzip
+
+	# A API. Precisa vir antes do handle genérico — a primeira rota que casa vence.
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# Todo o resto: as 10 telas, o CSS e os módulos JS.
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

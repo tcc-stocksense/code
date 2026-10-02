@@ -5,6 +5,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonTable } from '../components/skeleton.js';
+import { numero } from '../core/format.js';
 import { iconPencil, iconMinus, iconPlus, iconCheck, iconX, iconSearch } from '../components/icons.js';
 
 requireAuth();
@@ -21,6 +22,7 @@ page.innerHTML = `
       <p class="page-subtitle" id="subtitle"></p>
     </div>
   </div>
+  <div id="aviso-motor"></div>
   <div class="filters-row">
     <div class="field" style="flex:1 1 300px; max-width:380px">
       <div style="position:relative">
@@ -34,6 +36,7 @@ page.innerHTML = `
       <option value="critico">Crítico</option>
       <option value="atencao">Atenção</option>
       <option value="ok">OK</option>
+      <option value="sem-calculo">Sem cálculo</option>
     </select>
     <select class="select" id="filtro-classe">
       <option value="todas">Todas classes</option>
@@ -45,11 +48,6 @@ page.innerHTML = `
   <div id="tabela-container"></div>
   <div class="row-between" style="margin-top:16px">
     <span class="text-meta" id="contagem"></span>
-    <div class="row" style="gap:6px; align-items:center">
-      <span class="text-meta">Página 1 de 1</span>
-      <button class="btn btn-tertiary btn-sm" disabled>Anterior</button>
-      <button class="btn btn-tertiary btn-sm" disabled>Próxima</button>
-    </div>
   </div>
 `;
 
@@ -62,10 +60,10 @@ document.getElementById('filtro-cat').addEventListener('change', (e) => { filtro
 document.getElementById('filtro-status').addEventListener('change', (e) => { filtros.status = e.target.value; renderTabela(); });
 document.getElementById('filtro-classe').addEventListener('change', (e) => { filtros.classe = e.target.value; renderTabela(); });
 
-function statusClass(dias) {
-  if (dias < 3) return 'critico';
-  if (dias <= 7) return 'atencao';
-  return 'ok';
+// Ordem de urgência: crítico → atenção → ok → sem cálculo
+const PESO = { critico: 0, atencao: 1, ok: 2 };
+function peso(p) {
+  return p.semaforo ? PESO[p.semaforo] : 3;
 }
 
 function getFiltrados() {
@@ -73,14 +71,48 @@ function getFiltrados() {
     if (filtros.busca && !p.nome.toLowerCase().includes(filtros.busca)) return false;
     if (filtros.categoria !== 'todas' && p.categoria !== filtros.categoria) return false;
     if (filtros.classe !== 'todas' && p.classe !== filtros.classe) return false;
-    if (filtros.status !== 'todos' && statusClass(p.diasRuptura) !== filtros.status) return false;
+    // Mesmo critério do banner (`semCalculo`), para os dois não discordarem (M-02).
+    if (filtros.status === 'sem-calculo') return p.semCalculo;
+    if (filtros.status !== 'todos' && p.semaforo !== filtros.status) return false;
     return true;
-  }).sort((a, b) => a.diasRuptura - b.diasRuptura);
+  }).sort((a, b) => peso(a) - peso(b) || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function classeBadge(classe) {
+  const el = document.createElement('span');
+  if (!classe) {
+    el.className = 'text-meta';
+    el.textContent = '—';
+    return el;
+  }
   const map = { A: 'badge-primary', B: 'badge-warning', C: 'badge-neutral' };
-  return `<span class="badge ${map[classe] || 'badge-neutral'}">${classe}</span>`;
+  el.className = `badge ${map[classe] || 'badge-neutral'}`;
+  el.textContent = classe;
+  return el;
+}
+
+/** `<td>` com texto puro — nunca interpreta HTML vindo da planilha importada. */
+function tdTexto(texto, className) {
+  const td = document.createElement('td');
+  if (className) td.className = className;
+  td.textContent = texto;
+  return td;
+}
+
+function renderAvisoMotor() {
+  const semCalculo = produtos.filter(p => p.semCalculo).length;
+  const alvo = document.getElementById('aviso-motor');
+  if (semCalculo === 0) { alvo.innerHTML = ''; return; }
+
+  alvo.innerHTML = `
+    <div class="banner banner-warning" style="margin-bottom:16px">
+      <div class="banner-body">
+        <strong>${semCalculo} ${semCalculo === 1 ? 'produto ainda não tem' : 'produtos ainda não têm'} ponto de reposição calculado.</strong>
+        <small>O semáforo depende do motor preditivo. Execute o recálculo depois de importar as vendas.</small>
+      </div>
+      <a href="importar.html" class="btn btn-secondary btn-sm">Ir para Importar</a>
+    </div>
+  `;
 }
 
 function renderTabela() {
@@ -97,11 +129,11 @@ function renderTabela() {
   table.className = 'table';
   table.innerHTML = `
     <thead><tr>
-      <th style="width:80px">Status</th>
+      <th style="width:120px">Status</th>
       <th>Produto</th>
       <th>Categoria</th>
       <th>Estoque</th>
-      <th>Até ruptura</th>
+      <th>Ponto de reposição</th>
       <th>ABC</th>
       <th></th>
     </tr></thead>
@@ -113,19 +145,29 @@ function renderTabela() {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px 20px;color:var(--cor-texto-sec)">Nenhum produto encontrado.</td></tr>';
   }
 
+  // B-01: a linha é montada só com createElement/appendChild. Um único
+  // `tr.innerHTML +=` re-parseia a linha inteira e mata todos os listeners já
+  // registrados nos filhos — era o que deixava o lápis de editar estoque morto.
   filtrados.forEach(p => {
     const tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
     tr.addEventListener('click', () => { window.location.href = `produto-detalhe.html?id=${p.id}`; });
 
-    // Status
+    // Status (semáforo relativo ao ponto de reposição)
     const tdStatus = document.createElement('td');
-    tdStatus.appendChild(statusBadge(p.diasRuptura));
+    tdStatus.appendChild(statusBadge(p.semaforo));
     tr.appendChild(tdStatus);
 
     // Nome
-    tr.innerHTML += `<td><div style="font-weight:500">${p.nome}</div></td>`;
-    tr.innerHTML += `<td class="text-small text-secondary">${p.categoria}</td>`;
+    const tdNome = document.createElement('td');
+    const nomeWrap = document.createElement('div');
+    nomeWrap.style.fontWeight = '500';
+    nomeWrap.textContent = p.nome;
+    tdNome.appendChild(nomeWrap);
+    tr.appendChild(tdNome);
+
+    // Categoria
+    tr.appendChild(tdTexto(p.categoria || '—', 'text-small text-secondary'));
 
     // Estoque editável
     const tdEstoque = document.createElement('td');
@@ -133,15 +175,33 @@ function renderTabela() {
     renderEstoqueCell(tdEstoque, p);
     tr.appendChild(tdEstoque);
 
-    // Até ruptura
-    const diasText = p.diasRuptura === 0 ? 'zerado' : `${p.diasRuptura} ${p.diasRuptura === 1 ? 'dia' : 'dias'}`;
-    tr.innerHTML += `<td class="tabular">${diasText}</td>`;
+    // Ponto de reposição
+    if (p.pontoReposicao != null) {
+      tr.appendChild(tdTexto(`${numero(p.pontoReposicao, 1)} ${p.unidade}`, 'tabular'));
+    } else {
+      const tdPr = document.createElement('td');
+      tdPr.className = 'tabular';
+      const vazio = document.createElement('span');
+      vazio.className = 'text-meta';
+      vazio.textContent = 'sem cálculo';
+      tdPr.appendChild(vazio);
+      tr.appendChild(tdPr);
+    }
 
     // ABC
-    tr.innerHTML += `<td>${classeBadge(p.classe)}</td>`;
+    const tdClasse = document.createElement('td');
+    tdClasse.appendChild(classeBadge(p.classe));
+    tr.appendChild(tdClasse);
 
     // Ação
-    tr.innerHTML += `<td><a href="produto-detalhe.html?id=${p.id}" class="btn btn-tertiary btn-sm" onclick="event.stopPropagation()">Detalhe</a></td>`;
+    const tdAcao = document.createElement('td');
+    const link = document.createElement('a');
+    link.href = `produto-detalhe.html?id=${p.id}`;
+    link.className = 'btn btn-tertiary btn-sm';
+    link.textContent = 'Detalhe';
+    link.addEventListener('click', (e) => e.stopPropagation());
+    tdAcao.appendChild(link);
+    tr.appendChild(tdAcao);
 
     tbody.appendChild(tr);
   });
@@ -158,7 +218,11 @@ function renderEstoqueCell(td, produto) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'estoque-cell';
-  btn.innerHTML = `<span class="tabular">${produto.estoque} ${produto.unidade || 'un'}</span>${iconPencil(13)}`;
+  const rotulo = document.createElement('span');
+  rotulo.className = 'tabular';
+  rotulo.textContent = `${produto.estoque} ${produto.unidade || 'un'}`;
+  btn.appendChild(rotulo);
+  btn.insertAdjacentHTML('beforeend', iconPencil(13));
   btn.title = 'Clique para editar o estoque';
   btn.addEventListener('click', () => renderEstoqueEdit(td, produto));
   td.appendChild(btn);
@@ -215,13 +279,13 @@ function renderEstoqueEdit(td, produto) {
 
   async function salvar() {
     try {
-      const resp = await apiPatch(`/produtos/${produto.id}/estoque`, { estoque: val });
-      // Atualizar dados locais com resposta do backend
-      produto.estoque = resp.estoque ?? val;
-      if (resp.diasRuptura != null) produto.diasRuptura = resp.diasRuptura;
-      if (resp.status) produto.statusSemaforo = resp.status;
+      // PATCH /api/produtos/{id}/estoque → body { estoqueAtual }
+      // (a tradução do campo acontece no apiClient)
+      const resp = await apiPatch(`/produtos/${produto.id}/estoque`, { estoqueAtual: val });
+      Object.assign(produto, resp);
       toast.sucesso(`Estoque de "${produto.nome}" atualizado`);
       renderTabela();
+      renderAvisoMotor();
     } catch (err) {
       toast.erro(err.detail || 'Erro ao atualizar estoque');
       renderEstoqueCell(td, produto);
@@ -233,6 +297,16 @@ async function carregarEstoque() {
   try {
     produtos = await apiGet('/produtos');
 
+    if (!produtos || produtos.length === 0) {
+      tabelaContainer.innerHTML = '';
+      tabelaContainer.appendChild(emptyState({
+        titulo: 'Nenhum produto importado ainda',
+        msg: 'Vá para Importar para carregar seus dados.',
+        acao: { label: 'Importar dados', href: 'importar.html' },
+      }));
+      return;
+    }
+
     // Preencher categorias no filtro
     const categorias = [...new Set(produtos.map(p => p.categoria).filter(Boolean))].sort();
     const selectCat = document.getElementById('filtro-cat');
@@ -243,18 +317,11 @@ async function carregarEstoque() {
       selectCat.appendChild(opt);
     });
 
+    renderAvisoMotor();
     renderTabela();
   } catch (err) {
     tabelaContainer.innerHTML = '';
-    if (err.status === 404) {
-      tabelaContainer.appendChild(emptyState({
-        titulo: 'Nenhum produto importado ainda',
-        msg: 'Vá para Importar para carregar seus dados.',
-        acao: { label: 'Importar dados', href: 'importar.html' },
-      }));
-    } else {
-      toast.erro(err.detail || 'Erro ao carregar produtos');
-    }
+    toast.erro(err.detail || 'Erro ao carregar produtos');
   }
 }
 

@@ -22,7 +22,7 @@
 
 ---
 
-## Última Sessão — 2026-09/10 (Artigo do TCC — redação completa + baseline ingênuo)
+## Última Sessão — 2026-09/10 (Artigo do TCC — redação completa, baseline ingênuo e guia de estudo)
 
 > Branch: `analise-validacao-modelos`. Sessão longa, dedicada à redação do artigo científico.
 > **O artigo está completo de ponta a ponta** em `docs/artigo/`, gerando `.docx` no template
@@ -46,8 +46,24 @@
 - **Entrevistas viraram dado primário.** As 7 respostas do formulário entraram como 3.3.1
   (método) e 4.1 (resultados). Achado mais forte: **7/7 decidem a compra olhando a prateleira**,
   inclusive os 4 que já têm software.
-- **Infra entrou no artigo** (3.2, bloco F) após merge da `main`.
+- **Infra entrou no artigo** (3.2, bloco F) após merge da `main`, com **`gerar_infra.py`**
+  desenhando a topologia a partir dos `.tf` — era o único elemento da arquitetura sem figura.
 - Figuras externas copiadas para `docs/artigo/figuras/` — o artigo passa a ser autocontido.
+- **`docs/GUIA-DE-ESTUDO-TCC.md`** — guia de estudo do grupo, ~4.000 palavras. Absorve e
+  substitui o antigo `NOTAS-DEFESA.md`. Traz os conceitos do zero (série temporal, HW, Prophet,
+  as três métricas com exemplo numérico, baseline, split cronológico, Ballou passo a passo),
+  os resultados comentados, as perguntas de banca com resposta, a tabela honesta das oito
+  vulnerabilidades e a divisão de estudo entre os cinco integrantes.
+- **Redução deliberada da carga matemática do artigo**, para diminuir a superfície de perguntas
+  na arguição: **de 9 equações para 3**. Ficaram só as de Ballou (estoque de segurança, ponto de
+  reposição, dias até ruptura) — aritmética de negócio, que é o que o grupo defende com
+  naturalidade. As demais viraram prosa; a explicação detalhada migrou para o guia de estudo.
+  Em contrapeso, a interface ganhou a tabela dos sete indicadores e 4.5 ganhou a leitura de
+  negócio.
+- **`verificar_referencias.py`** — audita figuras, tabelas, equações e subseções. Nasceu de um
+  bug real: renumerar por substituição simples não casa com o plural, e **quatro referências**
+  ("As Figuras 5 e 6", "7 e 8", "9 e 10", "13 e 14") ficaram apontando para as figuras erradas.
+  Todas corrigidas.
 
 ### Decisões tomadas
 
@@ -58,20 +74,32 @@
 | Validação sobre dados **sintéticos**, declarada na metodologia | Não há dado do parceiro. Declarar em 3.3.4 é mais forte que ser cobrado nas limitações |
 | Entre os TCCs da instituição, citar só o **GRP03** | Aplicou Prophet a estoque sem comparar modelos — é a lacuna que este trabalho preenche. GRP04 e GRP05 não preveem demanda |
 | Dois achados de campo que **contrariam** o projeto entram declarados | 6/7 relatam sazonalidade mensal (o dataset só modela a semanal); 3/7 citam validade como dor principal, módulo cortado do escopo |
+| Reduzir a matemática exposta, **mas manter o α≈0** | A explicação do empate é a única resposta do artigo para "por que empataram", e essa pergunta é certa na banca. Simplificada, sem equação — não removida |
+| Diagramas **derivados da fonte**, não desenhados à mão | DER a partir das migrations, infra a partir do Terraform. Mesma lógica dos números: se a fonte muda, a figura acompanha |
 
 ### Pendências em aberto
 
 - **Prenomes** de FERREIRA; MOTA e SILVA; ARAÚJO — sem eles a referência ABNT é inválida.
 - **Referência de metodologia científica** do curso (marcador `[CITAR:]` na abertura da seção 3).
-- **Figura 6** — capturar mosaico 2×2 das telas (painel, estoque, alertas, comparativo).
+- **Figura 7** — capturar mosaico 2×2 das telas (painel, estoque, alertas, comparativo). É a
+  **única figura pendente** de 17.
 - **Ordem ABSTRACT/RESUMO** — o template manda inglês primeiro; GRP01, GRP02 e GRP04 fazem o
   inverso. Confirmar com o orientador.
 - **BPMN TO-BE** contém a tarefa "Verificar produtos próximos do vencimento (ESG)", que saiu do
   escopo, e o typo "vemdas". Figura promete o que o sistema não entrega — editar.
-- **Extensão:** ~14.000 palavras ≈ 55 páginas. Decidir entre podar até 30 (corte de ~45%, dói em
-  conteúdo) ou mirar 40–45, faixa do GRP05 (40) e do GRP04 (48).
-- `7-sem-TCC/docs/` **não é repositório** — os SVG originais dos BPMN não estão versionados em
-  lugar nenhum. Só os PNG derivados, agora em `docs/artigo/figuras/`.
+- **Extensão: decisão ainda em aberto.** O artigo segue em ~14.000 palavras (≈55 páginas). A
+  rodada de corte redistribuiu o risco — tirou matemática, pôs produto — mas **não encurtou**:
+  os cortes foram compensados pelas adições. Encurtar de verdade agora é escolha de conteúdo.
+  Candidatas, por ordem de dor: 3.2 Arquitetura (919 palavras) e 4.1 Caracterização do campo
+  (819) — esta última vale defender, porque ancora o problema em dado real. Referência da turma:
+  GRP01 17 páginas, GRP02 24, GRP03 22, GRP05 40, GRP04 48.
+- `7-sem-TCC/docs/` **não é repositório** — os SVG originais dos BPMN, a revisão bibliográfica
+  em `.docx`, o mapa do problema e o Ishikawa não estão versionados em lugar nenhum. Só os PNG
+  derivados, agora em `docs/artigo/figuras/`. Risco de perda se a máquina falhar.
+- **BPMN TO-BE** contém a tarefa "Verificar produtos próximos do vencimento (ESG)", que saiu do
+  escopo, e o typo "vemdas" — a figura promete o que o sistema não entrega.
+- **Prenomes** de FERREIRA; MOTA e SILVA; ARAÚJO e a **referência de metodologia científica**
+  seguem como `[CITAR:]` em `referencias.md`.
 
 ---
 

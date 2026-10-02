@@ -48,7 +48,7 @@ abre a caixa e mostra os componentes internos.
 
 **Figura 2 - Diagrama de contexto (C4, nível 1)**
 
-`[FIGURA: tcc-stocksense/docs/arquitetura/diagram-contexto.png]`
+`[FIGURA: docs/artigo/figuras/c4-contexto.png]`
 
 Fonte: Autoral, 2026
 
@@ -61,7 +61,7 @@ de custo e complexidade que o trabalho se propõe a contornar.
 
 **Figura 3 - Diagrama de containers (C4, nível 2)**
 
-`[FIGURA: tcc-stocksense/docs/arquitetura/diagram-container-c2.png]`
+`[FIGURA: docs/artigo/figuras/c4-containers.png]`
 
 Fonte: Autoral, 2026
 
@@ -151,7 +151,7 @@ precisaria ser revista.
 
 **Figura 4 - Processo de reposição proposto (BPMN TO-BE)**
 
-`[FIGURA: docs/contexto/BPMN-TO-BE.png — converter de BPMN-TO-BE 1.svg]`
+`[FIGURA: docs/artigo/figuras/bpmn-to-be.png]`
 
 Fonte: Autoral, 2026
 
@@ -202,7 +202,7 @@ resultados que fundamentam ambos estão na subseção 4.1.
 
 **Figura 5 - Modelo entidade-relacionamento**
 
-`[FIGURA: docs/arquitetura/der-stocksense.png]`
+`[FIGURA: docs/artigo/figuras/der.png]`
 
 Fonte: Autoral, 2026
 

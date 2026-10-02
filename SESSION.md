@@ -22,6 +22,59 @@
 
 ---
 
+## Última Sessão — 2026-09/10 (Artigo do TCC — redação completa + baseline ingênuo)
+
+> Branch: `analise-validacao-modelos`. Sessão longa, dedicada à redação do artigo científico.
+> **O artigo está completo de ponta a ponta** em `docs/artigo/`, gerando `.docx` no template
+> da SPTech. Ponto de entrada: [`docs/artigo/README.md`](docs/artigo/README.md).
+
+### O que foi feito
+
+- **Baseline ingênuo sazonal** (`ŷ(t) = y(t−7)`) acrescentado à camada de análise. Era o furo
+  mais grave do comparativo: sem um piso, HW × Prophet só respondia *qual dos dois é melhor*,
+  nunca *se algum vale a pena*. **Resultado: o motor supera o ingênuo em 10/10 produtos, com
+  redução mediana de erro de 45,1%** (mín. 12,8%, máx. 69,4%). Vive em `analysis/`, não em
+  `app/services/` — é instrumento de avaliação, não um terceiro modelo do motor.
+- **Artigo completo**, sete arquivos em `docs/artigo/`, ~14.000 palavras, 16 figuras e 11 tabelas:
+  front matter (resumo/abstract), introdução, fundamentação, metodologia, resultados,
+  considerações finais e referências.
+- **`gerar_docx.py`** — monta o `.docx` usando o template da SPTech como doador de formatação.
+- **`verificar_numeros.py`** — confere cada célula das tabelas contra `dados_documento.json`.
+  Pegou uma mediana calculada errada (49,4% onde o certo era 45,1%) antes de ir para o artigo.
+- **`gerar_der.py`** — desenha o DER a partir das migrations Flyway, em vez de exportar do
+  Workbench. Se o schema mudar, o diagrama se regenera.
+- **Entrevistas viraram dado primário.** As 7 respostas do formulário entraram como 3.3.1
+  (método) e 4.1 (resultados). Achado mais forte: **7/7 decidem a compra olhando a prateleira**,
+  inclusive os 4 que já têm software.
+- **Infra entrou no artigo** (3.2, bloco F) após merge da `main`.
+- Figuras externas copiadas para `docs/artigo/figuras/` — o artigo passa a ser autocontido.
+
+### Decisões tomadas
+
+| Decisão | Motivo |
+|---|---|
+| Seguir o template **oficial** da SPTech (5 seções), não a estrutura sugerida por IA | Arquitetura é `3.2`, não seção própria; limitações é parágrafo na 5; não há seção de hipóteses — viraram objetivos específicos em 1.2 |
+| Markdown durante a escrita, `.docx` gerado por script | `.docx` é binário e não mostra diff; a formatação é aplicada no fim, não à mão |
+| Validação sobre dados **sintéticos**, declarada na metodologia | Não há dado do parceiro. Declarar em 3.3.4 é mais forte que ser cobrado nas limitações |
+| Entre os TCCs da instituição, citar só o **GRP03** | Aplicou Prophet a estoque sem comparar modelos — é a lacuna que este trabalho preenche. GRP04 e GRP05 não preveem demanda |
+| Dois achados de campo que **contrariam** o projeto entram declarados | 6/7 relatam sazonalidade mensal (o dataset só modela a semanal); 3/7 citam validade como dor principal, módulo cortado do escopo |
+
+### Pendências em aberto
+
+- **Prenomes** de FERREIRA; MOTA e SILVA; ARAÚJO — sem eles a referência ABNT é inválida.
+- **Referência de metodologia científica** do curso (marcador `[CITAR:]` na abertura da seção 3).
+- **Figura 6** — capturar mosaico 2×2 das telas (painel, estoque, alertas, comparativo).
+- **Ordem ABSTRACT/RESUMO** — o template manda inglês primeiro; GRP01, GRP02 e GRP04 fazem o
+  inverso. Confirmar com o orientador.
+- **BPMN TO-BE** contém a tarefa "Verificar produtos próximos do vencimento (ESG)", que saiu do
+  escopo, e o typo "vemdas". Figura promete o que o sistema não entrega — editar.
+- **Extensão:** ~14.000 palavras ≈ 55 páginas. Decidir entre podar até 30 (corte de ~45%, dói em
+  conteúdo) ou mirar 40–45, faixa do GRP05 (40) e do GRP04 (48).
+- `7-sem-TCC/docs/` **não é repositório** — os SVG originais dos BPMN não estão versionados em
+  lugar nenhum. Só os PNG derivados, agora em `docs/artigo/figuras/`.
+
+---
+
 ## Última Sessão — 2026-09-12/13 (Infra — deploy em produção na AWS)
 
 > Branch: `chore/infra-terraform-aws`. Duas sessões emendadas. A primeira preparou tudo sem

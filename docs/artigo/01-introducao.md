@@ -20,7 +20,7 @@ procuram.
 
 **Figura 1 - Processo de reposição atual (BPMN AS-IS)**
 
-`[FIGURA: docs/contexto/BPMN-AS-IS.png — converter de BPMN-AS-IS.svg]`
+`[FIGURA: docs/artigo/figuras/bpmn-as-is.png]`
 
 Fonte: Autoral, 2026
 

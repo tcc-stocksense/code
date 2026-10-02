@@ -1,6 +1,6 @@
 <!--
   Numeração de figuras e tabelas é PROVISÓRIA — contínua a partir da seção 3
-  (que termina na Figura 4 e na Tabela 2). O script de geração renumera.
+  (que termina na Figura 7 e na Tabela 3). O script de geração renumera.
   Todos os números vêm de ml-service/analysis/results/dados_documento.json.
 -->
 
@@ -15,10 +15,10 @@ fim, a conversão da previsão em decisão de reposição.
 ## 4.1 Caracterização do campo
 
 O levantamento descrito na subseção 3.3.1 reuniu sete estabelecimentos, quatro
-de porte médio, dois de porte pequeno e um de porte grande. A Tabela 3 consolida
+de porte médio, dois de porte pequeno e um de porte grande. A Tabela 4 consolida
 as respostas fechadas.
 
-**Tabela 3 - Síntese do levantamento de campo (n = 7)**
+**Tabela 4 - Síntese do levantamento de campo (n = 7)**
 
 | Dimensão | Resposta | Freq. |
 |---|---|---:|
@@ -71,15 +71,14 @@ padrão de três dias adotado pelo motor na ausência das planilhas opcionais si
 se entre as duas medidas de tendência central, o que o torna uma escolha
 defensável e não arbitrária.
 
-A terceira diz respeito à **variabilidade do prazo**, e exige precisão para não
-afirmar demais. O desvio padrão de 3,3 dias observado acima mede a dispersão
-*entre estabelecimentos*, não a oscilação do prazo de um mesmo fornecedor ao
-longo do tempo — que é a grandeza exigida pela Equação (7). O levantamento não
-mediu a segunda. O que ele sustenta é mais modesto, e ainda assim relevante: num
-universo em que **todos** os sete trabalham com mais de seis fornecedores e os
-prazos praticados diferem em uma ordem de grandeza, tratar o prazo de entrega
-como constante é insustentável. É o argumento empírico para a formulação completa
-de Ballou, discutida na subseção 3.5.5.
+A terceira diz respeito à **variabilidade do prazo**, e exige precisão. A
+dispersão observada acima é *entre estabelecimentos*, não a oscilação do prazo de
+um mesmo fornecedor ao longo do tempo — que é a grandeza exigida pela Equação
+(1), e que o levantamento não mediu. O que ele sustenta é mais modesto e ainda
+assim relevante: num universo em que **todos** os sete trabalham com mais de seis
+fornecedores e os prazos praticados diferem em uma ordem de grandeza, tratar o
+prazo de entrega como constante é insustentável. É o argumento empírico para a
+formulação completa de Ballou (subseção 3.5.5).
 
 Dois achados contrariam decisões do projeto, e registrá-los é mais honesto que
 omiti-los.
@@ -97,14 +96,14 @@ cita previsão de demanda. É o módulo que foi deliberadamente retirado do esco
 pergunta de pesquisa é sobre previsão —, mas o levantamento indica que a
 prioridade percebida pelo usuário é outra, e isso tem consequência para a adoção.
 
-Essa tensão aparece na última linha da Tabela 3: apenas dois dos sete adotariam o
+Essa tensão aparece na última linha da Tabela 4: apenas dois dos sete adotariam o
 sistema sem reservas, enquanto quatro condicionam a adoção a ver o
 funcionamento. A disposição existe, mas não é entusiasmo — e nenhum teste de uso
 foi conduzido para qualificá-la, o que delimita o alcance desta subseção.
 
 ## 4.2 Perfil do conjunto de dados
 
-**Tabela 4 - Estatística descritiva dos dez produtos**
+**Tabela 5 - Estatística descritiva dos dez produtos**
 
 | id | Produto | Variab. | Média/dia | σ | CV | % zeros |
 |---:|---|---:|---:|---:|---:|---:|
@@ -125,7 +124,7 @@ O conjunto cobre uma faixa ampla de perfis: do sal refinado, de variabilidade
 0,05 e comportamento quase determinístico, à banana prata, de variabilidade
 0,45 e oscilação acentuada. A média diária considera apenas os dias com venda.
 
-Há uma observação não óbvia na Tabela 4. O coeficiente de variação nunca é
+Há uma observação não óbvia na Tabela 5. O coeficiente de variação nunca é
 baixo — permanece entre 0,47 e 0,68 mesmo nos produtos de ruído quase nulo. A
 razão é que o CV mede a dispersão em torno da média global, e essa dispersão
 inclui a oscilação semanal: um produto que vende 1,45 vez a média no sábado e
@@ -147,7 +146,7 @@ Fonte: Autoral, 2026
 Fonte: Autoral, 2026
 
 A decomposição aditiva de período 7 separa cada série em tendência,
-sazonalidade e resíduo. As Figuras 5 e 6 respondem à pergunta que precede
+sazonalidade e resíduo. As Figuras 8 e 9 respondem à pergunta que precede
 qualquer modelagem: existe sinal a capturar? Nos dois produtos a componente
 sazonal tem amplitude nítida e período regular, o que confirma que a estrutura
 semanal é recuperável e justifica o emprego de modelos sazonais em lugar de uma
@@ -161,7 +160,7 @@ modelo ser treinado.
 
 ## 4.3 Acurácia dos modelos e ganho sobre o baseline
 
-**Tabela 5 - MAPE, RMSE e MAE por produto e modelo (janela de teste)**
+**Tabela 6 - MAPE, RMSE e MAE por produto e modelo (janela de teste)**
 
 | id | Produto | Modelo | MAPE (%) | RMSE | MAE | Vencedor |
 |---:|---|---|---:|---:|---:|:---:|
@@ -189,9 +188,9 @@ modelo ser treinado.
 Fonte: Autoral, 2026
 
 O Holt-Winters venceu em seis produtos e o Prophet em quatro. O placar, isolado,
-sugeriria leve vantagem do primeiro — leitura que a Tabela 6 desautoriza.
+sugeriria leve vantagem do primeiro — leitura que a Tabela 7 desautoriza.
 
-**Tabela 6 - Margem de MAPE entre Holt-Winters e Prophet, por produto**
+**Tabela 7 - Margem de MAPE entre Holt-Winters e Prophet, por produto**
 
 | Produto | Margem (pontos percentuais) |
 |---|---:|
@@ -218,10 +217,10 @@ subseção 4.6.
 
 Esse resultado, porém, deixa em aberto a pergunta mais importante: se os dois
 modelos são equivalentes entre si, algum deles é melhor que não modelar nada? É
-o que a Tabela 7 responde, comparando o modelo vencedor de cada produto ao
-baseline ingênuo sazonal definido pela Equação (6).
+o que a Tabela 8 responde, comparando o modelo vencedor de cada produto ao
+baseline ingênuo sazonal descrito na subseção 3.5.3.
 
-**Tabela 7 - Ganho do modelo vencedor sobre o baseline ingênuo sazonal**
+**Tabela 8 - Ganho do modelo vencedor sobre o baseline ingênuo sazonal**
 
 | id | Produto | Vencedor | MAPE venc. (%) | MAPE ingênuo (%) | Ganho (pp) | Redução |
 |---:|---|---|---:|---:|---:|---:|
@@ -243,7 +242,7 @@ erro de 45,1% — mínimo de 12,8% no pão francês, máximo de 69,4% no sal ref
 Não há exceção no catálogo. É esse resultado, e não o placar entre os dois
 modelos, que responde à primeira parte do problema de pesquisa.
 
-A Tabela 7 também reenquadra os erros percentuais elevados da Tabela 5. Um MAPE
+A Tabela 8 também reenquadra os erros percentuais elevados da Tabela 6. Um MAPE
 de 81,25% no pão francês, lido isoladamente, sugere falha do método; comparado
 aos 93,17% da regra ingênua sobre a mesma série, revela que o erro é alto porque
 a série é intrinsecamente difícil — e que o modelo, ainda assim, extrai sinal
@@ -263,9 +262,9 @@ Fonte: Autoral, 2026
 
 Fonte: Autoral, 2026
 
-As Figuras 7 e 8 mostram o realizado na janela de teste contra o que cada
+As Figuras 10 e 11 mostram o realizado na janela de teste contra o que cada
 abordagem previu sem jamais ter visto esses dias. As curvas do Holt-Winters e do
-Prophet são visualmente indistinguíveis — evidência gráfica do que a Tabela 6
+Prophet são visualmente indistinguíveis — evidência gráfica do que a Tabela 7
 expressa numericamente —, enquanto a curva do baseline se descola das demais,
 acompanhando o ruído da última semana de treino em vez do padrão médio.
 
@@ -275,7 +274,7 @@ Uma única divisão treino/teste pode favorecer um modelo por acaso. As Tabelas 
 e 8 repetem a avaliação em cinco janelas independentes, com origem móvel e
 blocos de teste de 14 dias.
 
-**Tabela 8 - Backtesting de origem móvel — produto 1 (Arroz 5kg)**
+**Tabela 9 - Backtesting de origem móvel — produto 1 (Arroz 5kg)**
 
 | Origem | MAPE HW (%) | MAPE Prophet (%) | MAPE ingênuo (%) |
 |---|---:|---:|---:|
@@ -287,7 +286,7 @@ blocos de teste de 14 dias.
 
 Fonte: Autoral, 2026
 
-**Tabela 9 - Backtesting de origem móvel — produto 5 (Banana Prata kg)**
+**Tabela 10 - Backtesting de origem móvel — produto 5 (Banana Prata kg)**
 
 | Origem | MAPE HW (%) | RMSE HW | MAPE Prophet (%) | MAPE ingênuo (%) | RMSE ingênuo |
 |---|---:|---:|---:|---:|---:|
@@ -303,23 +302,17 @@ No produto 1 o desempenho é consistente: o MAPE dos modelos varia entre 10,50% 
 15,65% nas cinco dobras, faixa estreita que confirma a representatividade da
 métrica principal, e ambos superam o baseline em todas as janelas.
 
-O produto 5 exige análise mais cuidadosa, e a dobra de 19 de novembro não deve
-ser omitida. Nela o MAPE do Holt-Winters salta para 188,42% — quatro vezes o
-valor das demais janelas. Dois indícios mostram que se trata de artefato da
-métrica, e não de falha de previsão. O primeiro é que o RMSE da mesma janela
-(11,64) fica apenas moderadamente acima das outras dobras, o que exclui um erro
-de magnitude catastrófica em unidades. O segundo é mais revelador: nessa janela
-o baseline ingênuo apresenta **MAPE menor** que o dos modelos (159,97%) e, ao
-mesmo tempo, **RMSE maior** (13,92 contra 11,64). As duas métricas apontam
-vencedores opostos sobre exatamente os mesmos dados.
+No produto 5, a dobra de 19 de novembro merece análise. Nela o MAPE do
+Holt-Winters salta para 188,42%, quatro vezes o valor das demais janelas — mas o
+baseline ingênuo apresenta, ao mesmo tempo, **MAPE menor** (159,97%) e **RMSE
+maior** (13,92 contra 11,64). As duas métricas apontam vencedores opostos sobre
+exatamente os mesmos dados.
 
-Essa contradição é diagnóstica. Ela ocorre porque a janela concentra dias de
-venda muito baixa, e o MAPE divide o erro pelo valor real: um erro de três
-unidades sobre uma venda de duas produz 150% de erro percentual, enquanto o
-mesmo desvio sobre uma venda de trinta produz 10%. A métrica passa a medir o
-tamanho do denominador, não a qualidade da previsão. Declarar e explicar a dobra
-desfavorável é mais sólido que apresentar apenas as janelas convenientes, e
-reforça a limitação do MAPE já registrada na subseção 3.5.2.
+A contradição é diagnóstica: a janela concentra dias de venda muito baixa, e o
+MAPE divide o erro pelo valor observado. Um desvio de três unidades sobre uma
+venda de duas produz 150% de erro percentual; o mesmo desvio sobre uma venda de
+trinta produz 10%. A métrica passa a medir o tamanho do denominador, não a
+qualidade da previsão — limitação já registrada na subseção 3.5.2.
 
 **Figura 12 - Backtesting de origem móvel — produto 1 (Arroz 5kg)**
 
@@ -333,7 +326,7 @@ Fonte: Autoral, 2026
 
 Fonte: Autoral, 2026
 
-As Figuras 9 e 10 tornam visível o contraste entre os dois produtos. No arroz as
+As Figuras 12 e 13 tornam visível o contraste entre os dois produtos. No arroz as
 três linhas correm próximas e estáveis; na banana, a dobra de novembro produz um
 pico que afeta as três abordagens simultaneamente — inclusive o baseline —, o
 que é a assinatura gráfica de um problema da métrica, e não de um modelo.
@@ -362,12 +355,12 @@ estrutura remanescente.
 
 ## 4.5 Da previsão à decisão de reposição
 
-A previsão só tem valor quando convertida em instrução operacional. A Tabela 10
+A previsão só tem valor quando convertida em instrução operacional. A Tabela 11
 apresenta o encadeamento completo do cálculo para dois produtos de situação
 oposta, com prazo de entrega de três dias, variabilidade de prazo 1,0 e nível de
 serviço de 95%.
 
-**Tabela 10 - Parâmetros de reposição calculados pelo motor**
+**Tabela 11 - Parâmetros de reposição calculados pelo motor**
 
 | Etapa | Arroz 5kg | Banana Prata kg |
 |---|---:|---:|
@@ -385,14 +378,31 @@ Fonte: Autoral, 2026
 Os dois produtos têm demanda média semelhante — 13,1 e 15,3 unidades por dia —,
 mas estoques de segurança que diferem em quase 50%. A diferença vem inteiramente
 da variabilidade: o desvio padrão da banana é praticamente o dobro do arroz, e a
-Equação (7) converte essa incerteza em reserva. É o comportamento esperado de um
+Equação (1) converte essa incerteza em reserva. É o comportamento esperado de um
 dimensionamento por nível de serviço — proteger mais o que oscila mais.
 
 A leitura de negócio é imediata. O arroz tem 15 unidades contra um ponto de
 reposição de 65,84: já deveria ter sido pedido, com ruptura estimada para pouco
 mais de um dia. A banana tem 200 unidades contra 85,02 e está confortável por
-cerca de treze dias. É essa tradução — de erro estatístico para instrução
-acionável — que sustenta a proposta da plataforma.
+cerca de treze dias.
+
+É essa tradução que a interface entrega. Os dois produtos recebem tratamento
+visual oposto na tela de estoque — o arroz em vermelho, por estar abaixo do
+ponto de reposição, e a banana em verde — e apenas o arroz aparece na lista de
+alertas, com quantidade sugerida de 51 unidades, a diferença entre o ponto de
+reposição e o estoque atual. O lojista não vê MAPE, desvio padrão ou escore
+normal: vê um produto marcado como crítico, uma estimativa de quantos dias
+restam e uma quantidade a pedir.
+
+O efeito do nível de serviço também chega a ele de forma tangível. Elevar a meta
+de 95% para 99% no arroz aumenta o estoque de segurança de 26,56 para 37,57
+unidades e o ponto de reposição de 65,84 para 76,85 — ou seja, antecipa o pedido
+e amplia a reserva. É um controle de risco exposto em unidades de mercadoria, e
+não em probabilidade.
+
+É essa cadeia — de série temporal a instrução de compra — que sustenta a
+proposta da plataforma, e é também o que separa este trabalho de uma avaliação
+puramente comparativa de modelos.
 
 **Figura 16 - Projeção de estoque e ponto de reposição — produto 1 (Arroz 5kg)**
 
@@ -406,7 +416,7 @@ Fonte: Autoral, 2026
 
 Fonte: Autoral, 2026
 
-As Figuras 13 e 14 projetam o consumo do estoque atual à demanda média prevista
+As Figuras 16 e 17 projetam o consumo do estoque atual à demanda média prevista
 e marcam o instante em que a linha cruza o ponto de reposição. No arroz o
 cruzamento já ocorreu; na banana, ocorre por volta do oitavo dia — bem antes da
 ruptura, que é o comportamento desejado, já que o pedido precisa ser feito com a
@@ -414,10 +424,10 @@ antecedência do prazo de entrega.
 
 ## 4.6 Discussão
 
-**Por que os modelos empatam.** A Tabela 11 traz os parâmetros de suavização
+**Por que os modelos empatam.** A Tabela 12 traz os parâmetros de suavização
 encontrados pelo otimizador do Holt-Winters.
 
-**Tabela 11 - Parâmetros de suavização ajustados (Holt-Winters)**
+**Tabela 12 - Parâmetros de suavização ajustados (Holt-Winters)**
 
 | id | Produto | α (nível) | β (tendência) | γ (sazonal) |
 |---:|---|---:|---:|---:|
@@ -434,21 +444,17 @@ encontrados pelo otimizador do Holt-Winters.
 
 Fonte: Autoral, 2026
 
-Em todos os dez produtos o otimizador convergiu para α ≈ β ≈ γ ≈ 0 — sete deles
-exatamente zero, os demais na ordem de 10⁻⁵ a 10⁻³. O significado é direto: na
-equação de atualização do nível, com α = 0 o termo da nova observação
-desaparece, restando `L(t) = L(t−1) + b(t−1)`. O modelo deixa de ser um filtro
-adaptativo e degenera para `ŷ(t) = L₀ + t·b₀ + s(dia da semana)` — uma reta com
-padrão semanal fixo, ambos estimados uma única vez. É precisamente a mesma
-família de função que o Prophet ajusta neste cenário: tendência linear, sem
-pontos de quebra ativos porque não há quebras, somada a sazonalidade semanal
-fixa. Os dois modelos empatam porque, aqui, são a mesma função.
+Nos dez produtos o otimizador convergiu para parâmetros de suavização nulos —
+sete exatamente zero, os demais desprezíveis. O parâmetro α controla o quanto o
+modelo reage a cada venda nova; em zero, o modelo deixa de se adaptar e passa a
+prever sempre a mesma reta com o mesmo padrão semanal, estimados uma única vez a
+partir de todo o histórico.
 
-O otimizador chegou a esse ponto por uma razão identificável. O gerador produz
-tendência perfeitamente linear e perfil semanal rigorosamente constante; nesse
-regime, adaptar-se ao dado recente é prejudicial, porque toda reação a uma
-observação individual é reação a ruído puro. O otimizador identificou isso e
-desligou a adaptação.
+O otimizador fez essa escolha porque os dados não contêm quebra alguma: a
+tendência é linear e o perfil semanal, constante, de modo que reagir à venda de
+ontem seria reagir apenas a ruído. E, reduzido a reta mais padrão semanal, o
+Holt-Winters passa a descrever a mesma função que o Prophet ajusta num cenário
+sem quebras. **Os dois empatam porque, ali, são o mesmo modelo.**
 
 **O que isso valida e o que delimita.** O achado valida o motor em sentido
 forte: submetido a dados de estrutura conhecida, ele recuperou essa estrutura,
@@ -459,7 +465,7 @@ verdade geral sobre Holt-Winters e Prophet.
 **Por que o baseline perde por tanto.** Há uma objeção natural ao parágrafo
 anterior: se o Holt-Winters degenerou para tendência mais média por dia da
 semana, por que não empata também com a regra ingênua, que é igualmente
-simples? A Tabela 7 mostra que não empata — a diferença é de 45,1% de erro na
+simples? A Tabela 8 mostra que não empata — a diferença é de 45,1% de erro na
 mediana. A razão está em *como* cada um estima o perfil semanal. O baseline
 repete uma única semana, ou seja, uma realização ruidosa por dia da semana; o
 Holt-Winters estima esse perfil a partir das aproximadamente quarenta semanas do

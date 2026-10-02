@@ -68,6 +68,21 @@ das afirmações quantitativas do texto corrido ("supera em 10 de 10 produtos",
 dados mudarem.** Na primeira execução ele já pegou uma mediana calculada
 errado — 49,4% onde o correto era 45,1% — antes de o número ir para o artigo.
 
+## Verificacao das referencias cruzadas
+
+```bash
+ml-service/venv/Scripts/python.exe docs/artigo/verificar_referencias.py
+```
+
+Confere se figuras, tabelas e equacoes tem numeracao contigua e se toda
+referencia no corpo aponta para um rotulo existente. **Rodar sempre que algo for
+renumerado.**
+
+Limite conhecido: ele acusa referencia *inexistente*, nao referencia *errada*.
+Uma mencao a "Figuras 7 e 8" apontando para as figuras erradas passa, se 7 e 8
+existirem. Renumeracao por substituicao simples quebra o plural -- foi assim que
+quatro referencias ficaram erradas de uma vez.
+
 ## Marcadores no texto
 
 - `[CITAR: ...]` — afirmação que precisa de fonte que ainda não está no repositório.

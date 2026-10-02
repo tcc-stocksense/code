@@ -147,7 +147,8 @@ produção praticamente a zero.
 
 Fonte: Autoral, 2026
 
-A segunda escolha é o **banco de dados em contêiner na própria instância**, em
+A Figura 4 apresenta a topologia resultante. A segunda escolha é o **banco de
+dados em contêiner na própria instância**, em
 vez de serviço gerenciado. A justificativa é a mesma — o serviço gerenciado
 consumiria cerca de metade do crédito disponível —, e o risco é aceitável no
 contexto: os dados são integralmente reconstruíveis a partir das planilhas de
@@ -221,7 +222,7 @@ de acesso, decisão detalhada adiante. A tabela `produto` é identificada pelo
 código que o próprio gestor usa na planilha, e não por chave gerada pelo sistema,
 para que o mesmo identificador atravesse todas as planilhas enviadas sem exigir
 tradução. A associativa `produto_fornecedor` carrega o prazo médio de entrega e
-sua variabilidade — os dois parâmetros que alimentam a Equação (7) —, modelada
+sua variabilidade — os dois parâmetros que alimentam a Equação (1) —, modelada
 como *muitos-para-muitos* porque um produto pode ter mais de um fornecedor com
 prazos distintos.
 
@@ -281,18 +282,12 @@ como trabalho futuro, e a subseção 3.3.3 descreve o formato pelo qual esse
 histórico entraria sem alteração de código.
 
 O gerador produz 10 produtos ao longo de 365 dias do ano de 2024, totalizando
-3.650 observações diárias. Cada produto recebe um perfil de demanda distinto,
-da quase constância do sal refinado à alta volatilidade da banana. A quantidade
-vendida de um produto em um dia resulta do produto de quatro fatores, conforme
-a Equação (1):
-
-    q(t) = d · T(t) · S(t) · ε(t)          (1)
-
-Onde `q(t)` é a quantidade vendida no dia *t*; `d` é a demanda base diária do
-produto; `T(t)` é o fator de tendência, que cresce linearmente de 1,00 a 1,20 ao
-longo do ano; `S(t)` é o multiplicador do dia da semana; e `ε(t)` é um ruído
-gaussiano multiplicativo de média 1,0, cujo desvio padrão é o parâmetro de
-variabilidade do produto e cujo valor é truncado ao intervalo [0,1; 3,0].
+3.650 observações diárias. Cada produto recebe um perfil de demanda distinto, da
+quase constância do sal refinado à alta volatilidade da banana. A quantidade
+vendida em cada dia resulta da combinação multiplicativa de quatro fatores: a
+demanda base do produto, um fator de tendência que cresce linearmente de 1,00 a
+1,20 ao longo do ano, o multiplicador do dia da semana e um ruído gaussiano de
+média 1,0, cujo desvio padrão é o parâmetro de variabilidade do produto.
 
 O multiplicador semanal `S(t)` é o elemento que justifica o emprego de modelos
 sazonais, e sua amplitude está na Tabela 2.
@@ -391,58 +386,37 @@ total; na API, que detém o catálogo e os valores de venda, o cálculo é exato
 
 Foram implementados dois modelos, ambos ajustados individualmente por produto.
 
-O **Holt-Winters** — suavização exponencial tripla, proposta por Holt (1957) e
-estendida por Winters (1960) — decompõe a série em nível, tendência e
-sazonalidade. Adotou-se a variante aditiva para os dois componentes, com ciclo
-sazonal de sete dias, e a estimativa dos parâmetros de suavização é delegada ao
-otimizador da biblioteca. A previsão para *h* dias à frente é dada pela
-Equação (2):
+O **Holt-Winters** (Holt, 1957; Winters, 1960) decompõe a série em nível,
+tendência e sazonalidade, atualizando as três estimativas a cada observação.
+Adotou-se a variante aditiva, com ciclo sazonal de sete dias. Os parâmetros de
+suavização, que controlam o quanto cada componente reage a uma venda nova, não
+foram arbitrados: são estimados pelo otimizador a partir dos próprios dados —
+decisão que se revelou determinante nos resultados (subseção 4.6).
 
-    ŷ(t+h) = L(t) + h · b(t) + s(t + h − m·⌈h/m⌉)          (2)
+O **Prophet** (Taylor e Letham, 2018) decompõe a série nos mesmos componentes,
+mas estima a tendência com pontos de quebra e os parâmetros por regressão
+bayesiana. Foi configurado com sazonalidade semanal ativa e sazonalidades anual
+e diária desativadas — a primeira porque 365 dias não contêm os dois ciclos
+necessários para estimá-la, a segunda porque os dados são agregados por dia.
 
-Onde `L(t)` é o nível estimado no instante *t*; `b(t)` é a tendência por
-período; `s(·)` é o componente sazonal do dia correspondente; e `m = 7` é o
-comprimento do ciclo.
-
-O **Prophet**, publicado por Taylor e Letham (2018), é um modelo aditivo que
-decompõe a série em tendência, sazonalidade e efeitos de eventos, estimados por
-regressão bayesiana. Foi configurado com sazonalidade semanal ativa e
-sazonalidades anual e diária desativadas — a primeira porque 365 dias de
-histórico não contêm os dois ciclos necessários para estimá-la, a segunda porque
-os dados são agregados por dia e não há variação intradiária a modelar.
-
-A sazonalidade semanal de ambos os modelos só é habilitada quando o conjunto de
-treino contém ao menos dois ciclos completos; abaixo disso o componente é
-desativado automaticamente, para evitar estimar um padrão a partir de uma única
-repetição.
+Em ambos, a sazonalidade semanal só é habilitada quando o treino contém ao menos
+dois ciclos completos, para não estimar um padrão a partir de uma repetição.
 
 ### 3.5.2 Métricas de avaliação
 
-A comparação emprega as três métricas recomendadas por Hyndman e Athanasopoulos
-(2021) para avaliação multidimensional, definidas pelas Equações (3), (4) e (5):
+A avaliação usa as três métricas complementares recomendadas por Hyndman e
+Athanasopoulos (2021): o erro médio absoluto (MAE), expresso em unidades
+vendidas; a raiz do erro quadrático médio (RMSE), que penaliza mais os erros
+grandes e por isso é sensível a falhas isoladas de maior impacto; e o erro
+percentual absoluto médio (MAPE).
 
-    MAE = (1/n) · Σ |y(t) − ŷ(t)|          (3)
-
-    RMSE = √[ (1/n) · Σ (y(t) − ŷ(t))² ]          (4)
-
-    MAPE = (100/k) · Σ |y(t) − ŷ(t)| / y(t),  para y(t) > 0          (5)
-
-Onde `y(t)` é a quantidade observada; `ŷ(t)` é a prevista; `n` é o número de
-dias da janela de avaliação; e `k` é o número de dias com venda estritamente
-positiva.
-
-A restrição `y(t) > 0` na Equação (5) merece registro explícito, porque tem duas
-consequências. A primeira é necessária: o MAPE é indefinido quando o valor real
-é zero, e a série contém zeros por construção, nos dias de fechamento. A segunda
-é uma assimetria que precisa ser declarada — MAE e RMSE são calculados sobre
-todos os dias da janela, o MAPE apenas sobre os dias com venda. As três métricas,
-portanto, não incidem exatamente sobre o mesmo conjunto de pontos.
-
-O MAPE é adotado como critério de seleção por ser a única das três que é
-adimensional e, portanto, comparável entre produtos de escalas distintas — o pão
-francês vende dezenas de unidades por dia, o sal refinado vende unidades. É
-também o valor que alimenta o indicador de acurácia exibido ao lojista, na forma
-de `100 − MAPE`.
+O MAPE é o critério de seleção por ser o único adimensional, comparável entre
+produtos de escalas distintas — o pão francês vende dezenas de unidades por dia,
+o sal refinado vende unidades —, e é o valor que alimenta o indicador de
+acurácia exibido ao lojista, na forma de `100 − MAPE`. Por ser indefinido quando
+a venda observada é zero, é calculado apenas sobre os dias com venda, enquanto
+MAE e RMSE consideram todos os dias da janela: as três, portanto, não incidem
+sobre exatamente o mesmo conjunto de pontos.
 
 ### 3.5.3 Protocolo de avaliação
 
@@ -451,32 +425,23 @@ teste, o que corresponde, no conjunto descrito na subseção 3.3.4, a 292 dias d
 treino (de 1º de janeiro a 18 de outubro de 2024) e 73 dias de teste (de 19 de
 outubro a 30 de dezembro de 2024).
 
-A divisão é feita por posição temporal e **nunca** por amostragem aleatória.
-A razão é que embaralhar as observações colocaria dias posteriores no conjunto
-de treino e dias anteriores no de teste, permitindo que o modelo usasse
-informação do futuro para prever o passado. O erro medido cairia
-artificialmente e não teria valor preditivo algum — seria uma medida de ajuste,
-não de generalização.
+A divisão é por posição temporal e **nunca** por amostragem aleatória.
+Embaralhar as observações colocaria dias posteriores no treino e anteriores no
+teste, permitindo que o modelo usasse o futuro para prever o passado: o erro
+cairia artificialmente e mediria ajuste, não capacidade de generalizar.
 
-Uma única divisão, porém, pode ser favorável por acaso. Para verificar se o
-desempenho se mantém, aplicou-se adicionalmente **backtesting com origem
-móvel**: o conjunto de treino cresce a cada dobra e a previsão é feita sobre o
-bloco seguinte de 14 dias, repetindo-se o experimento cinco vezes. Se o erro
-oscilar pouco entre as dobras, a métrica principal é representativa; se oscilar
-muito, ela é um acidente da janela escolhida.
+Uma única divisão pode ser favorável por acaso. Aplicou-se também **backtesting
+com origem móvel** — o treino cresce a cada dobra e a previsão recai sobre o
+bloco seguinte de 14 dias, cinco vezes. Erro estável entre as dobras indica que
+a métrica principal é representativa.
 
-Por fim, incorporou-se um **baseline ingênuo sazonal** como piso de comparação,
-definido pela Equação (6):
-
-    ŷ(t+h) = y(t + h − m·⌈h/m⌉),  com m = 7          (6)
-
-Ou seja, cada dia previsto recebe o valor observado no mesmo dia da semana da
-última semana completa do conjunto de treino. O baseline não estima parâmetro
-algum e não é um terceiro candidato do motor: sua função é responder a uma
-pergunta que a comparação entre Holt-Winters e Prophet, sozinha, não responde.
-Comparar os dois modelos informa qual deles é melhor; comparar ambos com o
-ingênuo informa se **algum** deles vale o custo de existir. Sem esse piso, uma
-diferença pequena entre os modelos seria indistinguível de ausência de
+Por fim, incorporou-se um **baseline ingênuo sazonal** como piso de comparação:
+cada dia previsto recebe o valor observado no mesmo dia da semana da última
+semana completa do treino. Ele não estima parâmetro algum e não concorre como
+terceiro modelo do motor; sua função é responder ao que a comparação entre
+Holt-Winters e Prophet, sozinha, não responde. Comparar os dois informa qual é
+melhor; compará-los com o ingênuo informa se **algum** deles compensa. Sem esse
+piso, uma diferença pequena entre os modelos seria indistinguível de ausência de
 capacidade preditiva nos dois.
 
 ### 3.5.4 Critério de seleção do modelo
@@ -498,11 +463,11 @@ de informação.
 
 A previsão só tem valor operacional quando convertida em decisão de compra. Essa
 conversão usa as formulações de Ballou (2006) para estoque de segurança e ponto
-de reposição, nas Equações (7) e (8):
+de reposição, nas Equações (1) e (2):
 
-    ES = Z · √( LT · σ²_d + d̄² · σ²_LT )          (7)
+    ES = Z · √( LT · σ²_d + d̄² · σ²_LT )          (1)
 
-    PR = d̄ · LT + ES          (8)
+    PR = d̄ · LT + ES          (2)
 
 Onde `ES` é o estoque de segurança em unidades; `Z` é o escore da distribuição
 normal padrão correspondente ao nível de serviço alvo; `LT` é o prazo médio de
@@ -522,9 +487,9 @@ aplicada ao nível de serviço, e não fixado em 1,645. A distinção é funcion
 não apenas formal: com o valor fixo, a opção de alterar o nível de serviço
 exposta ao usuário não produziria efeito algum sobre o resultado.
 
-Completa o conjunto a estimativa de dias até ruptura, na Equação (9):
+Completa o conjunto a estimativa de dias até ruptura, na Equação (3):
 
-    DR = E / d̄          (9)
+    DR = E / d̄          (3)
 
 Onde `DR` é o número de dias até o esgotamento; `E` é o estoque atual; e `d̄` é
 a demanda média diária prevista. Quando a demanda prevista é nula, o indicador
@@ -563,6 +528,32 @@ permite ajustar o lead time e o nível de serviço com recálculo imediato.
 faturamento. O *comparativo de modelos* expõe MAPE, RMSE e MAE por produto e por
 modelo, com indicação de qual foi selecionado em cada caso.
 
+Os indicadores apresentados ao lojista derivam diretamente dos parâmetros
+calculados pelo motor, conforme a Tabela 3. Nenhum deles exige do usuário
+qualquer noção estatística: todos são expressos em unidades, dias ou reais.
+
+**Tabela 3 - Indicadores apresentados ao lojista**
+
+| Indicador | Origem | Onde aparece |
+|---|---|---|
+| Dias até ruptura | Equação (3) — estoque atual dividido pela demanda média prevista | estoque, alertas, detalhe |
+| Semáforo de urgência | 🔴 estoque ≤ ponto de reposição · 🟡 até `PR × 1,5` · 🟢 acima | estoque |
+| Quantidade sugerida | diferença entre o ponto de reposição e o estoque atual | alertas |
+| Produtos em risco | contagem dos itens com ruptura prevista em até sete dias | painel |
+| Produtos críticos | contagem dos itens já abaixo do ponto de reposição | painel |
+| Acurácia do motor | `100 − MAPE` do modelo selecionado para cada produto | painel, comparativo |
+| Classe ABC | participação acumulada no faturamento do período | curva ABC |
+
+Fonte: Autoral, 2026
+
+Duas opções de projeto nessa tabela merecem registro. O **semáforo** usa o ponto
+de reposição como limiar, e não um corte fixo de dias: um produto cujo
+fornecedor entrega em dez dias entra em alerta muito antes de outro atendido em
+vinte e quatro horas, ainda que ambos tenham o mesmo estoque e a mesma demanda.
+Um corte fixo trataria os dois do mesmo modo. E a **acurácia** reporta o modelo
+efetivamente selecionado para cada produto, e não um modelo fixo — do contrário
+o número exibido não corresponderia à previsão que gerou o alerta.
+
 **Figura 7 - Telas principais da aplicação**
 
 `[FIGURA: capturar da aplicação — mosaico 2 × 2 com painel inicial, estoque,
@@ -570,7 +561,8 @@ alertas e comparativo de modelos]`
 
 Fonte: Autoral, 2026
 
-A tela de comparativo merece nota, porque inverte uma convenção de produto: ela
+A Figura 7 reúne as quatro telas de uso diário. A de comparativo inverte uma
+convenção de produto: ela
 mostra ao usuário final a métrica de erro do próprio sistema, inclusive a do
 modelo perdedor. A decisão decorre do propósito do trabalho — a comparação entre
 modelos é o objeto de estudo, e ocultá-la na interface esvaziaria a contribuição

@@ -134,13 +134,13 @@ algum. Parte do que o desvio captura, portanto, é **estrutura previsível**, n�
 aleatoriedade — e é exatamente essa parte que os modelos conseguem extrair. A
 distinção prepara a leitura dos erros percentuais elevados que aparecem adiante.
 
-**Figura 7 - Decomposição da série do produto 1 (Arroz 5kg)**
+**Figura 8 - Decomposição da série do produto 1 (Arroz 5kg)**
 
 `[FIGURA: ml-service/analysis/figures/g1_decomposicao_produto1.png]`
 
 Fonte: Autoral, 2026
 
-**Figura 8 - Decomposição da série do produto 5 (Banana Prata kg)**
+**Figura 9 - Decomposição da série do produto 5 (Banana Prata kg)**
 
 `[FIGURA: ml-service/analysis/figures/g1_decomposicao_produto5.png]`
 
@@ -251,13 +251,13 @@ dela. O mesmo vale para a banana prata, que cai de 99,14% para 66,63%. O erro
 elevado é propriedade do dado, não do método, e o sistema trata esse caso: acima
 de 50% de MAPE o motor marca a previsão como de baixa confiança.
 
-**Figura 9 - Previsto × real na janela de teste — produto 1 (Arroz 5kg)**
+**Figura 10 - Previsto × real na janela de teste — produto 1 (Arroz 5kg)**
 
 `[FIGURA: ml-service/analysis/figures/g2_previsto_real_produto1.png]`
 
 Fonte: Autoral, 2026
 
-**Figura 10 - Previsto × real na janela de teste — produto 5 (Banana Prata kg)**
+**Figura 11 - Previsto × real na janela de teste — produto 5 (Banana Prata kg)**
 
 `[FIGURA: ml-service/analysis/figures/g2_previsto_real_produto5.png]`
 
@@ -321,13 +321,13 @@ tamanho do denominador, não a qualidade da previsão. Declarar e explicar a dob
 desfavorável é mais sólido que apresentar apenas as janelas convenientes, e
 reforça a limitação do MAPE já registrada na subseção 3.5.2.
 
-**Figura 11 - Backtesting de origem móvel — produto 1 (Arroz 5kg)**
+**Figura 12 - Backtesting de origem móvel — produto 1 (Arroz 5kg)**
 
 `[FIGURA: ml-service/analysis/figures/g6_backtesting_produto1.png]`
 
 Fonte: Autoral, 2026
 
-**Figura 12 - Backtesting de origem móvel — produto 5 (Banana Prata kg)**
+**Figura 13 - Backtesting de origem móvel — produto 5 (Banana Prata kg)**
 
 `[FIGURA: ml-service/analysis/figures/g6_backtesting_produto5.png]`
 
@@ -338,13 +338,13 @@ três linhas correm próximas e estáveis; na banana, a dobra de novembro produz
 pico que afeta as três abordagens simultaneamente — inclusive o baseline —, o
 que é a assinatura gráfica de um problema da métrica, e não de um modelo.
 
-**Figura 13 - Diagnóstico de resíduos — produto 1 (Holt-Winters)**
+**Figura 14 - Diagnóstico de resíduos — produto 1 (Holt-Winters)**
 
 `[FIGURA: ml-service/analysis/figures/g5_residuos_produto1_holt_winters.png]`
 
 Fonte: Autoral, 2026
 
-**Figura 14 - Diagnóstico de resíduos — produto 5 (Holt-Winters)**
+**Figura 15 - Diagnóstico de resíduos — produto 5 (Holt-Winters)**
 
 `[FIGURA: ml-service/analysis/figures/g5_residuos_produto5_holt_winters.png]`
 
@@ -354,10 +354,10 @@ O diagnóstico de resíduos verifica se o modelo extraiu toda a estrutura
 disponível. Um ajuste adequado deixa resíduos centrados em zero, sem padrão
 temporal e sem autocorrelação — aproximadamente ruído branco. O critério de
 refutação é explícito: um pico na função de autocorrelação no atraso 7
-indicaria sazonalidade semanal não capturada. A Figura 13 não apresenta esse
+indicaria sazonalidade semanal não capturada. A Figura 14 não apresenta esse
 pico, o que sustenta a conclusão de que o que restou é ruído irredutível. A
-Figura 14 mostra o mesmo padrão para a banana prata, com resíduos de amplitude
-muito maior — coerente com a decomposição da Figura 8 — mas igualmente sem
+Figura 15 mostra o mesmo padrão para a banana prata, com resíduos de amplitude
+muito maior — coerente com a decomposição da Figura 9 — mas igualmente sem
 estrutura remanescente.
 
 ## 4.5 Da previsão à decisão de reposição
@@ -394,13 +394,13 @@ mais de um dia. A banana tem 200 unidades contra 85,02 e está confortável por
 cerca de treze dias. É essa tradução — de erro estatístico para instrução
 acionável — que sustenta a proposta da plataforma.
 
-**Figura 15 - Projeção de estoque e ponto de reposição — produto 1 (Arroz 5kg)**
+**Figura 16 - Projeção de estoque e ponto de reposição — produto 1 (Arroz 5kg)**
 
 `[FIGURA: ml-service/analysis/figures/g7_reposicao_produto1.png]`
 
 Fonte: Autoral, 2026
 
-**Figura 16 - Projeção de estoque e ponto de reposição — produto 5 (Banana Prata kg)**
+**Figura 17 - Projeção de estoque e ponto de reposição — produto 5 (Banana Prata kg)**
 
 `[FIGURA: ml-service/analysis/figures/g7_reposicao_produto5.png]`
 

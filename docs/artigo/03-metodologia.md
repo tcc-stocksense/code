@@ -141,6 +141,12 @@ executando os três contêineres por meio do mesmo arquivo de composição já u
 em desenvolvimento, o que reduz a distância entre o ambiente local e o de
 produção praticamente a zero.
 
+**Figura 4 - Topologia de implantação em nuvem**
+
+`[FIGURA: docs/artigo/figuras/infra.png]`
+
+Fonte: Autoral, 2026
+
 A segunda escolha é o **banco de dados em contêiner na própria instância**, em
 vez de serviço gerenciado. A justificativa é a mesma — o serviço gerenciado
 consumiria cerca de metade do crédito disponível —, e o risco é aceitável no
@@ -149,13 +155,13 @@ importação, e a finalidade do ambiente é demonstração, sem requisito de alt
 disponibilidade. Em uso real, com dados de um estabelecimento, essa decisão
 precisaria ser revista.
 
-**Figura 4 - Processo de reposição proposto (BPMN TO-BE)**
+**Figura 5 - Processo de reposição proposto (BPMN TO-BE)**
 
 `[FIGURA: docs/artigo/figuras/bpmn-to-be.png]`
 
 Fonte: Autoral, 2026
 
-A Figura 4 representa o processo de reposição com o sistema em operação. O
+A Figura 5 representa o processo de reposição com o sistema em operação. O
 contraste com o processo atual, apresentado na Figura 1, está em onde a decisão
 se forma: no fluxo atual ela nasce da inspeção visual da prateleira; no
 proposto, nasce de um alerta que o motor emite ao cruzar o estoque com o ponto
@@ -200,14 +206,14 @@ resultados que fundamentam ambos estão na subseção 4.1.
 
 ### 3.3.2 Modelo de dados
 
-**Figura 5 - Modelo entidade-relacionamento**
+**Figura 6 - Modelo entidade-relacionamento**
 
 `[FIGURA: docs/artigo/figuras/der.png]`
 
 Fonte: Autoral, 2026
 
 O esquema tem sete tabelas, versionadas por migrações incrementais, e organiza-se
-em três blocos, destacados por cor na Figura 5.
+em três blocos, destacados por cor na Figura 6.
 
 O **bloco cadastral** reúne `estabelecimento`, `produto`, `fornecedor` e a
 associativa `produto_fornecedor`. O estabelecimento guarda também as credenciais
@@ -557,7 +563,7 @@ permite ajustar o lead time e o nível de serviço com recálculo imediato.
 faturamento. O *comparativo de modelos* expõe MAPE, RMSE e MAE por produto e por
 modelo, com indicação de qual foi selecionado em cada caso.
 
-**Figura 6 - Telas principais da aplicação**
+**Figura 7 - Telas principais da aplicação**
 
 `[FIGURA: capturar da aplicação — mosaico 2 × 2 com painel inicial, estoque,
 alertas e comparativo de modelos]`

@@ -84,10 +84,27 @@ Serve para revisar na véspera sem reler o artigo inteiro.
 ## Geração do .docx
 
 ```bash
-pip install -r docs/artigo/requirements-artigo.txt
-python docs/artigo/gerar_docx.py
+ml-service/venv/Scripts/python.exe -m pip install -r docs/artigo/requirements-artigo.txt
+ml-service/venv/Scripts/python.exe docs/artigo/gerar_docx.py
 ```
 
-O script abre o template, aplica os estilos dele e escreve
-`docs/artigo/artigo-stocksense.docx`. Dependência isolada de propósito: o
+Gera `docs/artigo/artigo-stocksense.docx`. Dependência isolada de propósito: o
 `requirements.txt` do ml-service continua sendo só o runtime do serviço.
+
+O script usa o template como **doador de formatação**: abre o arquivo, esvazia o
+corpo preservando `sectPr` (margens), cabeçalho e rodapé, e reescreve o conteúdo.
+Duas descobertas do template que o script precisa respeitar:
+
+- **O template não define estilos de título.** "1 Introdução" e um parágrafo
+  comum são ambos `Normal`; o que os distingue é negrito, `<w:caps/>`,
+  justificação e `outlineLvl`. Aplicar `Heading 1` produziria um documento azul,
+  com fonte diferente do modelo da faculdade.
+- **A entrelinha do corpo é 1,5**, não o 1,08 do `docDefaults` — cada parágrafo
+  sobrescreve o padrão.
+
+Também não existem os estilos `List Number`, `List Bullet` nem `Table Grid`: as
+listas recebem marcador textual com recuo manual e as tabelas ganham bordas
+aplicadas via XML.
+
+Figuras cujo arquivo existe são embarcadas; as que faltam viram um parágrafo
+`[FIGURA PENDENTE: ...]` em negrito, para a lacuna não passar despercebida.

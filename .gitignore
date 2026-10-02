@@ -42,3 +42,12 @@ npm-debug.log*
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Artigo gerado (reconstruivel por gerar_docx.py)
+docs/artigo/artigo-stocksense.docx

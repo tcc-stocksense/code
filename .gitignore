@@ -48,6 +48,15 @@ npm-debug.log*
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+*.tfplan
+terraform.tfvars
+*.auto.tfvars
+
+# ── Chaves e certificados ─────────────────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Artigo gerado (reconstruivel por gerar_docx.py)
 docs/artigo/artigo-stocksense.docx

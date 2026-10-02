@@ -75,11 +75,16 @@ errado — 49,4% onde o correto era 45,1% — antes de o número ir para o artig
 - `[CONFIRMAR: ...]` — dado factual que só os autores têm (nome de orientador,
   prenome de autor citado, data de banca).
 
-## Notas de defesa
+## Material de estudo
 
-`NOTAS-DEFESA.md` acumula, por seção, as perguntas que a banca tende a fazer, a
-resposta em duas linhas e o ponteiro para a tabela ou figura que a sustenta.
-Serve para revisar na véspera sem reler o artigo inteiro.
+O guia do grupo é [`docs/GUIA-DE-ESTUDO-TCC.md`](../GUIA-DE-ESTUDO-TCC.md): os
+conceitos explicados do zero, os resultados comentados, as perguntas de banca com
+resposta e a lista honesta de vulnerabilidades. Absorveu o antigo
+`NOTAS-DEFESA.md`.
+
+Ele existe porque o artigo passou por uma redução deliberada da carga matemática,
+para diminuir a superfície de perguntas na arguição — a explicação que saiu do
+artigo mora lá, mais longa e mais didática do que caberia num texto acadêmico.
 
 ## Geração do .docx
 

@@ -46,26 +46,26 @@ A arquitetura é descrita em dois níveis de abstração, seguindo o modelo C4. 
 primeiro situa o sistema em relação a quem o usa e ao que consome; o segundo
 abre a caixa e mostra os componentes internos.
 
-**Figura 1 - Diagrama de contexto (C4, nível 1)**
+**Figura 2 - Diagrama de contexto (C4, nível 1)**
 
 `[FIGURA: tcc-stocksense/docs/arquitetura/diagram-contexto.png]`
 
 Fonte: Autoral, 2026
 
-A Figura 1 delimita a fronteira do sistema. Há um único ator humano — o lojista,
+A Figura 2 delimita a fronteira do sistema. Há um único ator humano — o lojista,
 gestor do estabelecimento — e uma única fonte de dados: as planilhas exportadas
 pelo sistema de frente de caixa do próprio mercado. Não há integração com
 sistemas externos, e essa ausência é uma decisão, não uma lacuna: exigir
 integração com ERP ou com API de fornecedor reintroduziria exatamente a barreira
 de custo e complexidade que o trabalho se propõe a contornar.
 
-**Figura 2 - Diagrama de containers (C4, nível 2)**
+**Figura 3 - Diagrama de containers (C4, nível 2)**
 
 `[FIGURA: tcc-stocksense/docs/arquitetura/diagram-container-c2.png]`
 
 Fonte: Autoral, 2026
 
-Conforme ilustrado na Figura 2, a solução é composta por quatro elementos: a
+Conforme ilustrado na Figura 3, a solução é composta por quatro elementos: a
 interface do lojista, a API orquestradora, o motor preditivo e o banco de dados.
 
 **A. Aplicação web**
@@ -122,16 +122,85 @@ Três invariantes governam esse fluxo e não são violadas em nenhum ponto do
 sistema: a interface nunca chama o motor diretamente; o motor nunca acessa o
 banco; e toda escrita passa pela API.
 
+**F. Implantação**
+
+A solução foi implantada em nuvem pública (AWS) e esteve em operação durante a
+avaliação. A topologia é declarada como código, em Terraform: rede virtual
+isolada com sub-rede pública, *gateway* de internet, tabela de rotas e grupo de
+segurança que libera as portas de aplicação ao público e restringe o acesso
+administrativo; uma instância de computação com volume persistente; e um par de
+chaves gerado no próprio provisionamento. A execução é reproduzível — a
+infraestrutura inteira pode ser destruída e recriada a partir do repositório.
+
+Duas escolhas de dimensionamento merecem registro, porque foram determinadas por
+restrição orçamentária e não por preferência técnica. O projeto dispunha de
+créditos acadêmicos limitados, o que inviabilizou um balanceador de carga
+gerenciado, cuja taxa fixa mensal consumiria parcela significativa do total, e o
+uso de serviços de contêiner gerenciados. Optou-se por **uma única instância**
+executando os três contêineres por meio do mesmo arquivo de composição já usado
+em desenvolvimento, o que reduz a distância entre o ambiente local e o de
+produção praticamente a zero.
+
+A segunda escolha é o **banco de dados em contêiner na própria instância**, em
+vez de serviço gerenciado. A justificativa é a mesma — o serviço gerenciado
+consumiria cerca de metade do crédito disponível —, e o risco é aceitável no
+contexto: os dados são integralmente reconstruíveis a partir das planilhas de
+importação, e a finalidade do ambiente é demonstração, sem requisito de alta
+disponibilidade. Em uso real, com dados de um estabelecimento, essa decisão
+precisaria ser revista.
+
+**Figura 4 - Processo de reposição proposto (BPMN TO-BE)**
+
+`[FIGURA: ../../docs/contexto/BPMN-TO-BE 1.svg — converter para PNG]`
+
+Fonte: Autoral, 2026
+
+A Figura 4 representa o processo de reposição com o sistema em operação. O
+contraste com o processo atual, apresentado na Figura 1, está em onde a decisão
+se forma: no fluxo atual ela nasce da inspeção visual da prateleira; no
+proposto, nasce de um alerta que o motor emite ao cruzar o estoque com o ponto
+de reposição calculado. A conferência física não desaparece — passa a confirmar
+uma decisão em vez de originá-la.
+
 ## 3.3 Base de dados
 
-A base de dados do projeto tem três níveis, que convém não confundir: o modelo
-relacional que sustenta o sistema, o esquema de ingestão que define o que ele
-aceita de um estabelecimento real, e a base de validação sobre a qual os
-resultados deste artigo foram medidos.
+A base de dados do projeto tem quatro níveis, que convém não confundir: o
+levantamento de campo que caracterizou o problema, o modelo relacional que
+sustenta o sistema, o esquema de ingestão que define o que ele aceita de um
+estabelecimento real, e a base de validação sobre a qual os resultados
+quantitativos foram medidos.
 
-### 3.3.1 Modelo de dados
+### 3.3.1 Levantamento de campo
 
-**Figura 3 - Modelo entidade-relacionamento**
+A caracterização do problema não se apoiou apenas na literatura. Foi conduzido um
+levantamento junto a gestores de mercados de bairro, por questionário estruturado
+autoaplicado, com perguntas fechadas e três campos abertos. O instrumento cobriu
+seis dimensões: o grau de informatização do controle de estoque; o critério usado
+para decidir uma compra; a frequência de ruptura; o número de fornecedores e o
+prazo de entrega praticado; a percepção de sazonalidade; e o tempo e a perda
+financeira atribuídos à gestão de estoque.
+
+Participaram **sete estabelecimentos**, de porte pequeno a médio, entre abril e
+julho de 2026. A amostra é de conveniência, obtida por contato direto, e não
+pretende representatividade estatística — seu papel é qualificar o problema e
+calibrar parâmetros de projeto que, de outro modo, seriam arbitrados. Esse limite
+é retomado nas considerações finais.
+
+O tratamento dos dados seguiu três regras. Os respondentes são identificados
+apenas por código (E1 a E7); nenhum nome de estabelecimento, endereço de e-mail
+ou dado de contato é reproduzido neste artigo ou nos artefatos públicos do
+projeto. As respostas abertas são citadas apenas quando ilustram um padrão já
+evidenciado pelas fechadas. E os dados foram coletados com finalidade declarada
+de pesquisa acadêmica.
+
+Dois parâmetros de projeto saíram diretamente desse levantamento, em vez de
+serem arbitrados: o prazo de entrega padrão adotado na ausência das planilhas
+opcionais e a decisão de aceitar planilha eletrônica como formato de entrada. Os
+resultados que fundamentam ambos estão na subseção 4.1.
+
+### 3.3.2 Modelo de dados
+
+**Figura 5 - Modelo entidade-relacionamento**
 
 `[FIGURA: tcc-stocksense/database/der-diagram.mwb — exportar como imagem]`
 
@@ -172,7 +241,7 @@ um por produto, sobrescritos a cada execução do motor, e a desnormalização
 permite que as telas de estoque e de alertas sejam servidas por uma única
 consulta, sem junção.
 
-### 3.3.2 Esquema de ingestão
+### 3.3.3 Esquema de ingestão
 
 A entrada do sistema são planilhas no formato `.xlsx`. Duas são obrigatórias:
 o catálogo de produtos, com identificador, nome e estoque atual, e o histórico
@@ -189,7 +258,7 @@ confiabilidade estatística. Produtos que não atingem esse mínimo são recusad
 pelo motor, e a interface sinaliza a ausência de previsão em vez de exibir um
 valor sem lastro.
 
-### 3.3.3 Base de validação empírica
+### 3.3.4 Base de validação empírica
 
 Os resultados apresentados na seção 4 foram obtidos sobre um conjunto de dados
 sintético, gerado por código com semente fixa, e não sobre vendas reais de um
@@ -202,7 +271,7 @@ permitem verificar se o motor **recupera uma estrutura conhecida**, porque a
 estrutura verdadeira da série foi definida por construção. O que se valida aqui
 é a instrumentação — se a régua mede o que diz medir —, não a magnitude do erro
 em um mercado específico. A validação externa sobre histórico real permanece
-como trabalho futuro, e a subseção 3.3.2 descreve o formato pelo qual esse
+como trabalho futuro, e a subseção 3.3.3 descreve o formato pelo qual esse
 histórico entraria sem alteração de código.
 
 O gerador produz 10 produtos ao longo de 365 dias do ano de 2024, totalizando
@@ -372,7 +441,7 @@ de `100 − MAPE`.
 ### 3.5.3 Protocolo de avaliação
 
 A avaliação principal usa divisão cronológica em 80% para treino e 20% para
-teste, o que corresponde, no conjunto descrito na subseção 3.3.3, a 292 dias de
+teste, o que corresponde, no conjunto descrito na subseção 3.3.4, a 292 dias de
 treino (de 1º de janeiro a 18 de outubro de 2024) e 73 dias de teste (de 19 de
 outubro a 30 de dezembro de 2024).
 
@@ -466,7 +535,7 @@ O motor só cumpre sua função se o que ele calcula chegar ao gestor em termos
 acionáveis. A interface web expõe sete telas, das quais quatro concentram o uso
 cotidiano.
 
-**Figura 4 - Telas principais da aplicação**
+**Figura 6 - Telas principais da aplicação**
 
 `[FIGURA: capturar de code/frontend/web — sugestão de mosaico com Dashboard,
 Estoque, Alertas e Comparativo de modelos]`

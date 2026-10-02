@@ -31,55 +31,55 @@ def linhas_tabela(titulo):
 
 # ── Tabela 3: descritiva ────────────────────────────────────────────────────
 esperado = {r["produto_id"]: r for r in d["descritiva"]}
-for l in linhas_tabela("Tabela 3 -"):
+for l in linhas_tabela("Tabela 4 -"):
     c = [x.strip() for x in l.strip("|").split("|")]
     pid = int(c[0]); e = esperado[pid]
     for idx, chave in ((2, "variabilidade"), (3, "media_diaria"), (4, "desvio"), (5, "cv")):
         if abs(num(c[idx]) - e[chave]) > 1e-9:
-            erros.append(f"T3 pid={pid} {chave}: md={c[idx]} json={e[chave]}")
+            erros.append(f"T4 pid={pid} {chave}: md={c[idx]} json={e[chave]}")
     if abs(num(c[6].rstrip("%")) - e["pct_zeros"]) > 1e-9:
-        erros.append(f"T3 pid={pid} zeros: md={c[6]} json={e['pct_zeros']}")
-out.write(f"Tabela 3 (descritiva): {len(linhas_tabela('Tabela 3 -'))} linhas conferidas\n")
+        erros.append(f"T4 pid={pid} zeros: md={c[6]} json={e['pct_zeros']}")
+out.write(f"Tabela 4 (descritiva): {len(linhas_tabela('Tabela 4 -'))} linhas conferidas\n")
 
 # ── Tabela 4: comparativo ───────────────────────────────────────────────────
 comp = {(r["produto_id"], r["modelo"]): r for r in d["comparativo"]}
 mapa = {"Holt-Winters": "holt_winters", "Prophet": "prophet"}
 n = 0
-for l in linhas_tabela("Tabela 4 -"):
+for l in linhas_tabela("Tabela 5 -"):
     c = [x.strip() for x in l.strip("|").split("|")]
     pid = int(c[0]); modelo = mapa[c[2]]; e = comp[(pid, modelo)]
     for idx, chave in ((3, "mape"), (4, "rmse"), (5, "mae")):
         if abs(num(c[idx]) - e[chave]) > 1e-9:
-            erros.append(f"T4 pid={pid} {modelo} {chave}: md={c[idx]} json={e[chave]}")
+            erros.append(f"T5 pid={pid} {modelo} {chave}: md={c[idx]} json={e[chave]}")
     venceu = "✔" in c[6]
     if venceu != bool(e["vencedor"]):
-        erros.append(f"T4 pid={pid} {modelo} vencedor: md={venceu} json={e['vencedor']}")
+        erros.append(f"T5 pid={pid} {modelo} vencedor: md={venceu} json={e['vencedor']}")
     n += 1
-out.write(f"Tabela 4 (metricas): {n} linhas conferidas\n")
+out.write(f"Tabela 5 (metricas): {n} linhas conferidas\n")
 
 # ── Tabela 5: margens ───────────────────────────────────────────────────────
 marg = {r["nome"]: r["margem_pp"] for r in d["margens"]}
-for l in linhas_tabela("Tabela 5 -"):
+for l in linhas_tabela("Tabela 6 -"):
     c = [x.strip() for x in l.strip("|").split("|")]
     if abs(num(c[1]) - marg[c[0]]) > 1e-9:
-        erros.append(f"T5 {c[0]}: md={c[1]} json={marg[c[0]]}")
-out.write(f"Tabela 5 (margens): {len(linhas_tabela('Tabela 5 -'))} linhas conferidas\n")
+        erros.append(f"T6 {c[0]}: md={c[1]} json={marg[c[0]]}")
+out.write(f"Tabela 6 (margens): {len(linhas_tabela('Tabela 6 -'))} linhas conferidas\n")
 
 # ── Tabela 6: ganho sobre o baseline ────────────────────────────────────────
 ganho = {r["produto_id"]: r for r in d["ganho_vs_baseline"]}
-for l in linhas_tabela("Tabela 6 -"):
+for l in linhas_tabela("Tabela 7 -"):
     c = [x.strip() for x in l.strip("|").split("|")]
     pid = int(c[0]); e = ganho[pid]
     for idx, chave in ((3, "mape_vencedor"), (4, "mape_naive"), (5, "ganho_pp")):
         if abs(num(c[idx]) - round(e[chave], 2)) > 0.005:
-            erros.append(f"T6 pid={pid} {chave}: md={c[idx]} json={e[chave]}")
+            erros.append(f"T7 pid={pid} {chave}: md={c[idx]} json={e[chave]}")
     if abs(num(c[6].rstrip("%")) - e["ganho_rel_pct"]) > 0.05:
-        erros.append(f"T6 pid={pid} ganho_rel: md={c[6]} json={e['ganho_rel_pct']}")
-out.write(f"Tabela 6 (ganho): {len(linhas_tabela('Tabela 6 -'))} linhas conferidas\n")
+        erros.append(f"T7 pid={pid} ganho_rel: md={c[6]} json={e['ganho_rel_pct']}")
+out.write(f"Tabela 7 (ganho): {len(linhas_tabela('Tabela 7 -'))} linhas conferidas\n")
 
 # ── Tabelas 7 e 8: backtesting ──────────────────────────────────────────────
-for titulo, pid, cols in (("Tabela 7 -", "1", {1: ("holt_winters", "mape"), 2: ("prophet", "mape"), 3: ("naive_sazonal", "mape")}),
-                          ("Tabela 8 -", "5", {1: ("holt_winters", "mape"), 2: ("holt_winters", "rmse"),
+for titulo, pid, cols in (("Tabela 8 -", "1", {1: ("holt_winters", "mape"), 2: ("prophet", "mape"), 3: ("naive_sazonal", "mape")}),
+                          ("Tabela 9 -", "5", {1: ("holt_winters", "mape"), 2: ("holt_winters", "rmse"),
                                                3: ("prophet", "mape"), 4: ("naive_sazonal", "mape"), 5: ("naive_sazonal", "rmse")})):
     bt = d["backtesting"][pid]
     for l in linhas_tabela(titulo):
@@ -97,7 +97,7 @@ pares = {"Demanda média prevista (un/dia)": "demanda_media", "σ da demanda his
          "Z (nível de serviço 95%)": "z", "**Estoque de segurança**": "estoque_seguranca",
          "**Ponto de reposição**": "ponto_reposicao", "Estoque atual": "estoque_atual",
          "**Dias até ruptura**": "dias_ate_ruptura"}
-for l in linhas_tabela("Tabela 9 -"):
+for l in linhas_tabela("Tabela 10 -"):
     c = [x.strip() for x in l.strip("|").split("|")]
     if c[0] not in pares:
         continue
@@ -105,18 +105,18 @@ for l in linhas_tabela("Tabela 9 -"):
     for col, nome in ((1, "Arroz 5kg"), (2, "Banana Prata kg")):
         valor = c[col].replace("**", "")
         if abs(num(valor) - kpi[nome][chave]) > 0.005:
-            erros.append(f"T9 {nome} {chave}: md={valor} json={kpi[nome][chave]}")
-out.write(f"Tabela 9 (reposicao): conferida\n")
+            erros.append(f"T10 {nome} {chave}: md={valor} json={kpi[nome][chave]}")
+out.write(f"Tabela 10 (reposicao): conferida\n")
 
 # ── Tabela 10: alphas ───────────────────────────────────────────────────────
 al = {r["pid"]: r for r in alphas}
-for l in linhas_tabela("Tabela 10 -"):
+for l in linhas_tabela("Tabela 11 -"):
     c = [x.strip() for x in l.strip("|").split("|")]
     pid = int(c[0]); e = al[pid]
     for idx, chave in ((2, "a"), (3, "b"), (4, "g")):
         if abs(num(c[idx]) - e[chave]) > 1e-9:
-            erros.append(f"T10 pid={pid} {chave}: md={c[idx]} json={e[chave]}")
-out.write(f"Tabela 10 (alphas): {len(linhas_tabela('Tabela 10 -'))} linhas conferidas\n")
+            erros.append(f"T11 pid={pid} {chave}: md={c[idx]} json={e[chave]}")
+out.write(f"Tabela 11 (alphas): {len(linhas_tabela('Tabela 11 -'))} linhas conferidas\n")
 
 # ── Afirmacoes no texto corrido ─────────────────────────────────────────────
 out.write("\nAfirmacoes do texto:\n")

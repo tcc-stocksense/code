@@ -5,7 +5,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonTable } from '../components/skeleton.js';
-import { numero } from '../core/format.js';
+import { numeroEstoque } from '../core/format.js';
 import { iconPencil, iconMinus, iconPlus, iconCheck, iconX, iconSearch } from '../components/icons.js';
 
 requireAuth();
@@ -177,7 +177,7 @@ function renderTabela() {
 
     // Ponto de reposição
     if (p.pontoReposicao != null) {
-      tr.appendChild(tdTexto(`${numero(p.pontoReposicao, 1)} ${p.unidade}`, 'tabular'));
+      tr.appendChild(tdTexto(`${numeroEstoque(p.pontoReposicao)} ${p.unidade}`, 'tabular'));
     } else {
       const tdPr = document.createElement('td');
       tdPr.className = 'tabular';

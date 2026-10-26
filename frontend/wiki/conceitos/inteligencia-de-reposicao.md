@@ -36,3 +36,9 @@ Onde: **μ** = demanda média/dia · **σ** = desvio-padrão da demanda · **L**
 No mock, esses campos são **derivados por fórmula**. Na integração, decidir campo a campo: o **backend calcula e devolve**, ou o front computa? (Ex.: `pontoReposicao`, `estoqueSeguranca`, `tendencia`.) Ver [[integracao-backend]].
 
 Relacionado: [[modelo-de-dados]] · [[comparativo-modelos]]
+
+## Exibição de inteiros (2026-10-26)
+
+Ponto de reposição, demanda média, estoque de segurança e dias até ruptura são exibidos como inteiros: parte decimal menor que 0,8 arredonda para baixo; a partir de 0,8, para cima. A regra é centralizada em `web/js/core/format.js` e não altera os valores da API, os cálculos, a persistência ou os alertas. Estoque atual já é inteiro. Dias positivos que arredondam para zero aparecem como “0 dias”, sem afirmar que o estoque já zerou.
+
+O acesso “Sugestão de compra” no menu e o botão “Editar parâmetros” no detalhe ficam ocultos, preservando seu código e a página de sugestão.

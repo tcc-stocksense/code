@@ -23,3 +23,6 @@ As 10 telas prontas rodando com mock. Publicado no GitHub `tcc-stocksense/code` 
 
 ## [2026-07-13] pendente | Aguardando validação do backend
 Reunião marcada para validar o back; depois os arquivos do backend entram aqui p/ iniciar a integração. Ver [[integracao-backend]] e [[2026-07-13-validacao-backend]].
+
+## [2026-10-26] ajuste | Inteiros na apresentação e acessos ocultos
+Aplicado arredondamento visual com corte em 0,8 para reposição, demanda média, estoque de segurança e dias até ruptura. Cálculos originais preservados. Acesso à sugestão de compra e botão Editar parâmetros ocultos sem exclusão. Ver [[inteligencia-de-reposicao]].

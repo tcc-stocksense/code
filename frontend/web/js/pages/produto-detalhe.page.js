@@ -6,7 +6,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { skeletonKpiGrid, skeletonChart } from '../components/skeleton.js';
-import { numero, dataBR, esc } from '../core/format.js';
+import { numero, numeroEstoque, diasEstoque, dataBR, esc } from '../core/format.js';
 import { iconArrowLeft, iconTrend, iconPencil, iconCheck, iconX } from '../components/icons.js';
 
 requireAuth();
@@ -97,7 +97,7 @@ async function carregarDetalhe() {
 
     kpiGrid.appendChild(kpiCard({
       titulo: 'Demanda média/dia',
-      valor: p.demandaMedia != null ? numero(p.demandaMedia, 1) : '—',
+      valor: p.demandaMedia != null ? numeroEstoque(p.demandaMedia) : '—',
       sub: `${p.unidade}/dia`,
     }));
 
@@ -161,7 +161,7 @@ async function carregarDetalhe() {
             <tr>
               <td>${s.label}</td>
               <td class="tabular">${s.total} ${p.unidade}</td>
-              <td class="tabular text-secondary">${numero(s.media, 1)} ${p.unidade}/dia</td>
+              <td class="tabular text-secondary">${numeroEstoque(s.media)} ${p.unidade}/dia</td>
             </tr>
           `).join('')}
         </tbody>
@@ -265,7 +265,7 @@ async function carregarDetalhe() {
       const precisaPedir = p.pontoReposicao != null ? p.estoque <= p.pontoReposicao : null;
       const diasTxt = p.diasRuptura == null ? '—'
         : p.diasRuptura <= 0 ? 'zerado'
-        : `${numero(p.diasRuptura, 1)} dias`;
+        : diasEstoque(p.diasRuptura);
 
       const stats = [
         {
@@ -278,8 +278,8 @@ async function carregarDetalhe() {
         stats.push({ label: 'Quanto pedir (sugerido)', value: `${p.qtdSugerida} ${un}`, color: 'var(--cor-primaria)' });
       }
       stats.push(
-        { label: 'Ponto de reposição', value: p.pontoReposicao != null ? `${numero(p.pontoReposicao, 1)} ${un}` : '—' },
-        { label: 'Estoque de segurança', value: p.estoqueSeguranca != null ? `${numero(p.estoqueSeguranca, 1)} ${un}` : '—' },
+        { label: 'Ponto de reposição', value: p.pontoReposicao != null ? `${numeroEstoque(p.pontoReposicao)} ${un}` : '—' },
+        { label: 'Estoque de segurança', value: p.estoqueSeguranca != null ? `${numeroEstoque(p.estoqueSeguranca)} ${un}` : '—' },
         { label: 'Dias até ruptura', value: diasTxt },
         { label: 'Último cálculo', value: p.dataUltimoCalculo ? dataBR(String(p.dataUltimoCalculo).slice(0, 10)) : '—' },
       );
@@ -292,18 +292,18 @@ async function carregarDetalhe() {
     renderStats();
 
     // Botões.
-    // "Editar parâmetros" fica desabilitado: PATCH /api/produtos/{id}/parametros
+    // "Editar parâmetros" fica oculto e desabilitado: PATCH /api/produtos/{id}/parametros
     // ainda não existe no backend (pendência P-01 do backlog de integração).
     const btns = document.createElement('div');
     btns.className = 'stack-tight';
     btns.style.marginTop = '16px';
     btns.innerHTML = `
       <button class="btn btn-primary btn-block" id="btn-marcar-pedido">Marcar para pedido</button>
-      <button class="btn btn-secondary btn-block" id="btn-editar-params" disabled
+      <button class="btn btn-secondary btn-block" id="btn-editar-params" disabled hidden style="display:none"
         title="Indisponível: o backend ainda não expõe endpoint para editar lead time e nível de serviço.">
         Editar parâmetros
       </button>
-      <span class="text-meta" style="text-align:center; display:block">Lead time e nível de serviço ainda não são editáveis.</span>
+      <span class="text-meta" hidden style="text-align:center; display:none">Lead time e nível de serviço ainda não são editáveis.</span>
     `;
     sideCard.appendChild(btns);
 

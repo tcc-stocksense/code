@@ -7,7 +7,7 @@ const NAV_OPERACAO = [
   { id: 'estoque',     label: 'Estoque',              icon: iconBox,    href: 'estoque.html' },
   { id: 'alertas',     label: 'Alertas de reposição', icon: iconBell,   href: 'alertas.html' },
   { id: 'curva-abc',   label: 'Curva ABC',            icon: iconChart,  href: 'curva-abc.html' },
-  { id: 'sugestao',    label: 'Sugestão de compra',   icon: iconCart,   href: 'sugestao-compra.html', indisponivel: true },
+  { id: 'sugestao',    label: 'Sugestão de compra',   icon: iconCart,   href: 'sugestao-compra.html', indisponivel: true, oculto: true },
 ];
 
 const NAV_SISTEMA = [
@@ -17,7 +17,7 @@ const NAV_SISTEMA = [
 
 function navItems(items, telaAtiva) {
   return items.map(item => `
-    <a href="${item.href}" class="nav-item ${item.id === telaAtiva ? 'active' : ''}"${item.indisponivel ? ' title="Sem endpoint no backend — disponível apenas em modo mock"' : ''}>
+    <a href="${item.href}"${item.oculto ? ' hidden style="display:none"' : ''} class="nav-item ${item.id === telaAtiva ? 'active' : ''}"${item.indisponivel ? ' title="Sem endpoint no backend — disponível apenas em modo mock"' : ''}>
       ${item.icon()}
       ${item.label}
       ${item.indisponivel ? '<span class="badge badge-neutral" style="margin-left:auto;font-size:10px">em breve</span>' : ''}

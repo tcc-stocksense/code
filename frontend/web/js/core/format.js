@@ -37,3 +37,21 @@ export function numero(valor, casas = 0) {
     maximumFractionDigits: casas,
   }).format(valor);
 }
+
+/** Arredondamento apenas visual: fração abaixo de 0,8 desce; a partir de 0,8 sobe.
+ * Os valores originais continuam sendo usados nos cálculos e alertas.
+ */
+export function inteiroEstoque(valor) {
+  const base = Math.floor(valor);
+  return valor >= base + 0.8 ? base + 1 : base;
+}
+
+export function numeroEstoque(valor) {
+  return valor == null ? '—' : numero(inteiroEstoque(valor));
+}
+
+export function diasEstoque(valor) {
+  if (valor == null) return '—';
+  const dias = inteiroEstoque(valor);
+  return `${numero(dias)} ${dias === 1 ? 'dia' : 'dias'}`;
+}

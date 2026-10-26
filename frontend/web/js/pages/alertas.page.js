@@ -4,7 +4,7 @@ import { renderLayout } from '../components/layout.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonTable } from '../components/skeleton.js';
-import { numero, esc } from '../core/format.js';
+import { numeroEstoque, diasEstoque, esc } from '../core/format.js';
 import { iconCheck } from '../components/icons.js';
 
 requireAuth();
@@ -117,7 +117,7 @@ async function carregarAlertas() {
       const info = document.createElement('div');
       info.innerHTML = `
         <div style="font-weight:500; margin-bottom:2px">${esc(a.nome)}</div>
-        <div class="text-meta">${esc(ref?.categoria || '')}${ref?.categoria ? ' · ' : ''}estoque atual ${a.estoque} ${esc(un)} · ponto de reposição ${numero(a.pontoReposicao ?? 0, 1)} ${esc(un)}</div>
+        <div class="text-meta">${esc(ref?.categoria || '')}${ref?.categoria ? ' · ' : ''}estoque atual ${a.estoque} ${esc(un)} · ponto de reposição ${numeroEstoque(a.pontoReposicao ?? 0)} ${esc(un)}</div>
       `;
 
       // Urgência
@@ -126,7 +126,7 @@ async function carregarAlertas() {
         ? 'Sem previsão de ruptura'
         : a.diasRuptura <= 0
           ? 'Já zerou'
-          : `Vai faltar em ${numero(a.diasRuptura, 1)} ${a.diasRuptura === 1 ? 'dia' : 'dias'}`;
+          : `Vai faltar em ${diasEstoque(a.diasRuptura)}`;
       urgencia.innerHTML = `
         <div style="font-size:18px; font-weight:500; color:${isCritico ? 'var(--status-critico)' : 'var(--status-atencao)'}">${diasText}</div>
         <div class="text-meta">lead time do fornecedor: ${a.leadTime ?? '—'} dias</div>

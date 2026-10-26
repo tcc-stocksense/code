@@ -7,7 +7,7 @@ import { linha } from '../components/charts.js';
 import { toast } from '../components/toast.js';
 import { emptyState } from '../components/emptyState.js';
 import { skeletonKpiGrid, skeletonChart, skeletonTable } from '../components/skeleton.js';
-import { moedaBRcompacta, dataBR, numero } from '../core/format.js';
+import { moedaBRcompacta, dataBR, numero, numeroEstoque, diasEstoque } from '../core/format.js';
 import { iconAlert } from '../components/icons.js';
 
 requireAuth();
@@ -176,7 +176,7 @@ async function carregarDashboard() {
 
         const diasTxt = p.diasRuptura == null ? '—'
           : p.diasRuptura <= 0 ? 'zerado'
-          : `${numero(p.diasRuptura, 1)} dias`;
+          : diasEstoque(p.diasRuptura);
 
         // Mesmo motivo do B-01: nada de `innerHTML +=` depois de um appendChild.
         const celula = (texto, className) => {
@@ -187,7 +187,7 @@ async function carregarDashboard() {
         };
         tr.appendChild(celula(p.nome));
         tr.appendChild(celula(p.estoque, 'tabular'));
-        tr.appendChild(celula(p.pontoReposicao != null ? numero(p.pontoReposicao, 1) : '—', 'tabular'));
+        tr.appendChild(celula(p.pontoReposicao != null ? numeroEstoque(p.pontoReposicao) : '—', 'tabular'));
         tr.appendChild(celula(diasTxt, 'tabular'));
 
         const tdAcao = document.createElement('td');

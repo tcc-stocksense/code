@@ -113,6 +113,7 @@ ml-service/
     └── tests/
         ├── __init__.py
         ├── test_predict_router.py
+        ├── test_prediction_service.py
         ├── test_holt_winters_service.py
         ├── test_prophet_service.py
         └── test_stock_service.py
@@ -134,11 +135,11 @@ from datetime import date
 
 class VendaDiaria(BaseModel):
     data: date
-    quantidade: int = Field(gt=0)
+    quantidade: int = Field(gt=0)   # só dias com venda; os buracos são preenchidos no service
 
 class PredictRequest(BaseModel):
     produto_id: int
-    historico: list[VendaDiaria] = Field(min_length=90)  # mínimo 90 registros
+    historico: list[VendaDiaria] = Field(min_length=90)  # mínimo 90 registros (dias com venda)
     lead_time_medio: int = Field(default=3, ge=1)
     variabilidade_lead_time: float = Field(default=1.0, ge=0)
     nivel_servico_alvo: float = Field(default=0.95, ge=0.5, le=0.999)
@@ -186,7 +187,7 @@ class PredictResponse(BaseModel):
 PredictRequest
       │
       ▼
-1. Validar e preparar série temporal (pandas DataFrame)
+1. Validar e preparar série temporal (pd.Series diária contínua, zero nos dias sem venda)
       │
       ▼
 2. Treinar Holt-Winters → MetricasModelo (MAPE, RMSE, MAE)
@@ -207,6 +208,8 @@ PredictResponse
 ```
 
 > **Removido** o antigo passo de cálculo da classe ABC (migrou para o backend). O `/predict` não recebe `valor_venda` nem conhece os demais produtos, então não tem insumo para ABC.
+
+> **Passo 1 — dias sem venda entram com zero.** O backend envia só os dias com venda (o contrato exige `quantidade > 0`), então domingos fechados e feriados chegam como **buracos** no histórico. `_preparar_serie` reindexa a série em frequência diária (`asfreq("D", fill_value=0)`) da primeira à última data e soma datas repetidas. **Não remover:** o Holt-Winters conta `seasonal_periods=7` em *posições*, não em dias do calendário — com buracos, a sazonalidade sai de fase e o MAPE do HW fica de 2 a 5× maior que na análise do TCC (corrigido em 2026-10, commit `bb5eb67`). É o mesmo tratamento de `analysis_utils.carregar_series_reais`; o teste `test_prediction_service.py::TestEquivalenciaComAnalise` garante a equivalência com o notebook.
 
 ### Regra de isolamento dos services
 
@@ -427,6 +430,7 @@ Sempre incluir `produto_id` nos logs para rastreabilidade.
 | `test_prophet_service.py` | Série normal, série sem coluna promocional | **MVP** |
 | `test_stock_service.py` | Fórmulas de ES, PR e ruptura com valores conhecidos (incluindo demanda = 0 → None) | **MVP** |
 | `test_predict_router.py` | POST /predict com payload válido, com < 90 dias, com série inválida | **MVP** |
+| `test_prediction_service.py` | Preparação da série: dias sem venda viram zero, ordenação, datas repetidas; MAPE do HW igual ao do notebook (seed 42) | **MVP** |
 
 > **Removido** `test_abc_service.py` (ABC migrou para o backend — testar lá).
 

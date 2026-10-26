@@ -22,7 +22,69 @@
 
 ---
 
-## Última Sessão — 2026-09/10 (Artigo do TCC — redação completa, baseline ingênuo e guia de estudo)
+## Última Sessão — 2026-10-24/26 (Auditoria do sistema real + correção da série com buracos)
+
+> Branch: `analise-validacao-modelos`. Sessão de levantamento do que o sistema **realmente**
+> implementa (para o artigo) e, no caminho, a descoberta de um bug que fazia o sistema em
+> produção contradizer a análise do TCC. Corrigido no commit `bb5eb67`.
+
+### O bug: o sistema não montava a mesma série do notebook
+
+- **Sintoma.** Na nuvem, a T10 mostrava Prophet 14,18% × Holt-Winters 55,74%, enquanto o
+  artigo sustenta **empate** entre os dois modelos.
+- **Causa.** O backend envia ao `/predict` só os dias **com venda** (`VendaRepository.agregarVendasDiarias`
+  agrega o que existe na tabela, e o contrato exige `quantidade > 0`). Domingos fechados e
+  feriados chegavam como **buracos**, e o `_preparar_serie` não reindexava. O Holt-Winters conta
+  `seasonal_periods=7` em posições: cada dia faltante desloca o ciclo e a sazonalidade sai de
+  fase. O notebook, ao contrário, usa a série contínua com zeros — **a análise estava certa, o
+  sistema é que divergia**.
+- **Medição** (código de produção, dataset do artigo, seed 42): sem os zeros, o MAPE do HW
+  sobe de 2 a 5× em todos os produtos (ex.: produto 2, 13,26% → 43,66%; produto 6, 9,63% →
+  51,27%). O Prophet quase não muda — ajusta pela data, tolera buracos. O σ_d caía ~10–15%.
+- **Correção** (`prediction_service.py`, 1 linha): `serie.groupby(level=0).sum().asfreq("D", fill_value=0.0)`.
+  O contrato do `/predict` **não muda** e o backend não foi tocado. Com ela, o MAPE do sistema
+  bate com o do notebook (diferença ≤ 0,6 p.p., só em produtos cujo 1º de janeiro foi fechado).
+- **Teste novo:** `test_prediction_service.py` (8 casos), incluindo a regressão contra o
+  notebook. Suíte do ml-service: **74/74**.
+- **Os números do artigo não mudam.** O artigo não cita os números da nuvem.
+
+### Auditoria "o que o sistema realmente implementa" (para o artigo)
+
+Divergências entre código e documentação levantadas nesta sessão — **nenhuma corrigida**,
+ficam como pendência ou como redação honesta no artigo:
+
+| Achado | Onde |
+|---|---|
+| **Não há cron mensal** — recálculo só pelo botão "Processar dados" (`POST /api/motor/recalcular`), síncrono, sequencial, sem retry | `MotorController.kt:26-52`; contradiz `dashboard-kpis.md` §3 |
+| **Aviso de MAPE > 50%** é gerado pelo ml-service mas o backend descarta (`resp.aviso` nunca é lido) | `MotorService.kt:93-97` |
+| **Quantidade sugerida** é calculada no frontend como `⌈PR + ES − estoque⌉` — o ES entra **duas vezes** (PR já o contém) | `alertas.page.js:36-39` |
+| **Login de produção é o do seed** (`admin@stocksense.local` / `admin123`) — o deploy nunca troca | `V2__seed_dados_padrao.sql:18` |
+| **Importação não isola por estabelecimento** — `produto_id` é PK global e todo produto nasce com `estabelecimento_id = 1`; leituras são isoladas | `ProdutoImportacaoService.kt:209-233` |
+| Sem token, a API devolve **403** (padrão do Spring Security), não 401; credencial errada devolve **404** | `SecurityConfig.kt`, `AuthService.kt:18-21` |
+| Importação de vendas **deduplica** por produto e intervalo de datas — `ligar-desligar.md` diz o contrário | `VendaImportacaoService.kt:131-145` |
+| Sem testes de integração (40 unitários Kotlin + 74 pytest), sem CI/CD, sem Swagger no backend | — |
+
+### Operação
+
+- Instância religada e desligada nesta sessão via `boto3` (o AWS CLI não está instalado na
+  máquina). Ambiente em `C:\Users\Gabriel\.awsvenv`, script `ec2.py <creds> start|stop`.
+- O `5_vendas.xlsx` que está na nuvem **não é** o dataset do artigo (180 dias até 2026-09-12,
+  outro sorteio). O dataset do artigo é o `5_vendas_sintetico.csv` (365 dias de 2024, idêntico
+  ao `gerar_dataset()` do notebook) — não existe `.xlsx` dele.
+
+### Pendências em aberto
+
+- **Redeploy do ml-service** com a correção (`01` → `03` → `04`, lab ligado) e "Processar dados"
+  para conferir o empate na T10 em produção.
+- **Merge da branch na `main`** — fast-forward, 0 commits atrás, sem conflito.
+- Decidir se o **ES duplicado na sugestão de compra** é intencional; se não, corrigir no front.
+- Levar o **`aviso`** de MAPE > 50% até a tela (persistir ou repassar no backend).
+- Opcional para o artigo: uma frase na metodologia — "dias sem venda entram como zero para
+  manter o espaçamento diário exigido pelo Holt-Winters".
+
+---
+
+## Sessão — 2026-09/10 (Artigo do TCC — redação completa, baseline ingênuo e guia de estudo)
 
 > Branch: `analise-validacao-modelos`. Sessão longa, dedicada à redação do artigo científico.
 > **O artigo está completo de ponta a ponta** em `docs/artigo/`, gerando `.docx` no template

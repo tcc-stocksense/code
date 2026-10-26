@@ -158,7 +158,10 @@ def gerar_dataset(
     Note:
         A série em series_por_produto mantém os zeros (domingos e feriados)
         para preservar a continuidade do índice temporal. Ao construir um
-        PredictRequest, filtre os registros com quantidade > 0.
+        PredictRequest, envie só os registros com quantidade > 0 (o contrato
+        exige), como faz o backend: o prediction_service recoloca os dias
+        ausentes com zero, e a série que chega aos modelos volta a ser
+        idêntica a esta.
     """
     rng = np.random.default_rng(random_state)
     datas = pd.date_range(start=data_inicio, periods=dias, freq="D")

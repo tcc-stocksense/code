@@ -133,16 +133,23 @@ def _preparar_serie(request: PredictRequest) -> pd.Series:
     Ordena cronologicamente para garantir que a divisão walk-forward seja
     sempre temporal, independentemente da ordem de chegada no payload.
 
+    Os dias ausentes (sem venda: domingos fechados, feriados) entram com zero.
+    O backend só envia dias com venda, mas o Holt-Winters exige espaçamento
+    diário regular: com buracos, `seasonal_periods=7` deixa de corresponder a
+    uma semana e a sazonalidade sai de fase. É o mesmo tratamento do notebook
+    de análise (`analysis_utils.carregar_series_reais`). Datas repetidas são
+    somadas.
+
     Args:
         request: Payload validado com campo historico.
 
     Returns:
-        Série diária ordenada cronologicamente com DatetimeIndex e dtype float.
+        Série diária contínua, ordenada, com DatetimeIndex e dtype float.
     """
     datas = [v.data for v in request.historico]
     quantidades = [float(v.quantidade) for v in request.historico]
     serie = pd.Series(quantidades, index=pd.DatetimeIndex(datas), dtype=float)
-    return serie.sort_index()
+    return serie.groupby(level=0).sum().asfreq("D", fill_value=0.0)
 
 
 def _tentar_holt_winters(

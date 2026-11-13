@@ -38,6 +38,10 @@ class GlobalExceptionHandler {
     fun handleMotor(ex: MotorPreditivoException): ProblemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.message ?: "Erro no motor preditivo")
 
+    @ExceptionHandler(MotorEmExecucaoException::class)
+    fun handleMotorEmExecucao(ex: MotorEmExecucaoException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.message ?: "Recálculo já em andamento")
+
     @ExceptionHandler(Exception::class)
     fun handleGeneric(ex: Exception): ProblemDetail {
         log.error("Erro inesperado não tratado", ex)

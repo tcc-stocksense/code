@@ -10,7 +10,7 @@
 | **Stack** | Kotlin/Spring Boot · Python/FastAPI · MySQL 8 · HTML/CSS/JS |
 | **Branch principal** | `main` |
 | **Produção** | **http://107.20.236.251** — EC2 `i-01fb1975491b85fb1` (t3.medium, us-east-1), no ar desde 2026-09-13. Conta **AWS Academy Learner Lab**. Ponto de entrada: [`infra/README.md`](infra/README.md) |
-| **Branches abertas** | `chore/infra-terraform-aws` (deploy/infra, **atual**, sincronizada com o origin); `feat/produto-detalhe-metricas` (Épico 4, pushed, sem PR); `feat/dashboard-alertas` (Épico 5, empilhada na anterior); `test/importacao-services` (T-17 testes + doc, pushed, sem PR); `analise-validacao-modelos` (T10 + pin do cmdstanpy, pushed, **sem merge na main**) |
+| **Branches abertas** | `chore/infra-terraform-aws` (deploy/infra, sincronizada com o origin); `feat/produto-detalhe-metricas` (Épico 4, pushed, sem PR); `feat/dashboard-alertas` (Épico 5, empilhada na anterior); `test/importacao-services` (T-17 testes + doc, pushed, sem PR); `analise-validacao-modelos` (T10 + pin do cmdstanpy, pushed, **sem merge na main**) |
 
 > **Já mergeadas na `main`:** `feat/auth-login-jwt` (Épico 1, PR #4), `feat/motor-abc`
 > (Épico 3, PR #5), `feat/t26-produto-listagem-edicao-estoque` (T-26, PR #6). A `main`
@@ -55,14 +55,14 @@ ficam como pendência ou como redação honesta no artigo:
 
 | Achado | Onde |
 |---|---|
-| **Não há cron mensal** — recálculo só pelo botão "Processar dados" (`POST /api/motor/recalcular`), síncrono, sequencial, sem retry | `MotorController.kt:26-52`; contradiz `dashboard-kpis.md` §3 |
+| ~~**Não há cron mensal**~~ — **resolvido em 2026-11-13**: `feat/motor-cron-mensal` mergeada na `main` (dia 1 às 3h, `America/Sao_Paulo`). Recálculo manual continua síncrono e sequencial | `MotorScheduler.kt` |
 | **Aviso de MAPE > 50%** é gerado pelo ml-service mas o backend descarta (`resp.aviso` nunca é lido) | `MotorService.kt:93-97` |
 | **Quantidade sugerida** é calculada no frontend como `⌈PR + ES − estoque⌉` — o ES entra **duas vezes** (PR já o contém) | `alertas.page.js:36-39` |
 | **Login de produção é o do seed** (`admin@stocksense.local` / `admin123`) — o deploy nunca troca | `V2__seed_dados_padrao.sql:18` |
 | **Importação não isola por estabelecimento** — `produto_id` é PK global e todo produto nasce com `estabelecimento_id = 1`; leituras são isoladas | `ProdutoImportacaoService.kt:209-233` |
 | Sem token, a API devolve **403** (padrão do Spring Security), não 401; credencial errada devolve **404** | `SecurityConfig.kt`, `AuthService.kt:18-21` |
 | Importação de vendas **deduplica** por produto e intervalo de datas — `ligar-desligar.md` diz o contrário | `VendaImportacaoService.kt:131-145` |
-| Sem testes de integração (40 unitários Kotlin + 74 pytest), sem CI/CD, sem Swagger no backend | — |
+| Sem testes de integração (73 unitários Kotlin após o merge do cron — eram 40 — + 74 pytest), sem CI/CD, sem Swagger no backend | — |
 
 ### Operação
 
@@ -165,7 +165,86 @@ ficam como pendência ou como redação honesta no artigo:
 
 ---
 
-## Última Sessão — 2026-09-12/13 (Infra — deploy em produção na AWS)
+## Sessão — 2026-09-21 (Backend — Épico 6: recálculo mensal automático)
+
+> Branch: `feat/motor-cron-mensal`, a partir da `main` sincronizada (estava 27 commits atrás —
+> toda a infra/deploy e a integração do frontend tinham entrado sem esta cópia local saber).
+> Três commits, pushed, **sem PR aberto** (o `gh` não está instalado nesta máquina).
+
+### O que foi desenvolvido
+
+Fechado o **Épico 6** (T-35) mais as três tarefas que o destravavam. Os **três gatilhos do
+motor** passam a compartilhar um único ponto de entrada — hoje dois existem (manual e cron);
+o pós-importação (T-44) continua pendente.
+
+- **T-39 — núcleo `processarLoteMotor()`.** O loop do lote vivia dentro do
+  `MotorController.recalcular()`, violando o §11 do `backend/CLAUDE.md`, e o cron não teria o
+  que chamar. Extraído para um `MotorLoteService` novo, com `ResultadoLote` e o callback
+  `onProgress`. Controller virou invólucro fino. Sem mudança de comportamento.
+- **T-40 — `MotorJobStatus`.** Estado do lote por estabelecimento em `ConcurrentHashMap`, com
+  `EstadoJob` e `JobMotor`. Campos já no formato **congelado da T-42**, que passa a ser só ler
+  e serializar.
+- **T-52 — guard de concorrência.** Dentro do núcleo, não em cada gatilho. Duas portas sobre a
+  mesma tomada atômica: `iniciarJobOuConflitar` (lança → **409**) e `tentarIniciarJob`
+  (booleano). Nova `MotorEmExecucaoException` mapeada no `GlobalExceptionHandler`.
+- **T-35 — `MotorScheduler`.** `@EnableScheduling` + `@Scheduled` dia 1 às 3h, varrendo todos
+  os estabelecimentos. Usa `processarLoteSeOcioso`, casca que devolve `null` quando o guard
+  recusa.
+- **T-54 marcada como feita.** O benchmark rodou em **2026-08-30** e o resultado já estava em
+  `docs/benchmark-motor.md`, mas o checkbox nunca tinha sido atualizado — o `tasks.md` ainda
+  descrevia o Épico 7 como suspenso "aguardando o volume de SKUs" que o próprio benchmark
+  respondeu.
+
+Suíte: **40 → 73 testes, 0 falhas.**
+
+### Decisões técnicas tomadas nesta sessão
+
+| Decisão | Motivo |
+|---|---|
+| `MotorLoteService` como bean separado, não método do `MotorService` | `@Transactional` age por proxy: o loop chamando `executarMotor` de dentro do próprio `MotorService` seria auto-invocação e cada produto perderia a sua transação — junto com o contrato de "falha isolada não aborta o lote" |
+| `processarLoteMotor` **não** é `@Transactional` | Uma transação em volta do lote inteiro reintroduziria exatamente o acoplamento que o desenho evita |
+| Guard **dentro** do núcleo, não em cada gatilho | Manual, pós-importação e cron passam por ele sem chance de desvio; é o "ponto único" que a T-52 pede |
+| Tomada do guard **fora** do `try` | Se o guard recusa, o job em andamento é de outro chamador — marcar `FALHOU` ali destruiria o estado de um lote saudável |
+| `catch` do lote chama `falhar()` | Sem isso, um erro na ABC deixaria o job preso em `PROCESSANDO` e travaria o motor até o restart |
+| T-40 implementada junto com a T-52 | O guard não tem onde guardar estado sem ela; um lock ad-hoc criaria a segunda fonte de verdade que a T-52 proíbe |
+| Cron varre **todos** os estabelecimentos | Num `@Scheduled` não há requisição nem JWT; o `estabelecimentoId` não pode vir do `SecurityContext`. Hoje há um só (ADR #4), mas é o que o ADR #5 pede |
+| **Fuso explícito** `America/Sao_Paulo` no `@Scheduled` | Não há `TZ` em lugar nenhum do compose nem do Dockerfile → containers em UTC. Sem `zone`, "3h" seria meia-noite em Brasília, colado na virada do mês |
+| `motor.scheduler.{enabled,cron,zone}` como propriedades | Infra ajusta ou desliga sem recompilar |
+| `processarLoteSeOcioso` em vez de o scheduler tratar a exceção | A política de "pular" fica num método com nome; erro de verdade continua subindo |
+
+### Armadilhas encontradas
+
+- **A `main` local estava 27 commits atrás do origin.** A primeira auditoria do backend que fiz
+  nesta sessão saiu de uma árvore velha e errou em pontos relevantes (a T-54 aparecia como
+  pendente). Fast-forward limpo depois — sem sobreposição com os arquivos locais não versionados
+  de terraform (`.tfstate`, `.pem`, `lab-credentials.env`).
+- **Placeholder de `@Scheduled` só resolve no boot.** Um cron malformado ou fuso inexistente
+  passa por compilação e por teste unitário e quebra a subida. Daí o
+  `MotorSchedulerAgendamentoTest`, que sobe um contexto Spring real (sem banco, sem web) —
+  inclusive um caso negativo que confirma que um cron inválido *derruba* o contexto, para o
+  teste não passar por vacuidade.
+- **Commits saíram com `Co-Authored-By: Claude`** contra a preferência registrada do projeto;
+  os três precisaram ser reescritos e force-pushed. Segunda vez que isso acontece (a primeira
+  foi em 2026-07-12).
+
+### Pendências que ficaram em aberto
+
+- **PR do `feat/motor-cron-mensal` não foi aberto** — `gh` não instalado. Link:
+  `https://github.com/tcc-stocksense/code/pull/new/feat/motor-cron-mensal`
+- **O cron nunca foi visto num boot real.** O Docker não estava rodando nesta máquina. O teste
+  de contexto cobre o registro da tarefa, mas vale conferir o log de startup na próxima subida.
+- **T-55 (`is_promocional`) segue sendo a pendência mais importante** — é a única que toca a
+  validade acadêmica da comparação HW × Prophet. Depende de decisão do orientador entre
+  corrigir e documentar; se for corrigir, **precisa também da T-10 do ml-service** (o
+  `add_regressor` não existe), não só do backend.
+- **T-41 e T-42 ficaram curtas** com o núcleo e o `MotorJobStatus` prontos: a T-42 é
+  praticamente só serializar o estado, e a T-41 é `@EnableAsync` + um `TaskExecutor`.
+- A fila de PRs sem merge continua: `test/importacao-services`, `feat/produto-detalhe-metricas`,
+  `feat/dashboard-alertas`, `analise-validacao-modelos`.
+
+---
+
+## Sessão — 2026-09-12/13 (Infra — deploy em produção na AWS)
 
 > Branch: `chore/infra-terraform-aws`. Duas sessões emendadas. A primeira preparou tudo sem
 > gastar um dólar: merge da `main`, auditoria do backlog, decisões do Épico D2 fechadas,

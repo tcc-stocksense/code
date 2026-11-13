@@ -1,9 +1,7 @@
 package br.com.stocksense.controller
 
 import br.com.stocksense.dto.response.MotorRecalculoResponse
-import br.com.stocksense.service.AbcService
-import br.com.stocksense.service.MotorService
-import org.slf4j.LoggerFactory
+import br.com.stocksense.service.MotorLoteService
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -13,40 +11,26 @@ import java.time.LocalDateTime
 @RestController
 @RequestMapping("/api/motor")
 class MotorController(
-    private val motorService: MotorService,
-    private val abcService: AbcService,
+    private val motorLoteService: MotorLoteService,
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * Dispara o motor preditivo para todos os produtos do estabelecimento autenticado
-     * e, em seguida, recalcula a Curva ABC. Cada produto roda em sua própria transação
-     * (via proxy do `MotorService`): uma falha isolada não aborta o lote inteiro.
+     * e, em seguida, recalcula a Curva ABC. Cada produto roda em sua própria transação:
+     * uma falha isolada não aborta o lote inteiro.
+     *
+     * Síncrono: a resposta só volta quando o lote termina (ver `docs/benchmark-motor.md`
+     * para o custo medido).
      */
     @PostMapping("/recalcular")
     fun recalcular(): MotorRecalculoResponse {
-        val estabelecimentoId = estabelecimentoAutenticado()
-        val produtoIds = motorService.listarProdutoIds(estabelecimentoId)
-
-        var processados = 0
-        var falhas = 0
-        for (produtoId in produtoIds) {
-            try {
-                motorService.executarMotor(produtoId)
-                processados++
-            } catch (ex: Exception) {
-                log.warn("Motor falhou para produto {}: {}", produtoId, ex.message)
-                falhas++
-            }
-        }
-
-        val abc = abcService.recalcularAbc(estabelecimentoId)
+        val resultado = motorLoteService.processarLoteMotor(estabelecimentoAutenticado())
 
         return MotorRecalculoResponse(
-            produtosProcessados = processados,
-            produtosComFalha = falhas,
-            produtosClassificadosAbc = abc.produtosClassificados,
-            abcProxy = abc.abcProxy,
+            produtosProcessados = resultado.produtosProcessados,
+            produtosComFalha = resultado.produtosComFalha,
+            produtosClassificadosAbc = resultado.produtosClassificadosAbc,
+            abcProxy = resultado.abcProxy,
             executadoEm = LocalDateTime.now(),
         )
     }

@@ -59,3 +59,13 @@ logging:
   level:
     br.com.stocksense: INFO
     org.springframework.cloud.openfeign: DEBUG
+
+# Recalculo mensal automatico (T-35). O fuso e explicito porque os containers
+# rodam em UTC: sem ele, "3h" seria meia-noite no horario de Brasilia, perto
+# demais da virada do mes. Desligue com enabled=false em ambientes onde o
+# recalculo automatico atrapalha (ex.: maquina de desenvolvimento).
+motor:
+  scheduler:
+    enabled: ${MOTOR_SCHEDULER_ENABLED:true}
+    cron: ${MOTOR_SCHEDULER_CRON:0 0 3 1 * *}
+    zone: ${MOTOR_SCHEDULER_ZONE:America/Sao_Paulo}
